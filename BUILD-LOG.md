@@ -366,3 +366,31 @@ TypeScript 7.0.2; `@types/node` 22.20.5; React/React DOM 19.3.1; `@types/react`/
 - Add runtime dependencies when the first CLI/control/twin task needs them.
 - Add the real CLI, UI, Playwright config, twin registry, research, fixtures, scenarios, `THIRD-PARTY-NOTICES`, `CHANGELOG.md`, and docs in their phases.
 - Run `test:ui`, `check:package`, and `test:smoke` for real when those phases exist.
+---
+
+## Phase 2, Step 2.1: Paystack research
+
+Date: 27 October 2026.
+
+Wrote `research/paystack.md` from Paystack's official documentation only for API facts. The file records all C4a actions, request fields, success shapes, error shapes, documented statuses, webhook events, authentication, signing, retries, idempotency, test data, money rules, library base-URL findings, C5 support, and gaps. A small library-only exception is labelled: section 13 uses the published npm packages because Paystack's docs do not document Node base-URL overrides.
+
+Key findings and decisions:
+
+- The API base URL is `https://api.paystack.co`; every call uses `Authorization: Bearer SECRET_KEY` and HTTPS.
+- Webhooks are signed with `x-paystack-signature`, HMAC SHA512 over the raw payload using the secret key, in hex.
+- Documented webhook retries: live every 3 minutes for 4 tries then hourly for 72 hours; test hourly for 10 hours; 30-second attempt timeout.
+- Paystack documents only successful transaction webhooks. `charge.success` is the only transaction event relevant to C4a; no `charge.failed` or abandoned-payment event is documented.
+- Refund events documented: `refund.pending`, `refund.processing`, `refund.needs-attention`, `refund.failed`, `refund.processed`. Only `refund.pending` has a full payload example.
+- Transfer events documented: `transfer.success`, `transfer.failed`, `transfer.reversed`. Only `transfer.success` has a full payload example.
+- General idempotency is not documented. Transfer references can be retried, duplicate recipients return the existing record, and webhook resend is explicitly not idempotent.
+- The official Node library `@paystack/paystack-sdk` hardcodes `https://api.paystack.co`; it has no documented base-URL override. The most-used community libraries also have no documented override; two have internal mutable settings but they are unsupported.
+- C5 support: `server-error`, `rate-limited`, `webhook-verification-fails`, `payment-declined`, `transfer-stuck-pending`, and `transfer-reversed` are supported by docs. The other applicable failures need a real story. `authentication-required` is Stripe-only.
+- Every unresolved point is marked **UNCONFIRMED** in `research/paystack.md`; section 15 lists the gaps. No Paystack fact was copied to another service.
+
+No code, runtime dependency, fixture, or twin was written. No SPEC.md section was edited.
+
+### Later
+
+- Record Paystack fixtures in `fixtures/paystack/` when the recorder exists.
+- Research Flutterwave and Stripe separately; never reuse Paystack facts.
+- Resolve the library base-URL/T15 gap and the UNCONFIRMED webhook payloads in a later phase.
