@@ -1,0 +1,62 @@
+{
+  "name": "ibeji",
+  "version": "0.0.0",
+  "description": "Ibeji is a set of local \"twins\" of payment services.",
+  "private": true,
+  "license": "MIT",
+  "author": "Joseph Brendan",
+  "type": "module",
+  "engines": {
+    "node": "^22.18.0 || >=24.11.0"
+  },
+  "packageManager": "pnpm@10.34.9",
+  "bin": {
+    "ibeji": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist/",
+    "scenarios/",
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check --error-on-warnings .",
+    "format": "biome format --write .",
+    "build": "tsup src/cli/index.ts --format esm --target node22 --out-dir dist/cli --clean",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "test:ui": "node -e \"console.log('no UI tests yet')\"",
+    "check:package": "node -e \"console.log('added in Phase 8')\"",
+    "test:smoke": "node -e \"console.log('added in Phase 8')\"",
+    "dev": "tsup src/cli/index.ts --format esm --target node22 --out-dir dist/cli --watch"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@biomejs/biome": "2.6.3",
+    "@changesets/cli": "3.0.3",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "@playwright/test": "1.64.1",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "@vitest/coverage-v8": "5.0.5",
+    "fast-check": "4.10.2",
+    "publint": "0.3.25",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tsup": "9.0.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}
