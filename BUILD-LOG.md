@@ -394,3 +394,41 @@ No code, runtime dependency, fixture, or twin was written. No SPEC.md section wa
 - Record Paystack fixtures in `fixtures/paystack/` when the recorder exists.
 - Research Flutterwave and Stripe separately; never reuse Paystack facts.
 - Resolve the library base-URL/T15 gap and the UNCONFIRMED webhook payloads in a later phase.
+
+---
+
+## Phase 2, Step 2.2: Flutterwave research
+
+Date: 27 October 2026.
+
+Wrote `research/flutterwave.md` from Flutterwave's official developer documentation. No Paystack research file was read and no Paystack or Stripe fact was used; the only Stripe reference is the C5 note that `authentication-required` is Stripe-only.
+
+### Version decision
+
+- Flutterwave currently documents **v3.0.0** and **v4.0.0**. The older Rave generation is not described by the current docs for these actions.
+- v3 uses secret-key bearer authentication, `https://api.flutterwave.com/v3`, the Standard hosted checkout link (`POST /v3/payments` → `data.link`), `verif-hash` webhook checks, and `flutterwave-node-v3` 1.4.1, the official Node library labelled "API v3" in the official SDK directory.
+- v4 uses OAuth 2.0, sandbox/production base URLs, `/charges`, `X-Idempotency-Key`, `flutterwave-signature` HMAC webhooks, and has no official Flutterwave Node library at the research date; `flutterwave-node-v4` is explicitly unofficial.
+- **Recommendation: imitate v3.0.0.** It is the version of the official Node library and the only documented version with the hosted payment-link flow required by C4b. v3 docs were current and not marked deprecated on the research date.
+
+Proposed C21 entry (not applied to SPEC.md; needs Joseph's approval):
+
+> **27 October 2026: imitate Flutterwave API v3.0.0.** v3 is the version of the official Node library (`flutterwave-node-v3` 1.4.1, official SDK directory "API v3") and documents the hosted checkout-link flow required by C4b (`POST /v3/payments` → `data.link`). v4 is newer and documented, but its API reference uses `/charges`, switches to OAuth 2.0, has `X-Idempotency-Key`, and has no official Flutterwave Node library at the research date. v3 documentation was current and not marked deprecated on 27 October 2026. The rest of this file is v3-only.
+
+### Key findings
+
+- v3 API base URL: `https://api.flutterwave.com/v3`; `Authorization: Bearer <secret key>`; test keys contain `_TEST`; missing/invalid auth returns `{"status":"error","message":"Authorization required","data":null}` with 401.
+- v3 webhook verification uses the `verif-hash` header containing the secret hash. It is a shared-secret comparison, not HMAC. v4 uses `flutterwave-signature` HMAC-SHA256 instead.
+- v3 webhook retries: 3 times at 30-minute intervals if enabled in the dashboard; 60-second timeout; exactly HTTP 200 required.
+- v3 money in the documented examples is whole currency amount, not minor units. The docs do not use kobo/subunit language; v4 also uses whole-currency decimal amounts.
+- v3 test transfers default to `PENDING`; `_PMCK` succeeds after 10 minutes, `_PMCK_ST_F` fails after 10 minutes, and `DU_{minutes}` changes the delay.
+- C4b "fetch one transaction" has no distinct v3 endpoint; the closest are verify-by-ID and the filtered transaction list. This is a documented gap.
+- v3 refund webhooks are a bare object with no documented event name. v3 has no documented transfer reversal event/status; v4's `transfer.reversal` is not v3.
+- The official `flutterwave-node-v3` library can point at a twin with its third constructor argument (base URL ending in `/`), but its `Charge` group uses `v3/charges`, not the Standard `/payments` hosted link, and it contains telemetry calls to external Flutterwave/SigNoz hosts. T15 needs a decision.
+
+No code, runtime dependency, fixture, or twin was written. No SPEC.md section was edited.
+
+### Later
+
+- Record Flutterwave fixtures in `fixtures/flutterwave/` when the recorder exists.
+- Resolve the C4b fetch gap, v3 refund event name, transfer reversal, and T15 library mapping decisions.
+- Research Stripe separately; never reuse v3 facts.
