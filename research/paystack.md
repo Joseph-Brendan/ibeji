@@ -617,6 +617,8 @@ None.
 
 ## 4. Transfers
 
+> **Documentation-only on 28 October 2026:** transfer create, transfer fetch, and transfer verify could not be recorded. Paystack returned `"You cannot initiate third party payouts as a starter business"` with code `transfer_unavailable` on `POST /transfer`. These three actions stay documentation-only until the recorder uses a business account without this limit.
+
 ### 4.1 Create transfer recipient
 
 Sources: [Transfer Recipient API: Create](https://paystack.com/docs/api/transfer-recipient/#create) and [Single Transfers: Create a transfer recipient](https://paystack.com/docs/transfers/single-transfers/#create-a-transfer-recipient), accessed 27 October 2026.

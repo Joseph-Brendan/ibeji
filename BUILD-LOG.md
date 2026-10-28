@@ -652,3 +652,45 @@ Fixed two problems from the last Paystack recorder run. No real key was used and
 - When the Paystack twin is built, `refund.fetch` must return the observed HTTP 401 `missing_params` response for a non-integer refund id.
 - Any future recorder email field must use `RECORDER_EMAIL` or another address from `FAKE_EMAILS`.
 - No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
+
+---
+
+## Phase 2, Step 2.9: Recorder passes real values between steps
+
+Date: 28 October 2026.
+
+Fixed why successful Paystack steps could not supply values to the next step, added checkout verification and retry, and recorded unpaid, declined, and account-limited transfer cases. No real key was used and no fixture was recorded in this task.
+
+### Cause
+
+`responseData()` read `result.body`, but the recorder stores every real response under `result.responseBody`. It therefore always returned `undefined`, even though the response had arrived and the saved copy was correctly redacted. Stripe had the same `result.body` mistake in its ID, checkout URL, and event ID reads. This was a wrong field-path bug, not a redacted-copy bug.
+
+### What was built
+
+- **Real values in memory.** `responseData()`, `readResponseField()`, and `requireResponseField()` read the real `responseBody`. The saved fixture still receives only the redacted copy. `requireResponseField()` stops the run with the action, field path, and top-level fields when a 2xx response lacks a value the next step needs.
+- **Paystack dependent values.** The recorder now requires `data.authorization_url`, `data.id`, `data.recipient_code`, `data.reference`, and `data.status` with the expected types instead of silently skipping. The same guard was applied to Stripe and Flutterwave dependent reads.
+- **Checkout and retry.** Paystack prints the initialization link and the research success card (`4084 0840 8408 4081`, CVV `408`, expiry `10/27`, no PIN/OTP), waits for Enter, then verifies. A non-success status is printed and the person can type `y` to retry the checkout before continuing.
+- **Unpaid and declined records.** A second transaction is initialized and verified without payment; its verify is saved as `transaction-verify-unpaid.json`. A third transaction uses the research declined card (`4084 0800 0000 5408`, CVV `001`, expiry `10/27`), pauses for payment, and saves its verify as `transaction-verify-declined.json`.
+- **Transfer account limit.** `transfer.create` now saves the documented account-limit response as `transfer-create.account-limit.json` when Paystack returns `transfer_unavailable` or the starter-business message. Transfer fetch and verify are skipped with a documentation-only reason instead of stopping the run.
+- **Research notes.** `research/paystack.md` section 4 marks transfer create, fetch, and verify as documentation-only on 28 October 2026 and quotes the `transfer_unavailable` message.
+
+### Decisions
+
+- A missing value on a 2xx response is a recorder bug, not a normal skip. The run stops so the bug is visible.
+- The main verify uses the transaction status to choose its outcome (`success`, `unpaid`, or `declined`), while the separate unpaid and declined verifies use fixed outcomes.
+- The account-limit response uses the exact file name from the task: `transfer-create.account-limit.json`. Other fixtures keep the existing hyphenated naming.
+- The old final "checkout has no API" skip was removed from the Paystack run because the recorder now performs the real checkout pause.
+
+### Tests
+
+- Added a fake-server test proving a saved response is redacted while its real `data.id` builds the next request path.
+- Added a fake-server test for a 2xx response missing `data.id`, checking the action, field path, and top-level fields in the stop message.
+- Added a fake-server test for `transfer.create` returning `transfer_unavailable`, checking the `transfer-create.account-limit.json` file and that a later `bank.list` still runs.
+- Extended the Paystack fake-server run to check the unpaid and declined verify fixtures are created.
+
+### Later
+
+- Run the recorder by hand against Paystack to capture the new checkout, unpaid, declined, and account-limit fixtures.
+- T3 can use the `unpaid`, `declined`, and `account-limit` fixtures as named expected outcomes; only `skipped`, `invalid-request`, `invalid-key`, and `lenient-input` stay excluded.
+- The Paystack twin must copy the observed non-integer refund ID 401 and the transfer account-limit message when it is built.
+- No SPEC.md section was edited; the changes implement C15 and do not change its meaning.

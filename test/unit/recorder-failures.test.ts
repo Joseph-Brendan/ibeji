@@ -15,6 +15,8 @@ import {
   fingerprintKey,
   KeyRejectedError,
   type RecorderResult,
+  RecorderStopError,
+  requireResponseField,
   validateKey,
 } from "../../scripts/recorder/shared.mjs";
 import { meta as stripe } from "../../scripts/recorder/stripe.mjs";
@@ -431,7 +433,10 @@ describe("C15 recorder Paystack 401 input errors", () => {
         };
       }
       if (request.method === "GET" && request.url.startsWith("/transaction/verify/")) {
-        return { status: 200, body: { status: true, message: "ok", data: { id: 123 } } };
+        return {
+          status: 200,
+          body: { status: true, message: "ok", data: { id: 123, status: "success" } },
+        };
       }
       if (request.method === "GET" && request.url === "/transaction/123") {
         return { status: 200, body: { status: true, message: "ok", data: { id: 123 } } };
@@ -524,6 +529,10 @@ describe("C15 recorder Paystack 401 input errors", () => {
       expect(laterUrls.some((url) => url.startsWith("/refund?"))).toBe(true);
       expect(laterUrls.some((url) => url.startsWith("/transferrecipient"))).toBe(true);
       expect(laterUrls.some((url) => url.startsWith("/bank"))).toBe(true);
+
+      const files = await readdir(join(cwd, "fixtures", "paystack"));
+      expect(files).toContain("transaction-verify-unpaid.json");
+      expect(files).toContain("transaction-verify-declined.json");
 
       const saved = JSON.parse(
         await readFile(
@@ -916,6 +925,181 @@ describe("C15 recorder request printing", () => {
       expect(printed).not.toContain("Ada Lovelace");
       expect(printed).not.toContain("0123456789");
       expect(printed).not.toContain(paystackKey);
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder passes real response values between steps", () => {
+  it("uses the real value for the next request while saving a redacted response", async () => {
+    const server = await startServer((request) => {
+      if (request.url === "/transaction/initialize") {
+        return {
+          status: 200,
+          body: {
+            status: true,
+            message: "ok",
+            data: {
+              id: 987654,
+              customer: {
+                email: "ada@real-customer.example",
+                name: "Ada Lovelace",
+              },
+            },
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: { status: true, message: "ok", data: { id: 987654 } },
+      };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      const initialize = await ctx.record({
+        action: "transaction.initialize",
+        method: "POST",
+        path: "/transaction/initialize",
+        body: encodeJson({ email: "ada@real-customer.example" }),
+      });
+      const transactionId = requireResponseField(
+        initialize,
+        "transaction.initialize",
+        "data.id",
+        "number",
+      );
+      expect(transactionId).toBe(987654);
+
+      await ctx.record({
+        action: "transaction.fetch",
+        method: "GET",
+        path: `/transaction/${String(transactionId)}`,
+      });
+      expect(server.requests[1]?.url).toBe("/transaction/987654");
+
+      const savedText = await readFile(initialize.file, "utf8");
+      const saved = JSON.parse(savedText) as {
+        responseBody: { data: { customer: { email: string; name: string } } };
+      };
+      expect(saved.responseBody.data.customer.email).toBe("customer.one@example.com");
+      expect(saved.responseBody.data.customer.name).toBe("Test Name 1");
+      expect(savedText).not.toContain("ada@real-customer.example");
+      expect(savedText).not.toContain("Ada Lovelace");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder missing 2xx response fields", () => {
+  it("stops with the step, field path, and top-level fields present", async () => {
+    const server = await startServer(() => ({
+      status: 200,
+      body: { status: true, message: "ok", data: { status: "success" } },
+    }));
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      const verify = await ctx.record({
+        action: "transaction.verify",
+        method: "GET",
+        path: "/transaction/verify/ibeji-reference",
+      });
+
+      let caught: unknown;
+      try {
+        requireResponseField(verify, "transaction.verify", "data.id", "number");
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(RecorderStopError);
+      const message = caught instanceof Error ? caught.message : "";
+      expect(message).toContain("transaction.verify");
+      expect(message).toContain("data.id");
+      expect(message).toContain("Top-level fields present: status, message, data");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder transfer account limit", () => {
+  it("saves transfer.create as account-limit and does not stop the run", async () => {
+    const server = await startServer((request) => {
+      if (request.url === "/transfer") {
+        return {
+          status: 403,
+          body: {
+            status: false,
+            message: "You cannot initiate third party payouts as a starter business",
+            code: "transfer_unavailable",
+          },
+        };
+      }
+      return { status: 200, body: { status: true, message: "ok", data: [] } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      const transfer = await ctx.record({
+        action: "transfer.create",
+        failureOutcome: "account-limit",
+        failureMatches: (response) => response.status === 403,
+        failureFileName: "transfer-create.account-limit.json",
+        method: "POST",
+        path: "/transfer",
+        body: encodeJson({ source: "balance", amount: 100, recipient: "RCP_fake" }),
+      });
+
+      expect(transfer.ok).toBe(false);
+      expect(transfer.file.endsWith("transfer-create.account-limit.json")).toBe(true);
+      const saved = JSON.parse(await readFile(transfer.file, "utf8")) as {
+        outcome: string;
+        status: number;
+        responseBody: { message: string; code: string };
+      };
+      expect(saved.outcome).toBe("account-limit");
+      expect(saved.status).toBe(403);
+      expect(saved.responseBody.message).toContain("starter business");
+      expect(saved.responseBody.code).toBe("transfer_unavailable");
+
+      const next = await ctx.record({
+        action: "bank.list",
+        method: "GET",
+        path: "/bank",
+        query: { country: "nigeria" },
+      });
+      expect(next.status).toBe(200);
+      expect(server.requests).toHaveLength(2);
     } finally {
       output.restore();
       await server.close();

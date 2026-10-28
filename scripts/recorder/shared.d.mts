@@ -56,6 +56,14 @@ export type RecorderRequestResult = {
   readonly file: string;
 };
 
+export type ResponseClassifierInput = {
+  readonly ok: boolean;
+  readonly status: number;
+  readonly responseBody: unknown;
+};
+
+export type OutcomeResolver = (result: ResponseClassifierInput) => string;
+
 export type RecorderContext = {
   readonly meta: ServiceMeta;
   readonly keyFingerprint: string;
@@ -69,7 +77,10 @@ export type RecorderContext = {
     query?: Record<string, string | number | boolean | readonly (string | number)[]>;
     body?: string | null;
     contentType?: string;
-    outcome?: string;
+    outcome?: string | OutcomeResolver;
+    failureOutcome?: string;
+    failureMatches?: (result: ResponseClassifierInput) => boolean;
+    failureFileName?: string;
     invalidKey?: boolean;
     headers?: Record<string, string>;
   }) => Promise<RecorderRequestResult>;
@@ -88,6 +99,7 @@ export type RecorderContext = {
     card: string;
     extra?: string;
   }) => Promise<void>;
+  readonly ask: (question: string) => Promise<string>;
   readonly close: () => void;
 };
 
@@ -114,6 +126,14 @@ export function validateKey(meta: ServiceMeta, key: string | undefined): KeyVali
 export function encodeJson(value: unknown): string;
 export function encodeForm(value: unknown): string;
 export function makeReference(prefix: string, separator?: string): string;
+export function readResponseField(result: RecorderRequestResult, fieldPath: string): unknown;
+export function responseData(result: RecorderRequestResult): unknown;
+export function requireResponseField(
+  result: RecorderRequestResult,
+  action: string,
+  fieldPath: string,
+  expectedType?: "string" | "number" | "boolean" | "array" | "object",
+): unknown;
 export function createPrompt(): RecorderPrompt;
 export function createRecorderContext(options: {
   meta: ServiceMeta;

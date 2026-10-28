@@ -3,7 +3,7 @@ import {
   extractServiceError,
   makeReference,
   RECORDER_EMAIL,
-  responseData,
+  requireResponseField,
 } from "./shared.mjs";
 
 export const meta = {
@@ -73,9 +73,8 @@ export async function record(ctx) {
     }),
   });
 
-  const createData = responseData(createPayment);
-  const link = createData !== null && typeof createData === "object" ? createData.link : undefined;
-  if (typeof link === "string") {
+  if (createPayment.ok) {
+    const link = requireResponseField(createPayment, "payment.create", "data.link", "string");
     await ctx.promptCheckout({
       title: "Flutterwave test checkout",
       url: link,
@@ -83,7 +82,7 @@ export async function record(ctx) {
       extra: "Use the Mastercard test values shown above.",
     });
   } else {
-    await ctx.skip("checkout", "payment.create did not return data.link");
+    await ctx.skip("checkout", "payment.create did not return a successful response");
   }
 
   const verifyReference = await ctx.record({
@@ -98,11 +97,9 @@ export async function record(ctx) {
     query: { tx_ref: "ibeji-invalid-reference" },
   });
 
-  const verifyReferenceData = responseData(verifyReference);
-  const transactionId =
-    verifyReferenceData !== null && typeof verifyReferenceData === "object"
-      ? verifyReferenceData.id
-      : undefined;
+  const transactionId = verifyReference.ok
+    ? requireResponseField(verifyReference, "payment.verify_by_reference", "data.id", "number")
+    : undefined;
   if (transactionId !== undefined) {
     await ctx.record({
       action: "payment.verify",
@@ -151,9 +148,9 @@ export async function record(ctx) {
     });
   }
 
-  const refundData = refund === null ? undefined : responseData(refund);
-  const refundId =
-    refundData !== null && typeof refundData === "object" ? refundData.id : undefined;
+  const refundId = refund?.ok
+    ? requireResponseField(refund, "refund.create", "data.id", "number")
+    : undefined;
   if (refundId !== undefined) {
     await ctx.record({
       action: "refund.fetch",
@@ -203,9 +200,9 @@ export async function record(ctx) {
     }),
   });
 
-  const transferData = responseData(transfer);
-  const transferId =
-    transferData !== null && typeof transferData === "object" ? transferData.id : undefined;
+  const transferId = transfer.ok
+    ? requireResponseField(transfer, "transfer.create", "data.id", "number")
+    : undefined;
   if (transferId !== undefined) {
     await ctx.record({
       action: "transfer.fetch",

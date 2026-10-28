@@ -278,15 +278,53 @@ function appendForm(params, value, prefix) {
   params.append(prefix, String(value));
 }
 
-export function responseData(result) {
+export function readResponseField(result, fieldPath) {
   if (result === null || typeof result !== "object") {
     return undefined;
   }
-  const body = result.body;
-  if (body === null || typeof body !== "object" || Array.isArray(body)) {
-    return undefined;
+  let current = result.responseBody;
+  for (const segment of fieldPath.split(".")) {
+    if (current === null || typeof current !== "object") {
+      return undefined;
+    }
+    if (Array.isArray(current)) {
+      const index = Number(segment);
+      current = Number.isInteger(index) ? current[index] : undefined;
+    } else {
+      current = current[segment];
+    }
   }
-  return body.data;
+  return current;
+}
+
+export function responseData(result) {
+  return readResponseField(result, "data");
+}
+
+function responseTopLevelFields(result) {
+  const body = result === null || typeof result !== "object" ? undefined : result.responseBody;
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return "(response body is not a JSON object)";
+  }
+  const keys = Object.keys(body);
+  return keys.length === 0 ? "(none)" : keys.join(", ");
+}
+
+export function requireResponseField(result, action, fieldPath, expectedType) {
+  const value = readResponseField(result, fieldPath);
+  const typeMatches =
+    expectedType === undefined ||
+    (expectedType === "array" ? Array.isArray(value) : typeof value === expectedType);
+  if (value === undefined || value === null || !typeMatches) {
+    throw new RecorderStopError(
+      `${action} returned HTTP ${result.status} but the field ${fieldPath} was missing or invalid. ` +
+        `What: the recorder needs ${fieldPath} to build the next step. ` +
+        `Why: the successful response did not contain a usable ${fieldPath}. ` +
+        `Top-level fields present: ${responseTopLevelFields(result)}. ` +
+        `Fix: check the saved fixture for ${action}, correct the recorder's field path, and run it again.`,
+    );
+  }
+  return value;
 }
 
 export function makeReference(prefix, separator = "_") {
@@ -601,11 +639,12 @@ export async function saveFixture({
   responseHeaders,
   responseBody,
   note,
+  fileName,
 }) {
   const directory = join(cwd, "fixtures", service);
   await mkdir(directory, { recursive: true });
   const slug = action.replaceAll(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
-  const file = join(directory, `${slug}-${outcome}.json`);
+  const file = join(directory, fileName ?? `${slug}-${outcome}.json`);
   const fixture = {
     action,
     outcome,
@@ -873,6 +912,9 @@ export function createRecorderContext({
     body = null,
     contentType,
     outcome,
+    failureOutcome,
+    failureMatches,
+    failureFileName,
     invalidKey = false,
     headers,
   }) {
@@ -880,7 +922,6 @@ export function createRecorderContext({
     const authStatus = result.status === 401 || result.status === 403;
     const keyError =
       !invalidKey && authStatus && meta.isKeyError(result.status, result.responseBody);
-    const note = !invalidKey && authStatus && !keyError ? inputErrorNote(result.status) : undefined;
 
     if (keyError) {
       const reason = `key rejected: ${failureReason(result)}`;
@@ -898,21 +939,55 @@ export function createRecorderContext({
     }
 
     const success = serviceSucceeded(meta, result.status, result.responseBody);
-    const expectedSuccess =
-      outcome === undefined ||
-      outcome === "setup" ||
-      outcome === "idempotent-original" ||
-      outcome === "idempotent-replay";
+    const expectedFailure =
+      result.status !== 0 &&
+      !success &&
+      failureOutcome !== undefined &&
+      (failureMatches === undefined || failureMatches(result));
+    const note =
+      !invalidKey && authStatus && !keyError && !expectedFailure
+        ? inputErrorNote(result.status)
+        : undefined;
 
-    if (result.status === 0 || (expectedSuccess && !success)) {
+    if (expectedFailure) {
+      const redacted = redactedRequestResponse(result);
+      const stored = await saveFixture({
+        cwd,
+        service: meta.id,
+        action,
+        outcome: failureOutcome,
+        note,
+        fileName: failureFileName,
+        recordedAt: now().toISOString(),
+        method: result.method,
+        path: redacted.path,
+        query: redacted.query,
+        requestBody: redacted.requestBody,
+        status: result.status,
+        responseHeaders: redacted.responseHeaders,
+        responseBody: redacted.responseBody,
+      });
+      pushResult(action, result, failureOutcome, undefined, stored, note);
+      return { ...result, ok: false, file: stored };
+    }
+    const outcomeIsResolver = typeof outcome === "function";
+    const expectedSuccess =
+      !outcomeIsResolver &&
+      (outcome === undefined ||
+        outcome === "setup" ||
+        outcome === "idempotent-original" ||
+        outcome === "idempotent-replay");
+
+    if (result.status === 0 || (expectedSuccess && !success) || (outcomeIsResolver && !success)) {
       const reason = failureReason(result);
       const file = await saveSkipped(result, action, reason, note);
       pushResult(action, result, "skipped", reason, file, note);
       return { ...result, ok: false, file };
     }
 
-    const effectiveOutcome =
-      outcome ?? (invalidKey ? "invalid-key" : success ? "success" : "skipped");
+    const effectiveOutcome = outcomeIsResolver
+      ? outcome({ status: result.status, responseBody: result.responseBody, ok: success })
+      : (outcome ?? (invalidKey ? "invalid-key" : success ? "success" : "skipped"));
     const redacted = redactedRequestResponse(result);
     const stored = await saveFixture({
       cwd,
@@ -1068,6 +1143,7 @@ export function createRecorderContext({
     recordInvalid,
     recordInvalidKey,
     promptCheckout,
+    ask: (question) => prompt.ask(question),
     close: () => prompt.close(),
   };
 }

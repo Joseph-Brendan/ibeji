@@ -1,4 +1,4 @@
-import { encodeForm, extractServiceError, makeReference } from "./shared.mjs";
+import { encodeForm, extractServiceError, makeReference, requireResponseField } from "./shared.mjs";
 
 const API_VERSION = "2026-09-30.endive";
 const STRIPE_HEADERS = { "stripe-version": API_VERSION };
@@ -49,17 +49,6 @@ const PI_BODY = {
   metadata: { recorder: "ibeji" },
 };
 
-function idFrom(result) {
-  if (result === null || result === undefined) {
-    return undefined;
-  }
-  const body = result.body;
-  if (body !== null && typeof body === "object" && "id" in body) {
-    return body.id;
-  }
-  return undefined;
-}
-
 export async function record(ctx) {
   const createPaymentIntent = await ctx.record({
     action: "payment_intent.create",
@@ -75,7 +64,9 @@ export async function record(ctx) {
     headers: STRIPE_HEADERS,
   });
 
-  const paymentIntentId = idFrom(createPaymentIntent);
+  const paymentIntentId = createPaymentIntent.ok
+    ? requireResponseField(createPaymentIntent, "payment_intent.create", "id", "string")
+    : undefined;
   if (paymentIntentId !== undefined) {
     await ctx.record({
       action: "payment_intent.retrieve",
@@ -123,7 +114,9 @@ export async function record(ctx) {
     }),
     headers: STRIPE_HEADERS,
   });
-  const cancelId = idFrom(cancelSetup);
+  const cancelId = cancelSetup.ok
+    ? requireResponseField(cancelSetup, "payment_intent.create", "id", "string")
+    : undefined;
   if (cancelId !== undefined) {
     await ctx.record({
       action: "payment_intent.cancel",
@@ -194,14 +187,16 @@ export async function record(ctx) {
     headers: STRIPE_HEADERS,
   });
 
-  const checkoutId = idFrom(checkoutSession);
-  const checkoutUrl =
-    checkoutSession.body !== null &&
-    typeof checkoutSession.body === "object" &&
-    "url" in checkoutSession.body
-      ? checkoutSession.body.url
-      : undefined;
-  if (typeof checkoutUrl === "string") {
+  const checkoutId = checkoutSession.ok
+    ? requireResponseField(checkoutSession, "checkout_session.create", "id", "string")
+    : undefined;
+  if (checkoutSession.ok) {
+    const checkoutUrl = requireResponseField(
+      checkoutSession,
+      "checkout_session.create",
+      "url",
+      "string",
+    );
     await ctx.promptCheckout({
       title: "Stripe test checkout",
       url: checkoutUrl,
@@ -209,7 +204,7 @@ export async function record(ctx) {
       extra: "Complete the hosted Checkout payment, then return here.",
     });
   } else {
-    await ctx.skip("checkout", "checkout_session.create did not return a hosted url");
+    await ctx.skip("checkout", "checkout_session.create did not return a successful response");
   }
 
   if (checkoutId !== undefined) {
@@ -264,7 +259,9 @@ export async function record(ctx) {
     headers: STRIPE_HEADERS,
   });
 
-  const refundId = refund === null ? undefined : idFrom(refund);
+  const refundId = refund?.ok
+    ? requireResponseField(refund, "refund.create", "id", "string")
+    : undefined;
   if (refundId !== undefined) {
     await ctx.record({
       action: "refund.retrieve",
@@ -309,16 +306,9 @@ export async function record(ctx) {
     headers: STRIPE_HEADERS,
   });
 
-  const eventId =
-    events.body !== null &&
-    typeof events.body === "object" &&
-    Array.isArray(events.body.data) &&
-    events.body.data.length > 0 &&
-    events.body.data[0] !== null &&
-    typeof events.body.data[0] === "object" &&
-    "id" in events.body.data[0]
-      ? events.body.data[0].id
-      : undefined;
+  const eventId = events.ok
+    ? requireResponseField(events, "event.list", "data.0.id", "string")
+    : undefined;
   if (eventId !== undefined) {
     await ctx.record({
       action: "event.retrieve",
