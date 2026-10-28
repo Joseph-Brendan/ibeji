@@ -1,0 +1,14 @@
+{
+  "id": "test-declined",
+  "name": "Declined payments",
+  "story": "A small test scenario that declines half of the payments on one twin.",
+  "twins": ["alpha"],
+  "rules": [
+    {
+      "id": "decline-payments",
+      "failureId": "payment-declined",
+      "settings": { "percent": 50 },
+      "actions": "payment"
+    }
+  ]
+}

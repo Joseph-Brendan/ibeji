@@ -1,0 +1,15 @@
+{
+  "id": "test-timed-slow",
+  "name": "Timed slow response",
+  "story": "A small test scenario that slows refunds and then removes the rule after thirty seconds.",
+  "twins": ["alpha", "beta"],
+  "rules": [
+    {
+      "id": "slow-refunds",
+      "failureId": "slow-response",
+      "settings": { "seconds": 8 },
+      "actions": "refund"
+    }
+  ],
+  "steps": [{ "afterSeconds": 30, "removeRule": "slow-refunds" }]
+}

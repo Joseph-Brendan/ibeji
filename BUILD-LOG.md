@@ -968,3 +968,43 @@ Built the first eight core modules in `src/core/`, with tests written alongside 
 - Wire `ConfigContext` to the registry when the twin definitions and scenario catalog exist.
 - Add webhook address policy checks (`WEBHOOK_URL_NOT_ALLOWED`) when the webhook dispatcher is built; the config schema currently checks only that a URL is http or https.
 - Add the session/export layers that consume the event log and state store.
+
+---
+
+## Phase 3, Step 3.2: failure engine and scenarios
+
+Date: 28 October 2026.
+
+Built the C5 failure catalog, the pure request and webhook decision engines, the rule store, and the C6 scenario loader and runner. The six real scenarios were not added; the only scenario files are the two small test fixtures.
+
+### What was built
+
+- **Catalog.** All 16 C5 failures are present, with their names, placeholder descriptions, exact settings, defaults, limits, and JSON Schema. The shared `twins` and `actions` settings are in every full settings schema. No twin ids or twin support live in the catalog.
+- **Engine.** `decide` and `decideWebhook` return typed plans. The request plan says which steps fired, whether the action was performed, the HTTP status to shape, the slow-response delay, the result effect, and how the connection ends. The webhook plan says whether to send, the signing failure, hold window, each delivery's delay and due time, and duplicate copies. Both follow the C5 order.
+- **Rules.** `RuleStore` adds, validates, lists, updates, removes and clears rules. It resolves resource, local-id and full-id selectors against each twin's declared actions, keeps `times` counters per rule per twin, emits `rule-added` and `rule-removed` events, and rejects unknown failures, unknown twins, unsupported failures, invalid settings and selectors that match no action.
+- **Scenarios.** `src/core/scenarios/schema.ts` validates scenario files and names the file and field on failure. `loader.ts` loads `.json` files in deterministic order and rejects duplicate scenario ids. `runner.ts` runs one scenario at a time, defaults to the supported running twins, adds scenario-owned rules, fires timed removals with the injected clock, emits `scenario-started`, `scenario-step` and `scenario-finished`, stops and replaces runs, removes a stopped twin's rules, and stops when all rules are cleared.
+- **Test fixtures.** Added `test/fixtures/scenarios/timed-slow.json` and `declined.json`. They are test data, not the six C6 scenarios.
+
+### Decisions
+
+- **Randomness stays outside the engine.** The engine takes a `RandomSource` and a `now` value. Production passes the seeded generator; tests pass a fixed source or a seeded generator. Neither engine function reads a clock, `Math.random`, the network, or a file.
+- **`times: null` means unlimited.** The C5 "empty" value is represented as `null` and becomes an unlimited counter. `3` remains the default. The counter still exists for every rule and is kept per twin, so it counts across all actions the rule covers.
+- **One result-shaping failure wins in step 5.** If several rules shape the same action's result, the most recently added rule wins, matching the C5 "most recently added" rule. Probabilistic `payment-declined` and `transfer-reversed` effects only fire when their percentage draw succeeds.
+- **Scenario rules are added once per chosen twin.** This gives each twin its own rule id and counter. It also makes "a stopped twin loses that scenario's rules" a simple removal without changing another twin's rule.
+- **Scenario start validates before stopping the current run.** A bad start leaves the current scenario running. Scenario rules also use `RuleStore.validate` before any rule is added.
+- **No SPEC.md change.** No C21 entry is needed; this step implements C5, C6 and the C17 test rules.
+
+### Tests
+
+- Added 156 tests across four files: catalog, engine, rules and scenarios. Total suite: 275 tests.
+- T2 has 1,000-run fast-check properties for request and webhook plan validity and determinism.
+- T4 has one default-and-maximum test for every one of the 16 failures.
+- Order tests cover every request-failure pair (55) and every webhook-failure pair (10), plus explicit checks for `flaky-network` after the action, `timeout-after-commit` after a result, and duplicate webhooks following signing, hold and delay.
+- Coverage is 100% of statements, branches, functions and lines for `src/core/`.
+
+### Later
+
+- Write the six real C6 scenarios in Step 5.2.
+- Wire the rule store to the registry and the control API when those layers exist.
+- Have the webhook dispatcher consume `WebhookPlan` and the twin adapters consume `RequestPlan`.
+- Add the real failure descriptions in Step 5.2.
