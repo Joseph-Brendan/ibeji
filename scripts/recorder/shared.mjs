@@ -1000,7 +1000,10 @@ export function createRecorderContext({
     invalidKey = false,
     headers,
     paymentStatusPath,
+    fixtureAction,
+    fileName,
   }) {
+    const recordedAction = fixtureAction ?? action;
     if (!shouldRunNormal(action, outcome)) {
       return suppressedResult({ method, path, query, body, contentType });
     }
@@ -1046,7 +1049,7 @@ export function createRecorderContext({
       const stored = await saveFixture({
         cwd,
         service: meta.id,
-        action,
+        action: recordedAction,
         outcome: failureOutcome,
         note,
         fileName: failureFileName,
@@ -1060,7 +1063,7 @@ export function createRecorderContext({
         responseHeaders: redacted.responseHeaders,
         responseBody: redacted.responseBody,
       });
-      pushResult(action, result, failureOutcome, undefined, stored, note, paymentStatus);
+      pushResult(recordedAction, result, failureOutcome, undefined, stored, note, paymentStatus);
       return { ...result, ok: false, file: stored };
     }
     const outcomeIsResolver = typeof outcome === "function";
@@ -1085,9 +1088,10 @@ export function createRecorderContext({
     const stored = await saveFixture({
       cwd,
       service: meta.id,
-      action,
+      action: recordedAction,
       outcome: effectiveOutcome,
       note,
+      fileName,
       register: (file) => registerFile(file),
       recordedAt: now().toISOString(),
       method: result.method,
@@ -1098,7 +1102,7 @@ export function createRecorderContext({
       responseHeaders: redacted.responseHeaders,
       responseBody: redacted.responseBody,
     });
-    pushResult(action, result, effectiveOutcome, undefined, stored, note, paymentStatus);
+    pushResult(recordedAction, result, effectiveOutcome, undefined, stored, note, paymentStatus);
     return { ...result, ok: success, file: stored };
   }
 

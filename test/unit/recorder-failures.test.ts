@@ -1464,7 +1464,69 @@ describe("C15 Flutterwave verify status", () => {
       expect(output.logs.join("\n")).toContain("checkout.unpaid (verify) status: pending.");
       expect(output.logs.join("\n")).toContain("| 200 | pending |");
       const files = await readdir(join(cwd, "fixtures", "flutterwave"));
-      expect(files).toContain("checkout-unpaid-pending.json");
+      expect(files).toContain("payment-create-unpaid.json");
+      expect(files).toContain("payment-verify-by-reference-pending.json");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 Flutterwave unpaid verify", () => {
+  it("saves the 400 no-transaction response as unpaid, not skipped", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/v3/transfers?")) {
+        return { status: 200, body: { status: "success", message: "ok", data: [] } };
+      }
+      if (request.method === "POST" && request.url === "/v3/payments") {
+        return {
+          status: 200,
+          body: {
+            status: "success",
+            message: "Hosted Link",
+            data: { link: "https://example.com/checkout" },
+          },
+        };
+      }
+      if (
+        request.method === "GET" &&
+        request.url.startsWith("/v3/transactions/verify_by_reference?")
+      ) {
+        return {
+          status: 400,
+          body: {
+            status: "error",
+            message: "No transaction was found for this id",
+            data: null,
+          },
+        };
+      }
+      return { status: 500, body: { status: "error", message: "unexpected request" } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "flutterwave", "--only", "checkout.unpaid"],
+        { FLUTTERWAVE_TEST_SECRET_KEY: flutterwaveKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      expect(code).toBe(0);
+      const files = await readdir(join(cwd, "fixtures", "flutterwave"));
+      expect(files).toContain("payment-verify-by-reference-unpaid.json");
+      expect(files).not.toContain("checkout.unpaid.skipped.json");
+      const saved = JSON.parse(
+        await readFile(
+          join(cwd, "fixtures", "flutterwave", "payment-verify-by-reference-unpaid.json"),
+          "utf8",
+        ),
+      ) as { action: string; outcome: string; status: number };
+      expect(saved.action).toBe("payment.verify_by_reference");
+      expect(saved.outcome).toBe("unpaid");
+      expect(saved.status).toBe(400);
     } finally {
       output.restore();
       await server.close();

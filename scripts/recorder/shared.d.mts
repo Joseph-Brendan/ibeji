@@ -87,6 +87,8 @@ export type RecorderContext = {
     headers?: Record<string, string>;
     stepLabel?: string;
     paymentStatusPath?: string;
+    fixtureAction?: string;
+    fileName?: string;
   }) => Promise<RecorderRequestResult>;
   readonly skip: (action: string, reason: string) => Promise<void>;
   readonly recordInvalid: (

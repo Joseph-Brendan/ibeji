@@ -403,6 +403,7 @@ Source: [Verify transaction status with reference](https://developer.flutterwave
 
 - Action page sample: `200`, `400`.
 - Common: `401`, `500`, `503`, `429`.
+- An unpaid hosted payment has no transaction yet; verify by reference returns `400` until the customer starts paying. Observed while recording on 28 October 2026. The recorded response is `fixtures/flutterwave/payment-verify-by-reference-unpaid.json`.
 
 #### Webhook events this action can trigger
 
@@ -587,6 +588,8 @@ Source: [Fetch multiple refunded transactions](https://developer.flutterwave.com
 None.
 
 ## 5. Transfers and banks
+
+> **Documentation-only on 28 October 2026:** transfer create and transfer fetch could not be recorded. Flutterwave returned HTTP `400` with `"Please enable IP Whitelisting to access this service"` on `POST /v3/transfers`; the saved response is `fixtures/flutterwave/transfer-create.account-limit.json`. `fixtures/flutterwave/` contains no successful `transfer.create` recording. Both actions stay documentation-only until the recorder uses an account with IP whitelisting enabled or another transfer-capable account.
 
 ### 5.1 Initiate transfer
 

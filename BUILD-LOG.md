@@ -874,3 +874,29 @@ Finished the Flutterwave recorder: verify statuses now appear in the console and
 - Add recorder steps for the Flutterwave failing-card outcomes if the twin needs more than one failure flavour.
 - The Flutterwave twin must not copy the HTML 200 transfer-fetch response; use the documented JSON 404 instead.
 - No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
+
+---
+
+## Phase 2, Step 2.14a: Flutterwave fixture names and transfer scope
+
+Date: 28 October 2026.
+
+Corrected the Flutterwave fixture names from the review, recorded the unpaid hosted-payment behaviour, and marked transfer create and fetch as documentation-only for both Paystack and Flutterwave. No real key was used and no fixture was committed.
+
+### What changed
+
+- **Unpaid verify is real behaviour.** `checkout.unpaid.skipped.json` was renamed to `payment-verify-by-reference-unpaid.json`; its action is now `payment.verify_by_reference`, its outcome is `unpaid`, and it carries the observed 400 response instead of a skip reason. `research/flutterwave.md` records that an unpaid hosted payment has no transaction yet and verify by reference returns 400 until the customer starts paying, observed on 28 October 2026.
+- **Fixture names say what happened.** The three checkout fixtures were renamed to `payment-create-unpaid.json`, `payment-create-for-failed-checkout.json`, and `payment-verify-by-reference-failed.json`. The recorder now writes these names directly for future runs.
+- **Transfer scope.** Paystack section 4 and Flutterwave section 5 mark transfer create and fetch as documentation-only, citing the saved account-limit fixtures. `fixtures/flutterwave/` contains no successful `transfer.create` recording, so Flutterwave transfer create and fetch stay documentation-only.
+- **TWIN-DESIGN proposal only.** TWIN-DESIGN.md was not edited. A one-line clarification is proposed for section 2.0: a Flutterwave hosted payment that has been created but not started has no transaction, so `payment.verify_by_reference` returns the documented 400 until payment starts. No structural change to `TwinDefinition` or the action list is needed.
+
+### Tests
+
+- Updated the Flutterwave `checkout.unpaid` status test for the new `payment-create-unpaid.json` and `payment-verify-by-reference-pending.json` names.
+- Added a test proving the unpaid verify 400 is saved as `payment-verify-by-reference-unpaid.json` with action `payment.verify_by_reference`, outcome `unpaid`, not as a skipped fixture.
+
+### Later
+
+- Approve or reject the TWIN-DESIGN section 2.0 clarification before the Flutterwave twin implements verify-before-payment.
+- Run the Flutterwave recorder again to confirm future fixtures use the new names.
+- No SPEC.md section was edited; the changes implement C15 and do not change its meaning.

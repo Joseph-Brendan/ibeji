@@ -76,6 +76,11 @@ function isTransferAccountLimit(result) {
   return /enable IP Whitelisting/i.test(message) || /ip[_-]?whitelist/i.test(code);
 }
 
+function isUnpaidNoTransaction(result) {
+  const { message = "" } = extractServiceError(result.responseBody);
+  return result.status === 400 && /No transaction was found for this id/i.test(message);
+}
+
 export async function record(ctx) {
   const nextEmail = makeCheckoutEmailPicker();
   const txRef = makeReference("ibeji");
@@ -153,6 +158,8 @@ export async function record(ctx) {
   const unpaidRef = makeReference("ibeji-unpaid");
   const unpaidCreate = await ctx.record({
     action: "checkout.unpaid",
+    fixtureAction: "payment.create",
+    fileName: "payment-create-unpaid.json",
     method: "POST",
     path: "/v3/payments",
     body: encodeJson({
@@ -169,6 +176,10 @@ export async function record(ctx) {
   if (unpaidCreate.ok) {
     await ctx.record({
       action: "checkout.unpaid",
+      fixtureAction: "payment.verify_by_reference",
+      failureOutcome: "unpaid",
+      failureMatches: isUnpaidNoTransaction,
+      failureFileName: "payment-verify-by-reference-unpaid.json",
       outcome: makeActualStatusOutcome("checkout.unpaid (verify)"),
       paymentStatusPath: "data.status",
       method: "GET",
@@ -182,6 +193,8 @@ export async function record(ctx) {
   const failedRef = makeReference("ibeji-failed");
   const failedCreate = await ctx.record({
     action: "checkout.failed",
+    fixtureAction: "payment.create",
+    fileName: "payment-create-for-failed-checkout.json",
     method: "POST",
     path: "/v3/payments",
     body: encodeJson({
@@ -205,6 +218,7 @@ export async function record(ctx) {
     });
     await ctx.record({
       action: "checkout.failed",
+      fixtureAction: "payment.verify_by_reference",
       outcome: makeActualStatusOutcome("checkout.failed (verify)"),
       paymentStatusPath: "data.status",
       method: "GET",
