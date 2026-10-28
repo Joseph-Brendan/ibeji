@@ -107,8 +107,114 @@ async function makeTempDir() {
   return mkdtemp(join(tmpdir(), "ibeji-recorder-"));
 }
 
+async function startPaystackFlowServer(verifyStatuses: readonly string[]) {
+  let verifyCount = 0;
+  let initializeCount = 0;
+  return startServer((request) => {
+    if (request.method === "GET" && request.url.startsWith("/transaction?")) {
+      return { status: 200, body: { status: true, message: "ok", data: [] } };
+    }
+    if (request.method === "POST" && request.url === "/transaction/initialize") {
+      initializeCount += 1;
+      return {
+        status: 200,
+        body: {
+          status: true,
+          message: "ok",
+          data: { authorization_url: `https://example.com/checkout/${initializeCount}` },
+        },
+      };
+    }
+    if (request.method === "GET" && request.url === "/transaction/verify/ibeji-invalid-reference") {
+      return {
+        status: 400,
+        body: { status: false, message: "Invalid reference", code: "invalid_params" },
+      };
+    }
+    if (request.method === "GET" && request.url.startsWith("/transaction/verify/")) {
+      const status = verifyStatuses[verifyCount] ?? "abandoned";
+      verifyCount += 1;
+      return { status: 200, body: { status: true, message: "ok", data: { id: 123, status } } };
+    }
+    if (request.method === "GET" && request.url === "/transaction/123") {
+      return { status: 200, body: { status: true, message: "ok", data: { id: 123 } } };
+    }
+    if (request.method === "POST" && request.url === "/refund") {
+      return { status: 200, body: { status: true, message: "ok", data: { id: 55 } } };
+    }
+    if (request.method === "GET" && request.url === "/refund/not-a-number") {
+      return {
+        status: 401,
+        body: {
+          status: false,
+          message: "Please provide a valid refund ID. ID should be a valid integer",
+          code: "missing_params",
+        },
+      };
+    }
+    if (request.method === "GET" && request.url.startsWith("/refund")) {
+      return { status: 200, body: { status: true, message: "ok", data: [] } };
+    }
+    if (request.method === "POST" && request.url === "/transferrecipient") {
+      return {
+        status: 200,
+        body: { status: true, message: "ok", data: { recipient_code: "RCP_fake" } },
+      };
+    }
+    if (request.method === "POST" && request.url === "/transfer") {
+      return {
+        status: 200,
+        body: { status: true, message: "ok", data: { id: 77, reference: "transfer-ref" } },
+      };
+    }
+    if (request.method === "GET" && request.url.startsWith("/transfer/verify/")) {
+      return {
+        status: 200,
+        body: { status: true, message: "ok", data: { id: 77, reference: "transfer-ref" } },
+      };
+    }
+    if (request.method === "GET" && request.url.startsWith("/transfer/")) {
+      return {
+        status: 200,
+        body: { status: true, message: "ok", data: { id: 77, reference: "transfer-ref" } },
+      };
+    }
+    if (request.method === "GET" && request.url.startsWith("/bank/resolve")) {
+      return {
+        status: 200,
+        body: {
+          status: true,
+          message: "ok",
+          data: { account_number: "0000000000", account_name: "Test Name 1" },
+        },
+      };
+    }
+    if (request.method === "GET" && request.url.startsWith("/bank")) {
+      if (request.headers.authorization === "Bearer invalid-ibeji-recorder") {
+        return {
+          status: 401,
+          body: { status: false, message: "Invalid key", code: "invalid_key" },
+        };
+      }
+      return { status: 200, body: { status: true, message: "ok", data: [] } };
+    }
+    return {
+      status: 400,
+      body: { status: false, message: "unexpected request", code: "invalid_params" },
+    };
+  });
+}
+
 function makePrompt() {
   return { ask: vi.fn(async () => ""), close: vi.fn() };
+}
+
+function makeScriptedPrompt(answers: readonly string[]) {
+  const queue = [...answers];
+  return {
+    ask: vi.fn(async () => queue.shift() ?? "q"),
+    close: vi.fn(),
+  };
 }
 
 const paystackKey = "sk_test_fake_recorder_key_123";
@@ -418,6 +524,8 @@ describe("C15 recorder mid-run key rejection", () => {
 
 describe("C15 recorder Paystack 401 input errors", () => {
   it("does not stop the run on a 401 input error and still records transfers and banks", async () => {
+    const verifyStatuses = ["success", "abandoned", "failed"];
+    let verifyCount = 0;
     const server = await startServer((request) => {
       if (request.method === "GET" && request.url.startsWith("/transaction?")) {
         return { status: 200, body: { status: true, message: "ok", data: [] } };
@@ -432,10 +540,21 @@ describe("C15 recorder Paystack 401 input errors", () => {
           },
         };
       }
+      if (
+        request.method === "GET" &&
+        request.url === "/transaction/verify/ibeji-invalid-reference"
+      ) {
+        return {
+          status: 400,
+          body: { status: false, message: "Invalid reference", code: "invalid_params" },
+        };
+      }
       if (request.method === "GET" && request.url.startsWith("/transaction/verify/")) {
+        const status = verifyStatuses[verifyCount] ?? "abandoned";
+        verifyCount += 1;
         return {
           status: 200,
-          body: { status: true, message: "ok", data: { id: 123, status: "success" } },
+          body: { status: true, message: "ok", data: { id: 123, status } },
         };
       }
       if (request.method === "GET" && request.url === "/transaction/123") {
@@ -531,8 +650,10 @@ describe("C15 recorder Paystack 401 input errors", () => {
       expect(laterUrls.some((url) => url.startsWith("/bank"))).toBe(true);
 
       const files = await readdir(join(cwd, "fixtures", "paystack"));
-      expect(files).toContain("transaction-verify-unpaid.json");
-      expect(files).toContain("transaction-verify-declined.json");
+      expect(files).toContain("transaction-verify-success.json");
+      expect(files).toContain("transaction-verify-abandoned.json");
+      expect(files).toContain("transaction-verify-failed.json");
+      expect(output.logs.join("\n")).toContain("transaction.verify (unpaid) status: abandoned.");
 
       const saved = JSON.parse(
         await readFile(
@@ -545,6 +666,120 @@ describe("C15 recorder Paystack 401 input errors", () => {
       expect(output.logs.join("\n")).toContain(
         "The service returned 401 for an input error, not a key error.",
       );
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder fixture labels from real status", () => {
+  it("saves an abandoned verify under its real status after Enter then s", async () => {
+    const server = await startPaystackFlowServer(["abandoned", "success", "failed"]);
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makeScriptedPrompt(["", "", "s"]) },
+      );
+
+      expect(code).toBe(0);
+      const files = await readdir(join(cwd, "fixtures", "paystack"));
+      expect(files).toContain("transaction-verify-abandoned.json");
+      expect(files).not.toContain("transaction-verify-declined.json");
+      expect(output.logs.join("\n")).toContain(
+        "Expected status: success. Paystack returned: abandoned.",
+      );
+      expect(output.logs.join("\n")).toContain("Please type r, s, or q, then press Enter.");
+      expect(output.logs.join("\n")).toContain("| 200 | abandoned |");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("retries with a new payment link when the person types r", async () => {
+    const server = await startPaystackFlowServer(["abandoned", "success", "pending", "failed"]);
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makeScriptedPrompt(["", "r", ""]) },
+      );
+
+      expect(code).toBe(0);
+      const initializeRequests = server.requests.filter(
+        (request) =>
+          request.method === "POST" &&
+          request.url === "/transaction/initialize" &&
+          request.body.includes('"reference"'),
+      );
+      expect(initializeRequests).toHaveLength(4);
+      expect(output.logs.join("\n")).toContain("Link: https://example.com/checkout/1");
+      expect(output.logs.join("\n")).toContain("Link: https://example.com/checkout/3");
+
+      const files = await readdir(join(cwd, "fixtures", "paystack"));
+      expect(files).toContain("transaction-verify-success.json");
+      expect(files).toContain("transaction-verify-pending.json");
+      expect(files).not.toContain("transaction-verify-abandoned.json");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("stops without saving when the person types q", async () => {
+    const server = await startPaystackFlowServer(["abandoned"]);
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makeScriptedPrompt(["", "q"]) },
+      );
+
+      expect(code).toBe(1);
+      expect(output.errors.join("\n")).toContain(
+        "Expected status: success. Paystack returned: abandoned.",
+      );
+      expect(output.errors.join("\n")).toContain("you chose q");
+      const files = await readdir(join(cwd, "fixtures", "paystack"));
+      expect(files).not.toContain("transaction-verify-abandoned.json");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("stops with both step names instead of overwriting a fixture", async () => {
+    const server = await startPaystackFlowServer(["success", "success"]);
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makeScriptedPrompt([""]) },
+      );
+
+      expect(code).toBe(1);
+      const errors = output.errors.join("\n");
+      expect(errors).toContain(
+        "Two steps tried to save the same fixture transaction-verify-success.json",
+      );
+      expect(errors).toContain("transaction.verify (success checkout)");
+      expect(errors).toContain("transaction.verify (unpaid)");
+      const files = await readdir(join(cwd, "fixtures", "paystack"));
+      expect(files).toContain("transaction-verify-success.json");
     } finally {
       output.restore();
       await server.close();

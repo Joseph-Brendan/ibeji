@@ -36,6 +36,7 @@ export type RecorderResult = {
   readonly serviceMessage?: string;
   readonly serviceCode?: string;
   readonly note?: string;
+  readonly paymentStatus?: string;
 };
 
 export type RecorderPrompt = {
@@ -62,7 +63,7 @@ export type ResponseClassifierInput = {
   readonly responseBody: unknown;
 };
 
-export type OutcomeResolver = (result: ResponseClassifierInput) => string;
+export type OutcomeResolver = (result: ResponseClassifierInput) => string | Promise<string>;
 
 export type RecorderContext = {
   readonly meta: ServiceMeta;
@@ -83,6 +84,8 @@ export type RecorderContext = {
     failureFileName?: string;
     invalidKey?: boolean;
     headers?: Record<string, string>;
+    stepLabel?: string;
+    paymentStatusPath?: string;
   }) => Promise<RecorderRequestResult>;
   readonly skip: (action: string, reason: string) => Promise<void>;
   readonly recordInvalid: (

@@ -3,7 +3,7 @@ import {
   extractServiceError,
   makeReference,
   RECORDER_EMAIL,
-  readResponseField,
+  RecorderStopError,
   requireResponseField,
 } from "./shared.mjs";
 
@@ -47,15 +47,63 @@ const EMAIL = RECORDER_EMAIL;
 const SUCCESS_CARD = "4084 0840 8408 4081, CVV 408, expiry 10/27 (no PIN or OTP)";
 const DECLINED_CARD = "4084 0800 0000 5408, CVV 001, expiry 10/27 (declines)";
 
-function verifyOutcome(result) {
-  const status = readResponseField(result, "data.status");
-  if (status === "success") {
-    return "success";
+class RetryCheckoutSignal extends Error {
+  constructor() {
+    super("retry checkout with a new payment link");
+    this.name = "RetryCheckoutSignal";
   }
-  if (status === "failed") {
-    return "declined";
+}
+
+function statusMatchesExpected(expectedStatus, actualStatus) {
+  if (expectedStatus === "success") {
+    return actualStatus === "success";
   }
-  return "unpaid";
+  if (expectedStatus === "declined") {
+    return actualStatus === "failed" || actualStatus === "declined";
+  }
+  return false;
+}
+
+function makeActualStatusOutcome(stepLabel) {
+  return async (result) => {
+    const status = requireResponseField(result, stepLabel, "data.status", "string");
+    console.log(`${stepLabel} status: ${status}.`);
+    return status;
+  };
+}
+
+function makeExpectedStatusOutcome(ctx, expectedStatus, stepLabel) {
+  return async (result) => {
+    const actualStatus = requireResponseField(result, stepLabel, "data.status", "string");
+    if (statusMatchesExpected(expectedStatus, actualStatus)) {
+      console.log(`${stepLabel} status: ${actualStatus}.`);
+      return actualStatus;
+    }
+
+    for (;;) {
+      console.log(`Expected status: ${expectedStatus}. Paystack returned: ${actualStatus}.`);
+      const answer = await ctx.ask(
+        "Type r to retry with a new payment link, s to save it under its real status and continue, or q to stop: ",
+      );
+      const choice = answer.trim().toLowerCase();
+      if (choice === "s") {
+        return actualStatus;
+      }
+      if (choice === "r") {
+        throw new RetryCheckoutSignal();
+      }
+      if (choice === "q") {
+        throw new RecorderStopError(
+          `Recorder stopped at the payment status prompt for ${stepLabel}. ` +
+            `Expected status: ${expectedStatus}. Paystack returned: ${actualStatus}. ` +
+            `What: you chose q, so the recorder stopped. ` +
+            `Why: the payment did not end in the expected status. ` +
+            `Fix: run the recorder again when you are ready to retry or save the real status.`,
+        );
+      }
+      console.log("Please type r, s, or q, then press Enter.");
+    }
+  };
 }
 
 function isTransferUnavailable(result) {
@@ -63,11 +111,12 @@ function isTransferUnavailable(result) {
   return code === "transfer_unavailable" || /starter business/i.test(message);
 }
 
-async function initializeTransaction(ctx, outcome) {
+async function initializeTransaction(ctx, outcome, stepLabel) {
   const reference = makeReference("ibeji", "-");
   const result = await ctx.record({
     action: "transaction.initialize",
     outcome,
+    stepLabel,
     method: "POST",
     path: "/transaction/initialize",
     body: encodeJson({
@@ -82,20 +131,71 @@ async function initializeTransaction(ctx, outcome) {
   return { reference, result };
 }
 
-async function verifyTransaction(ctx, reference, outcome) {
+async function verifyTransaction(ctx, reference, outcome, stepLabel) {
   return ctx.record({
     action: "transaction.verify",
     outcome,
+    stepLabel,
+    paymentStatusPath: "data.status",
     method: "GET",
     path: `/transaction/verify/${encodeURIComponent(reference)}`,
   });
 }
 
+async function runExpectedCheckout(ctx, initial, options) {
+  let current = initial;
+  let retryCount = 0;
+
+  for (;;) {
+    if (!current.result.ok) {
+      throw new RecorderStopError(
+        `${options.title} could not start because transaction.initialize did not succeed. ` +
+          `What: the recorder stopped before the checkout. ` +
+          `Why: transaction.initialize did not return a successful Paystack response. ` +
+          `Fix: check the saved transaction.initialize fixture, then run the recorder again.`,
+      );
+    }
+    const authorizationUrl = requireResponseField(
+      current.result,
+      "transaction.initialize",
+      "data.authorization_url",
+      "string",
+    );
+    await ctx.promptCheckout({
+      title: options.title,
+      url: authorizationUrl,
+      card: options.card,
+      extra: options.extra,
+    });
+
+    try {
+      const verify = await verifyTransaction(
+        ctx,
+        current.reference,
+        makeExpectedStatusOutcome(ctx, options.expectedStatus, options.stepLabel),
+        options.stepLabel,
+      );
+      return { current, verify };
+    } catch (error) {
+      if (error instanceof RetryCheckoutSignal) {
+        retryCount += 1;
+        current = await initializeTransaction(
+          ctx,
+          options.retryOutcome(retryCount),
+          options.retryStepLabel(retryCount),
+        );
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 export async function record(ctx) {
   // Paystack transaction references allow only "-", ".", "=" and alphanumeric
   // characters (research/paystack.md section 1.1), so use hyphens here.
-  const main = await initializeTransaction(ctx);
-  const reference = main.reference;
+  const main = await initializeTransaction(ctx, undefined, "transaction.initialize (main)");
+  let mainReference = main.reference;
 
   await ctx.recordInvalid("transaction.initialize", {
     method: "POST",
@@ -105,39 +205,18 @@ export async function record(ctx) {
 
   let verify = null;
   if (main.result.ok) {
-    const authorizationUrl = requireResponseField(
-      main.result,
-      "transaction.initialize",
-      "data.authorization_url",
-      "string",
-    );
-    for (;;) {
-      await ctx.promptCheckout({
-        title: "Paystack test checkout",
-        url: authorizationUrl,
-        card: SUCCESS_CARD,
-        extra:
-          "The card has no PIN or OTP. Pay any amount; the recorder verifies the result afterward.",
-      });
-      const attempt = await verifyTransaction(ctx, reference, verifyOutcome);
-      if (!attempt.ok) {
-        break;
-      }
-      const status = requireResponseField(attempt, "transaction.verify", "data.status", "string");
-      requireResponseField(attempt, "transaction.verify", "data.id", "number");
-      if (status === "success") {
-        verify = attempt;
-        break;
-      }
-      console.log(`Paystack reports the transaction status as "${status}", not "success".`);
-      const answer = await ctx.ask(
-        "Try the checkout again? Type y and press Enter to retry, or press Enter to continue: ",
-      );
-      if (!/^y(es)?$/i.test(answer.trim())) {
-        verify = attempt;
-        break;
-      }
-    }
+    const mainRun = await runExpectedCheckout(ctx, main, {
+      title: "Paystack test checkout",
+      card: SUCCESS_CARD,
+      extra:
+        "The card has no PIN or OTP. Pay any amount; the recorder verifies the result afterward.",
+      expectedStatus: "success",
+      stepLabel: "transaction.verify (success checkout)",
+      retryOutcome: (attempt) => (attempt === 1 ? "retry" : `retry-${attempt}`),
+      retryStepLabel: (attempt) => `transaction.initialize (retry ${attempt})`,
+    });
+    mainReference = mainRun.current.reference;
+    verify = mainRun.verify;
   } else {
     await ctx.skip(
       "transaction.verify",
@@ -151,7 +230,12 @@ export async function record(ctx) {
   });
 
   if (verify?.ok) {
-    const transactionId = requireResponseField(verify, "transaction.verify", "data.id", "number");
+    const transactionId = requireResponseField(
+      verify,
+      "transaction.verify (success checkout)",
+      "data.id",
+      "number",
+    );
     await ctx.record({
       action: "transaction.fetch",
       method: "GET",
@@ -165,46 +249,34 @@ export async function record(ctx) {
     path: "/transaction/not-a-number",
   });
 
-  const unpaid = await initializeTransaction(ctx, () => "unpaid");
+  const unpaid = await initializeTransaction(ctx, "unpaid", "transaction.initialize (unpaid)");
   if (unpaid.result.ok) {
-    const unpaidVerify = await verifyTransaction(ctx, unpaid.reference, () => "unpaid");
-    if (unpaidVerify.ok) {
-      const status = requireResponseField(
-        unpaidVerify,
-        "transaction.verify",
-        "data.status",
-        "string",
-      );
-      console.log(`Unpaid transaction status: ${status}.`);
-    }
+    await verifyTransaction(
+      ctx,
+      unpaid.reference,
+      makeActualStatusOutcome("transaction.verify (unpaid)"),
+      "transaction.verify (unpaid)",
+    );
   } else {
     await ctx.skip("transaction.verify", "unpaid transaction.initialize did not succeed");
   }
 
-  const declined = await initializeTransaction(ctx, () => "declined");
+  const declined = await initializeTransaction(
+    ctx,
+    "declined",
+    "transaction.initialize (declined)",
+  );
   if (declined.result.ok) {
-    const authorizationUrl = requireResponseField(
-      declined.result,
-      "transaction.initialize",
-      "data.authorization_url",
-      "string",
-    );
-    await ctx.promptCheckout({
+    await runExpectedCheckout(ctx, declined, {
       title: "Paystack declined-card checkout",
-      url: authorizationUrl,
       card: DECLINED_CARD,
-      extra: "Use the declining test card shown above. The verify result is saved as declined.",
+      extra:
+        "Use the declining test card shown above. The verify result is saved under its real status.",
+      expectedStatus: "declined",
+      stepLabel: "transaction.verify (declined checkout)",
+      retryOutcome: (attempt) => (attempt === 1 ? "declined-retry" : `declined-retry-${attempt}`),
+      retryStepLabel: (attempt) => `transaction.initialize (declined retry ${attempt})`,
     });
-    const declinedVerify = await verifyTransaction(ctx, declined.reference, () => "declined");
-    if (declinedVerify.ok) {
-      const status = requireResponseField(
-        declinedVerify,
-        "transaction.verify",
-        "data.status",
-        "string",
-      );
-      console.log(`Declined-card transaction status: ${status}.`);
-    }
   } else {
     await ctx.skip("transaction.verify", "declined transaction.initialize did not succeed");
   }
@@ -225,7 +297,7 @@ export async function record(ctx) {
     action: "refund.create",
     method: "POST",
     path: "/refund",
-    body: encodeJson({ transaction: reference }),
+    body: encodeJson({ transaction: mainReference }),
   });
   await ctx.recordInvalid("refund.create", {
     method: "POST",

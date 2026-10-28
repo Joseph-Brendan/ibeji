@@ -50,8 +50,8 @@ function summaryCell(value) {
 export function printSummary(results) {
   console.log("");
   console.log("Recorder summary");
-  console.log("Action | Result | HTTP | Service message | Code | File or reason");
-  console.log("---|---|---|---|---|---");
+  console.log("Action | Result | HTTP | Payment status | Service message | Code | File or reason");
+  console.log("---|---|---|---|---|---|---|");
   for (const result of results) {
     const resultLabel =
       result.outcome === "skipped"
@@ -79,7 +79,7 @@ export function printSummary(results) {
       .filter((value) => value !== undefined && value !== null && value !== "")
       .join(" ");
     console.log(
-      `${summaryCell(result.action)} | ${summaryCell(resultLabel)} | ${statusLabel(result.status)} | ${summaryCell(result.serviceMessage)} | ${summaryCell(result.serviceCode)} | ${summaryCell(detail)}`,
+      `${summaryCell(result.action)} | ${summaryCell(resultLabel)} | ${statusLabel(result.status)} | ${summaryCell(result.paymentStatus)} | ${summaryCell(result.serviceMessage)} | ${summaryCell(result.serviceCode)} | ${summaryCell(detail)}`,
     );
   }
 }

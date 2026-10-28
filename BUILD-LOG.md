@@ -694,3 +694,44 @@ Fixed why successful Paystack steps could not supply values to the next step, ad
 - T3 can use the `unpaid`, `declined`, and `account-limit` fixtures as named expected outcomes; only `skipped`, `invalid-request`, `invalid-key`, and `lenient-input` stay excluded.
 - The Paystack twin must copy the observed non-integer refund ID 401 and the transfer account-limit message when it is built.
 - No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
+
+---
+
+## Phase 2, Step 2.10: Recorder labels fixtures by real status
+
+Date: 28 October 2026.
+
+Fixed fixtures being saved under expected status labels instead of the status Paystack actually returned, repeated writes to the same name, and payment pauses that continued before payment was made. No real key was used and no fixture was recorded in this task.
+
+### What was built
+
+- **Real status labels.** `transaction.verify` now takes its outcome from the real `data.status`. A verify that returns `abandoned` is saved as `transaction-verify-abandoned.json`, not `transaction-verify-declined.json`. A Paystack decline usually returns `failed`, so a correctly declined card is saved as `transaction-verify-failed.json`.
+- **Expected-status prompt.** A success checkout expects `success`; a declined-card checkout expects `declined` (with Paystack's documented `failed` treated as the declined result). On any other status the recorder prints both the expected and actual status and asks again until the person types:
+  - `r` to retry with a new payment link, which initializes a new transaction;
+  - `s` to save the response under its real status and continue;
+  - `q` to stop.
+  Plain Enter prints the choices again and changes nothing.
+- **No overwrites in one run.** Every fixture write is registered before it happens. If a name is already used, the run stops with an error naming both steps, for example `transaction.verify (success checkout)` and `transaction.verify (unpaid)`.
+- **Payment status in the summary.** Verify rows now show the real Paystack transaction status in a `Payment status` column.
+- **Retry fixtures.** A retry creates a new payment link and saves the new initialize under a distinct outcome such as `retry` or `declined-retry`, so retrying does not overwrite the original initialize fixture.
+
+### Decisions
+
+- The expected declined status accepts `failed` because `research/paystack.md` section 2 documents that a declined test card produces transaction status `failed`.
+- A mismatched verify chosen for retry or quit is not saved under a guessed label. Only `s` saves it, under its real status.
+- The duplicate check covers every fixture type in the current run, including skipped and invalid-request files, not only verifies.
+- The unpaid verify has no expected status; it is always saved under whatever status Paystack returns.
+
+### Tests
+
+- Added a fake-server test where the main verify returns `abandoned`, plain Enter repeats the prompt, then `s` saves `transaction-verify-abandoned.json` and the summary shows `abandoned`.
+- Added a fake-server test where `r` initializes a new transaction and prints a different payment link, then saves the retried verification by its real status.
+- Added a fake-server test where `q` stops without saving the mismatched verify.
+- Added a fake-server test where main and unpaid verifies both return `success`, proving the second write stops and names both steps instead of overwriting.
+- Updated the existing Paystack flow test to use real statuses (`success`, `abandoned`, `failed`) and check the new summary column.
+
+### Later
+
+- Run the recorder by hand against Paystack to capture the status-labelled fixtures.
+- T3 should use the real-status files (`success`, `abandoned`, `failed`, and any other recorded status) as named expected outcomes.
+- No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
