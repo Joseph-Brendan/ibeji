@@ -928,3 +928,43 @@ Reviewed the recorded Paystack and Flutterwave fixtures against their research f
 - Record Flutterwave transfer create/fetch when an IP-whitelisted account is available.
 - Record webhook delivery examples separately from the API fixture recorder.
 - No SPEC.md section was edited; this review corrects research and the comparison table only.
+
+---
+
+## Phase 3, Step 3.1: core foundations
+
+Date: 28 October 2026.
+
+Built the first eight core modules in `src/core/`, with tests written alongside each module. No twin-specific code or twin id list was added. The core still knows no service names.
+
+### What was built
+
+- **Errors.** `IbejiError` has a stable code, what, why, fix, optional cause, HTTP status where C12 gives one, and `toJSON()` without a stack. `zodProblemsToError` turns every Zod problem into one error naming all fields. All 23 C12 codes have plain-English defaults.
+- **Clock.** A `Clock` interface with a real clock and a fake clock. The fake clock advances only when asked, fires timers in due order and never early, and supports timers created inside callbacks.
+- **Random.** A seeded Mulberry32 generator. The same seed gives the same sequence; `next`, `int` and `chance` validate their inputs.
+- **Events.** An event log and bus with increasing ids, clock time, type, scope, summary and details. Subscribers can filter by scope, `after(id)` supports reconnection, and only the newest 5,000 events are kept.
+- **State.** A session-wide store with one scoped store per twin. Each twin registers its named collections; get, list, insert and update return deep copies; reset clears one twin or all. A twin cannot reach a collection it did not register.
+- **Config.** A strict Zod schema for every C14 field. Twin ids, default ports, scenarios and extra credential patterns come from `ConfigContext`, never from a hard-coded list. Unknown fields, unknown twin ids, duplicate twins, empty `twins`, nulls, clashing ports and unsupported scenarios become one `CONFIG_INVALID` error with examples. Secret-looking values become `CONFIG_HAS_SECRET` without echoing the value. `mergeConfig` applies defaults, file, then flags, and a flag list replaces the file list.
+- **Redaction.** `fingerprint` returns the first eight hex characters of SHA-256. `redactCredential` returns only a known public prefix plus that fingerprint, and refuses a value that does not start with the prefix.
+- **Logger.** Levels error, warn, info and debug. The default writer is stderr; there is no stdout path.
+
+### Decisions
+
+- **Zod is a runtime dependency.** SPEC.md C1 already requires Zod 4.x for request, config and scenario checks, and this task requires a Zod config schema. Added `zod@4.6.7`; it is pure JavaScript with no native code or install script. It is the only new dependency.
+- **The core receives service facts through context.** Config validation gets twin ids, default ports, scenarios and credential patterns from the caller. This keeps service names and key formats out of the core (C3 rule 8).
+- **Deep copies use `structuredClone`.** Twin state and event details are JSON-shaped snapshots, so a caller changing a returned object cannot change the store or log.
+- **`after(id)` returns retained events only.** If the oldest events were trimmed, a reconnect gets the newest 5,000, which is the same limit C9's export uses.
+- **Config objects merge by key, lists replace.** A `--twin-port` flag can override one port without dropping the configured ports for other twins; `--twins` replaces the list, as C14 requires.
+- **No SPEC.md change.** No C21 entry is needed; this step implements C12, C14 and C17.
+
+### Tests
+
+- Added 75 unit tests across eight files, named with `C12`, `C14` or `T1` references.
+- Property tests cover `int(min, max)` in range and redaction never returning a six-character run from the secret part.
+- Coverage is 100% of statements, branches, functions and lines for `src/core/`.
+
+### Later
+
+- Wire `ConfigContext` to the registry when the twin definitions and scenario catalog exist.
+- Add webhook address policy checks (`WEBHOOK_URL_NOT_ALLOWED`) when the webhook dispatcher is built; the config schema currently checks only that a URL is http or https.
+- Add the session/export layers that consume the event log and state store.
