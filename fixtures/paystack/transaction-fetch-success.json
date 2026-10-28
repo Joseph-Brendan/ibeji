@@ -1,0 +1,126 @@
+{
+  "action": "transaction.fetch",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:27:46.591Z",
+  "method": "GET",
+  "path": "/transaction/6704973978",
+  "query": null,
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "98"
+  },
+  "responseBody": {
+    "status": true,
+    "message": "Transaction retrieved",
+    "data": {
+      "id": 6704973978,
+      "domain": "test",
+      "status": "success",
+      "reference": "ibeji-1793190415564-39ea4bc1863a",
+      "receipt_number": null,
+      "amount": 10000,
+      "message": null,
+      "gateway_response": "Successful",
+      "gateway_response_code": "approved",
+      "response_code": "00",
+      "helpdesk_link": null,
+      "paid_at": "2026-10-28T12:27:35.000Z",
+      "created_at": "2026-10-28T12:26:56.000Z",
+      "channel": "card",
+      "currency": "NGN",
+      "ip_address": "203.0.113.1",
+      "metadata": {
+        "recorder": "ibeji"
+      },
+      "log": {
+        "start_time": 1793190424,
+        "time_spent": 32,
+        "attempts": 1,
+        "errors": 0,
+        "success": true,
+        "mobile": false,
+        "input": [],
+        "history": [
+          {
+            "type": "input",
+            "message": "Filled this field: card number",
+            "time": 15
+          },
+          {
+            "type": "action",
+            "message": "User switched transaction currency to NGN",
+            "time": 16
+          },
+          {
+            "type": "input",
+            "message": "Filled this field: card expiry",
+            "time": 24
+          },
+          {
+            "type": "input",
+            "message": "Filled this field: card cvv",
+            "time": 30
+          },
+          {
+            "type": "action",
+            "message": "Attempted to pay with card",
+            "time": 31
+          },
+          {
+            "type": "success",
+            "message": "Successfully paid with card",
+            "time": 32
+          }
+        ]
+      },
+      "fees": 150,
+      "fees_split": null,
+      "authorization": {
+        "authorization_code": "[REDACTED_AUTH_CODE_2]",
+        "bin": "408408",
+        "last4": "0000",
+        "exp_month": "12",
+        "exp_year": "2099",
+        "channel": "card",
+        "card_type": "visa ",
+        "bank": "TEST BANK",
+        "country_code": "NG",
+        "brand": "visa",
+        "reusable": true,
+        "signature": "[REDACTED_KEY_1]",
+        "account_name": null,
+        "receiver_bank_account_number": null,
+        "receiver_bank": null
+      },
+      "customer": {
+        "id": 412410465,
+        "first_name": null,
+        "last_name": null,
+        "email": "customer.one@example.com",
+        "customer_code": "CUS_04u1wadufvyzo7o",
+        "phone": null,
+        "metadata": null,
+        "risk_action": "default",
+        "international_format_phone": null
+      },
+      "plan": {},
+      "subaccount": {},
+      "split": {},
+      "order_id": null,
+      "paidAt": "2026-10-28T12:27:35.000Z",
+      "createdAt": "2026-10-28T12:26:56.000Z",
+      "requested_amount": 10000,
+      "pos_transaction_data": null,
+      "source": {
+        "type": "api",
+        "source": "merchant_api",
+        "identifier": null
+      },
+      "fees_breakdown": null,
+      "connect": null
+    }
+  }
+}

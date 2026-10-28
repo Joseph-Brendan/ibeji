@@ -1,0 +1,18 @@
+{
+  "action": "refund.create",
+  "outcome": "invalid-request",
+  "recordedAt": "2026-10-28T12:59:09.576Z",
+  "method": "POST",
+  "path": "/v3/transactions/10579745/refund",
+  "query": null,
+  "requestBody": "{\"amount\":1}",
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "error",
+    "message": "Some error occured",
+    "data": "A partial refund is currently processing on this transaction. Please, try again in 2 mins."
+  }
+}

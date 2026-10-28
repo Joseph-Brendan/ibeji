@@ -1,0 +1,27 @@
+{
+  "action": "bank.resolve",
+  "outcome": "invalid-request",
+  "recordedAt": "2026-10-28T12:28:43.318Z",
+  "method": "GET",
+  "path": "/bank/resolve",
+  "query": {
+    "account_number": "0000000002",
+    "bank_code": "057"
+  },
+  "requestBody": null,
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "89"
+  },
+  "responseBody": {
+    "status": false,
+    "message": "Account number should be numeric",
+    "meta": {
+      "nextStep": "You need to pass a valid account number in your API Request"
+    },
+    "type": "validation_error",
+    "code": "invalid_account_number"
+  }
+}

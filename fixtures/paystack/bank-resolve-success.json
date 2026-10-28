@@ -1,0 +1,27 @@
+{
+  "action": "bank.resolve",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:37:20.206Z",
+  "method": "GET",
+  "path": "/bank/resolve",
+  "query": {
+    "account_number": "0000000001",
+    "bank_code": "001"
+  },
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "100"
+  },
+  "responseBody": {
+    "status": true,
+    "message": "Account number resolved",
+    "data": {
+      "account_number": "0000000001",
+      "account_name": "Test Name 1",
+      "bank_id": 24
+    }
+  }
+}

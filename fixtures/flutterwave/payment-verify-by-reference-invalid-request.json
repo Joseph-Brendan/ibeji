@@ -1,0 +1,20 @@
+{
+  "action": "payment.verify_by_reference",
+  "outcome": "invalid-request",
+  "recordedAt": "2026-10-28T12:58:59.632Z",
+  "method": "GET",
+  "path": "/v3/transactions/verify_by_reference",
+  "query": {
+    "tx_ref": "ibeji-invalid-reference"
+  },
+  "requestBody": null,
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "error",
+    "message": "No transaction was found for this id",
+    "data": null
+  }
+}

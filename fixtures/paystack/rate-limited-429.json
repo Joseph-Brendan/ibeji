@@ -1,0 +1,31 @@
+{
+  "action": "bank.resolve",
+  "outcome": "skipped",
+  "realRateLimit": true,
+  "note": "Real Paystack rate-limit response recorded on 28 October 2026.",
+  "reason": "HTTP 429: Test mode daily limit of 3 live bank resolves exceeded. Use test bank codes 001 or upgrade to live mode. (unknown)",
+  "recordedAt": "2026-10-28T12:28:43.029Z",
+  "method": "GET",
+  "path": "/bank/resolve",
+  "query": {
+    "account_number": "0000000001",
+    "bank_code": "057"
+  },
+  "requestBody": null,
+  "requestContentType": null,
+  "status": 429,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "90"
+  },
+  "responseBody": {
+    "status": false,
+    "message": "Test mode daily limit of 3 live bank resolves exceeded. Use test bank codes 001 or upgrade to live mode.",
+    "meta": {
+      "nextStep": "Try again later"
+    },
+    "type": "api_error",
+    "code": "unknown"
+  }
+}

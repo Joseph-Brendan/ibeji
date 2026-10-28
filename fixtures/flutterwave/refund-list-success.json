@@ -1,0 +1,42 @@
+{
+  "action": "refund.list",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:59:18.628Z",
+  "method": "GET",
+  "path": "/v3/refunds",
+  "query": {
+    "from": "2026-10-28",
+    "to": "2026-10-28"
+  },
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "success",
+    "message": "Refunds fetched",
+    "meta": {
+      "page_info": {
+        "total": 1,
+        "current_page": 1,
+        "total_pages": 1,
+        "page_size": 20
+      }
+    },
+    "data": [
+      {
+        "id": 110122,
+        "amount_refunded": 100,
+        "status": "completed",
+        "flw_ref": "FLW-MOCK-1f880e899320a79fff8df457d83c3e07",
+        "comment": null,
+        "settlement_id": "NEW",
+        "meta": "{\"source\":\"ledgerbalance\",\"isPartialRefund\":true,\"uniquereference\":\"73098543515\"}",
+        "created_at": "2026-10-28T12:59:03.000Z",
+        "account_id": 1967796,
+        "transaction_id": 9822964
+      }
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "action": "payment.verify_by_reference",
+  "outcome": "unpaid",
+  "note": "An unpaid hosted payment has no transaction yet; verify by reference returns 400 until the customer starts paying. Observed while recording on 28 October 2026.",
+  "recordedAt": "2026-10-28T13:11:43.376Z",
+  "method": "GET",
+  "path": "/v3/transactions/verify_by_reference",
+  "query": {
+    "tx_ref": "ibeji-unpaid_1793193102760_8997ba7cf9c9"
+  },
+  "requestBody": null,
+  "requestContentType": null,
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "error",
+    "message": "No transaction was found for this id",
+    "data": null
+  }
+}

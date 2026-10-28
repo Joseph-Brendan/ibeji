@@ -1,0 +1,15 @@
+{
+  "action": "transfer.fetch",
+  "outcome": "lenient-input",
+  "note": "Flutterwave accepted the deliberately wrong input with HTTP 200; saved as lenient-input instead of invalid-request.",
+  "recordedAt": "2026-10-28T12:59:21.753Z",
+  "method": "GET",
+  "path": "/v3/transfers/not-a-number",
+  "query": null,
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "text/html; charset=utf-8"
+  },
+  "responseBody": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /v3/transfers/not-a-number</pre>\n</body>\n</html>\n"
+}

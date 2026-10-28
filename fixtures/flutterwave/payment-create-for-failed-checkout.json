@@ -1,0 +1,20 @@
+{
+  "action": "payment.create",
+  "outcome": "for-failed-checkout",
+  "recordedAt": "2026-10-28T13:11:43.669Z",
+  "method": "POST",
+  "path": "/v3/payments",
+  "query": null,
+  "requestBody": "{\"amount\":7500,\"tx_ref\":\"ibeji-failed_1793193103378_665a64a7b0dd\",\"currency\":\"NGN\",\"redirect_url\":\"https://example.com/ibeji/flutterwave/failed\",\"customer\":{\"email\":\"customer.two@example.com\",\"name\":\"Test Name 1\"}}",
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "success",
+    "message": "Hosted Link",
+    "data": {
+      "link": "https://checkout-v2.dev-flutterwave.com/v3/hosted/pay/f5f255fcc31ee00146a4"
+    }
+  }
+}

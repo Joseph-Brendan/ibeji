@@ -1,0 +1,20 @@
+{
+  "action": "transfer.list",
+  "outcome": "invalid-request",
+  "recordedAt": "2026-10-28T12:59:22.315Z",
+  "method": "GET",
+  "path": "/v3/transfers",
+  "query": {
+    "page": "not-a-number"
+  },
+  "requestBody": null,
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "error",
+    "message": "page parameter must be a positive integer",
+    "data": null
+  }
+}

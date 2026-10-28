@@ -1,0 +1,18 @@
+{
+  "action": "payment.verify",
+  "outcome": "invalid-request",
+  "recordedAt": "2026-10-28T12:59:00.401Z",
+  "method": "GET",
+  "path": "/v3/transactions/not-a-number/verify",
+  "query": null,
+  "requestBody": null,
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "error",
+    "message": "No transaction was found for this id",
+    "data": null
+  }
+}

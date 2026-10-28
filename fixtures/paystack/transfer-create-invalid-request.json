@@ -1,0 +1,24 @@
+{
+  "action": "transfer.create",
+  "outcome": "invalid-request",
+  "recordedAt": "2026-10-28T12:28:42.147Z",
+  "method": "POST",
+  "path": "/transfer",
+  "query": null,
+  "requestBody": "{\"source\":\"balance\",\"amount\":100}",
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "91"
+  },
+  "responseBody": {
+    "status": false,
+    "message": "You cannot initiate third party payouts as a starter business",
+    "meta": {
+      "nextStep": "You'll need to upgrade your business to a Registered Business."
+    },
+    "type": "api_error",
+    "code": "transfer_unavailable"
+  }
+}

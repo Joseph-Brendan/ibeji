@@ -1,0 +1,24 @@
+{
+  "action": "transfer.create",
+  "outcome": "account-limit",
+  "recordedAt": "2026-10-28T12:28:41.572Z",
+  "method": "POST",
+  "path": "/transfer",
+  "query": null,
+  "requestBody": "{\"source\":\"balance\",\"amount\":100,\"recipient\":\"RCP_rnolhq7smwpju6s\",\"reference\":\"ibeji_1793190521251_e496d9b72d6f\",\"reason\":\"Ibeji recorder\",\"currency\":\"NGN\"}",
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "92"
+  },
+  "responseBody": {
+    "status": false,
+    "message": "You cannot initiate third party payouts as a starter business",
+    "meta": {
+      "nextStep": "You'll need to upgrade your business to a Registered Business."
+    },
+    "type": "api_error",
+    "code": "transfer_unavailable"
+  }
+}

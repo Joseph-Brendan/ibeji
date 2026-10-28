@@ -900,3 +900,31 @@ Corrected the Flutterwave fixture names from the review, recorded the unpaid hos
 - Approve or reject the TWIN-DESIGN section 2.0 clarification before the Flutterwave twin implements verify-before-payment.
 - Run the Flutterwave recorder again to confirm future fixtures use the new names.
 - No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
+
+---
+
+## Phase 2, Step 2.15: Fixture review for Paystack and Flutterwave
+
+Date: 28 October 2026.
+
+Reviewed the recorded Paystack and Flutterwave fixtures against their research files. Stripe is out of scope for 0.1.0 (C21 D42) and was not treated as missing.
+
+### What was reviewed
+
+- **Paystack:** 30 fixture files covering initialize, verify, fetch, list, refund create/fetch/list, transfer recipient, bank list, bank resolve, error cases, and the account-limit response.
+- **Flutterwave:** 28 fixture files covering payment create/verify/verify-by-reference/list, unpaid and failed checkout verifies, refund create/fetch/list, transfer create/fetch/list, bank list, bank resolve, and error cases.
+- **Research corrections:** the Paystack and Flutterwave research files now record the fixture-confirmed fields, types, error bodies, lenient responses, transfer scope, and the Flutterwave unpaid-payment 400. Each change is marked “corrected from fixture, 28 October 2026”.
+- **TWIN-DESIGN:** the comparison table now includes the Flutterwave `errors[]` validation shape and the rule that verify-by-reference returns 400 before an unpaid hosted payment starts. The twin definition still fits; no structural design change was needed.
+- **Actions without fixtures:** Paystack transfer create/fetch/verify are still documentation-only because of the starter-business limit. Flutterwave transfer create/fetch are still documentation-only because of IP whitelisting; no successful transfer.create fixture exists. Local checkout pages and webhook deliveries have no recorder fixtures by design and remain documentation-led.
+
+### Privacy
+
+- T13 passed.
+- Manual scan of all 58 fixture files found only `customer.one` to `customer.four@example.com`, `+15550000001`, `Test Name N`, `0000000001`/`0000000002`, `203.0.113.x`, redacted key/token/auth-code placeholders, `last4` `0000`, and no keys or card numbers.
+
+### Later
+
+- Record Paystack transfer create/fetch/verify when an eligible business account is available.
+- Record Flutterwave transfer create/fetch when an IP-whitelisted account is available.
+- Record webhook delivery examples separately from the API fixture recorder.
+- No SPEC.md section was edited; this review corrects research and the comparison table only.

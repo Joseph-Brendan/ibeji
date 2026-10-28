@@ -1,0 +1,21 @@
+{
+  "action": "bank.resolve",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:59:25.460Z",
+  "method": "POST",
+  "path": "/v3/accounts/resolve",
+  "query": null,
+  "requestBody": "{\"account_number\":\"0000000001\",\"account_bank\":\"044\"}",
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "success",
+    "message": "Account details fetched",
+    "data": {
+      "account_name": "Test Name 576",
+      "account_number": "0000000001"
+    }
+  }
+}

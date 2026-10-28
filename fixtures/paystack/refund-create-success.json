@@ -1,0 +1,74 @@
+{
+  "action": "refund.create",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:28:39.004Z",
+  "method": "POST",
+  "path": "/refund",
+  "query": null,
+  "requestBody": "{\"transaction\":\"ibeji-1793190415564-39ea4bc1863a\"}",
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "100"
+  },
+  "responseBody": {
+    "status": true,
+    "message": "Refund has been queued for processing",
+    "data": {
+      "integration": 1044674,
+      "transaction": {
+        "id": 6704973978,
+        "domain": "test",
+        "reference": "ibeji-1793190415564-39ea4bc1863a",
+        "receipt_number": null,
+        "amount": 10000,
+        "gateway_response_code": null,
+        "response_code": null,
+        "paid_at": "2026-10-28T12:27:35.000Z",
+        "channel": "card",
+        "currency": "NGN",
+        "metadata": "{\"recorder\":\"ibeji\"}",
+        "authorization": {
+          "exp_month": null,
+          "exp_year": null,
+          "account_name": null,
+          "receiver_bank_account_number": null,
+          "receiver_bank": null
+        },
+        "customer": {
+          "international_format_phone": null
+        },
+        "plan": {},
+        "subaccount": {
+          "currency": null,
+          "is_verified": false
+        },
+        "split": {},
+        "order_id": null,
+        "paidAt": "2026-10-28T12:27:35.000Z",
+        "requested_amount": 10000,
+        "pos_transaction_data": null,
+        "source": null,
+        "fees_breakdown": null,
+        "connect": null
+      },
+      "id": 18884372,
+      "domain": "test",
+      "currency": "NGN",
+      "amount": 10000,
+      "status": "pending",
+      "expected_at": "2026-11-06T12:28:39.060Z",
+      "channel": "test",
+      "refunded_by": "gmail",
+      "customer_note": "Refund for transaction ibeji-1793190415564-39ea4bc1863a",
+      "merchant_note": "Refund for transaction ibeji-1793190415564-39ea4bc1863a by customer.four@example.com",
+      "deducted_amount": 0,
+      "fully_deducted": false,
+      "reason": "PENDING",
+      "customer": null,
+      "initiated_by": "gmail",
+      "session_id": null
+    }
+  }
+}

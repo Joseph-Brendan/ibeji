@@ -1,0 +1,21 @@
+{
+  "action": "bank.list",
+  "outcome": "lenient-input",
+  "note": "Paystack accepted the deliberately wrong input with HTTP 200; saved as lenient-input instead of invalid-request.",
+  "recordedAt": "2026-10-28T12:28:42.723Z",
+  "method": "GET",
+  "path": "/bank",
+  "query": {
+    "country": "not-a-country"
+  },
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": true,
+    "message": "Banks retrieved",
+    "data": []
+  }
+}

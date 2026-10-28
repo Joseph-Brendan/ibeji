@@ -1,0 +1,462 @@
+{
+  "action": "transaction.list",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:28:38.331Z",
+  "method": "GET",
+  "path": "/transaction",
+  "query": {
+    "perPage": 5,
+    "page": 1
+  },
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "1000",
+    "x-ratelimit-remaining": "1000"
+  },
+  "responseBody": {
+    "status": true,
+    "message": "Transactions retrieved",
+    "data": [
+      {
+        "id": 6704976747,
+        "domain": "test",
+        "status": "failed",
+        "reference": "ibeji-1793190467579-27b6bcf84eff",
+        "amount": 10000,
+        "message": null,
+        "gateway_response": "Declined",
+        "gateway_response_code": "do_not_honor",
+        "response_code": "05",
+        "paid_at": null,
+        "created_at": "2026-10-28T12:27:48.000Z",
+        "channel": "card",
+        "currency": "NGN",
+        "ip_address": "203.0.113.1",
+        "metadata": {
+          "recorder": "ibeji"
+        },
+        "log": {
+          "start_time": 1793190481,
+          "time_spent": 26,
+          "attempts": 1,
+          "errors": 1,
+          "success": false,
+          "mobile": false,
+          "input": [],
+          "history": [
+            {
+              "type": "input",
+              "message": "Filled this field: card number",
+              "time": 15
+            },
+            {
+              "type": "action",
+              "message": "User switched transaction currency to NGN",
+              "time": 15
+            },
+            {
+              "type": "input",
+              "message": "Filled this field: card expiry",
+              "time": 22
+            },
+            {
+              "type": "input",
+              "message": "Filled this field: card cvv",
+              "time": 24
+            },
+            {
+              "type": "action",
+              "message": "Attempted to pay with card",
+              "time": 25
+            },
+            {
+              "type": "error",
+              "message": "Error: Declined",
+              "time": 26
+            }
+          ]
+        },
+        "fees": null,
+        "fees_split": null,
+        "customer": {
+          "id": 412421623,
+          "first_name": null,
+          "last_name": null,
+          "email": "customer.three@example.com",
+          "phone": null,
+          "metadata": null,
+          "customer_code": "CUS_mzdue8n4k3999e2",
+          "risk_action": "default"
+        },
+        "authorization": {
+          "authorization_code": "[REDACTED_AUTH_CODE_5]",
+          "bin": "408408",
+          "last4": "0000",
+          "exp_month": "12",
+          "exp_year": "2099",
+          "channel": "card",
+          "card_type": "visa ",
+          "bank": "TEST BANK",
+          "country_code": "NG",
+          "brand": "visa",
+          "reusable": true,
+          "signature": "[REDACTED_KEY_2]",
+          "account_name": null
+        },
+        "plan": {},
+        "split": {},
+        "subaccount": {},
+        "order_id": null,
+        "paidAt": null,
+        "createdAt": "2026-10-28T12:27:48.000Z",
+        "requested_amount": 10000,
+        "source": {
+          "source": "merchant_api",
+          "type": "api",
+          "identifier": null,
+          "entry_point": "transaction_initialize"
+        },
+        "connect": null,
+        "pos_transaction_data": null
+      },
+      {
+        "id": 6704976695,
+        "domain": "test",
+        "status": "abandoned",
+        "reference": "ibeji-1793190466899-62e37b7e7d2e",
+        "amount": 10000,
+        "message": null,
+        "gateway_response": "The transaction was not completed",
+        "gateway_response_code": null,
+        "response_code": null,
+        "paid_at": null,
+        "created_at": "2026-10-28T12:27:47.000Z",
+        "channel": "card",
+        "currency": "NGN",
+        "ip_address": "203.0.113.2",
+        "metadata": {
+          "recorder": "ibeji"
+        },
+        "log": null,
+        "fees": null,
+        "fees_split": null,
+        "customer": {
+          "id": 412419790,
+          "first_name": null,
+          "last_name": null,
+          "email": "customer.two@example.com",
+          "phone": null,
+          "metadata": null,
+          "customer_code": "CUS_r9i1a26h3dupnfl",
+          "risk_action": "default"
+        },
+        "authorization": {
+          "authorization_code": null,
+          "bin": null,
+          "last4": null,
+          "exp_month": null,
+          "exp_year": null,
+          "channel": null,
+          "card_type": null,
+          "bank": null,
+          "country_code": null,
+          "brand": null,
+          "reusable": false,
+          "signature": null,
+          "account_name": null
+        },
+        "plan": {},
+        "split": {},
+        "subaccount": {},
+        "order_id": null,
+        "paidAt": null,
+        "createdAt": "2026-10-28T12:27:47.000Z",
+        "requested_amount": 10000,
+        "source": {
+          "source": "merchant_api",
+          "type": "api",
+          "identifier": null,
+          "entry_point": "transaction_initialize"
+        },
+        "connect": null,
+        "pos_transaction_data": null
+      },
+      {
+        "id": 6704973978,
+        "domain": "test",
+        "status": "success",
+        "reference": "ibeji-1793190415564-39ea4bc1863a",
+        "amount": 10000,
+        "message": null,
+        "gateway_response": "Successful",
+        "gateway_response_code": "approved",
+        "response_code": "00",
+        "paid_at": "2026-10-28T12:27:35.000Z",
+        "created_at": "2026-10-28T12:26:56.000Z",
+        "channel": "card",
+        "currency": "NGN",
+        "ip_address": "203.0.113.1",
+        "metadata": {
+          "recorder": "ibeji"
+        },
+        "log": {
+          "start_time": 1793190424,
+          "time_spent": 32,
+          "attempts": 1,
+          "errors": 0,
+          "success": true,
+          "mobile": false,
+          "input": [],
+          "history": [
+            {
+              "type": "input",
+              "message": "Filled this field: card number",
+              "time": 15
+            },
+            {
+              "type": "action",
+              "message": "User switched transaction currency to NGN",
+              "time": 16
+            },
+            {
+              "type": "input",
+              "message": "Filled this field: card expiry",
+              "time": 24
+            },
+            {
+              "type": "input",
+              "message": "Filled this field: card cvv",
+              "time": 30
+            },
+            {
+              "type": "action",
+              "message": "Attempted to pay with card",
+              "time": 31
+            },
+            {
+              "type": "success",
+              "message": "Successfully paid with card",
+              "time": 32
+            }
+          ]
+        },
+        "fees": 150,
+        "fees_split": null,
+        "customer": {
+          "id": 412410465,
+          "first_name": null,
+          "last_name": null,
+          "email": "customer.one@example.com",
+          "phone": null,
+          "metadata": null,
+          "customer_code": "CUS_04u1wadufvyzo7o",
+          "risk_action": "default"
+        },
+        "authorization": {
+          "authorization_code": "[REDACTED_AUTH_CODE_2]",
+          "bin": "408408",
+          "last4": "0000",
+          "exp_month": "12",
+          "exp_year": "2099",
+          "channel": "card",
+          "card_type": "visa ",
+          "bank": "TEST BANK",
+          "country_code": "NG",
+          "brand": "visa",
+          "reusable": true,
+          "signature": "[REDACTED_KEY_1]",
+          "account_name": null
+        },
+        "plan": {},
+        "split": {},
+        "subaccount": {},
+        "order_id": null,
+        "paidAt": "2026-10-28T12:27:35.000Z",
+        "createdAt": "2026-10-28T12:26:56.000Z",
+        "requested_amount": 10000,
+        "source": {
+          "source": "merchant_api",
+          "type": "api",
+          "identifier": null,
+          "entry_point": "transaction_initialize"
+        },
+        "connect": null,
+        "pos_transaction_data": null
+      },
+      {
+        "id": 6704954513,
+        "domain": "test",
+        "status": "abandoned",
+        "reference": "ibeji-1793190063428-3691f3825e0b",
+        "amount": 10000,
+        "message": null,
+        "gateway_response": "The transaction was not completed",
+        "gateway_response_code": null,
+        "response_code": null,
+        "paid_at": null,
+        "created_at": "2026-10-28T12:21:04.000Z",
+        "channel": "card",
+        "currency": "NGN",
+        "ip_address": "203.0.113.3",
+        "metadata": {
+          "recorder": "ibeji"
+        },
+        "log": null,
+        "fees": null,
+        "fees_split": null,
+        "customer": {
+          "id": 412419790,
+          "first_name": null,
+          "last_name": null,
+          "email": "customer.two@example.com",
+          "phone": null,
+          "metadata": null,
+          "customer_code": "CUS_r9i1a26h3dupnfl",
+          "risk_action": "default"
+        },
+        "authorization": {
+          "authorization_code": null,
+          "bin": null,
+          "last4": null,
+          "exp_month": null,
+          "exp_year": null,
+          "channel": null,
+          "card_type": null,
+          "bank": null,
+          "country_code": null,
+          "brand": null,
+          "reusable": false,
+          "signature": null,
+          "account_name": null
+        },
+        "plan": {},
+        "split": {},
+        "subaccount": {},
+        "order_id": null,
+        "paidAt": null,
+        "createdAt": "2026-10-28T12:21:04.000Z",
+        "requested_amount": 10000,
+        "source": {
+          "source": "merchant_api",
+          "type": "api",
+          "identifier": null,
+          "entry_point": "transaction_initialize"
+        },
+        "connect": null,
+        "pos_transaction_data": null
+      },
+      {
+        "id": 6704950630,
+        "domain": "test",
+        "status": "abandoned",
+        "reference": "ibeji-1793189986980-4ac3df6e3d8c",
+        "amount": 10000,
+        "message": null,
+        "gateway_response": "Transaction declined. Please use the test card.",
+        "gateway_response_code": null,
+        "response_code": null,
+        "paid_at": null,
+        "created_at": "2026-10-28T12:19:47.000Z",
+        "channel": "card",
+        "currency": "NGN",
+        "ip_address": "203.0.113.1",
+        "metadata": {
+          "recorder": "ibeji"
+        },
+        "log": {
+          "start_time": 1793190008,
+          "time_spent": 29,
+          "attempts": 1,
+          "errors": 1,
+          "success": false,
+          "mobile": false,
+          "input": [],
+          "history": [
+            {
+              "type": "input",
+              "message": "Filled this field: card number",
+              "time": 12
+            },
+            {
+              "type": "action",
+              "message": "User switched transaction currency to NGN",
+              "time": 12
+            },
+            {
+              "type": "input",
+              "message": "Filled this field: card expiry",
+              "time": 20
+            },
+            {
+              "type": "input",
+              "message": "Filled this field: card cvv",
+              "time": 27
+            },
+            {
+              "type": "action",
+              "message": "Attempted to pay with card",
+              "time": 28
+            },
+            {
+              "type": "error",
+              "message": "Error: Transaction declined. Please use the test card.",
+              "time": 29
+            }
+          ]
+        },
+        "fees": null,
+        "fees_split": null,
+        "customer": {
+          "id": 412410465,
+          "first_name": null,
+          "last_name": null,
+          "email": "customer.one@example.com",
+          "phone": null,
+          "metadata": null,
+          "customer_code": "CUS_04u1wadufvyzo7o",
+          "risk_action": "default"
+        },
+        "authorization": {
+          "authorization_code": null,
+          "bin": null,
+          "last4": null,
+          "exp_month": null,
+          "exp_year": null,
+          "channel": null,
+          "card_type": null,
+          "bank": null,
+          "country_code": null,
+          "brand": null,
+          "reusable": false,
+          "signature": null,
+          "account_name": null
+        },
+        "plan": {},
+        "split": {},
+        "subaccount": {},
+        "order_id": null,
+        "paidAt": null,
+        "createdAt": "2026-10-28T12:19:47.000Z",
+        "requested_amount": 10000,
+        "source": {
+          "source": "merchant_api",
+          "type": "api",
+          "identifier": null,
+          "entry_point": "transaction_initialize"
+        },
+        "connect": null,
+        "pos_transaction_data": null
+      }
+    ],
+    "meta": {
+      "total": 12,
+      "total_volume": 50000,
+      "skipped": 0,
+      "perPage": 5,
+      "page": 1,
+      "pageCount": 3
+    }
+  }
+}

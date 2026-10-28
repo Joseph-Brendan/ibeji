@@ -87,7 +87,7 @@ Most errors:
 }
 ```
 
-`data` is optional and may contain details. The 500 error sample is different:
+`data` is optional and may contain details. Validation errors can also add an `errors` array of objects with `field` and `message`; the payment create fixture returns `{"status":"error","errors":[{"field":"redirect_url","message":"Redirect URL is required"}],"message":"One or more required parameters missing"}` (corrected from fixture, 28 October 2026). The 500 error sample is different:
 
 ```json
 {
@@ -231,6 +231,11 @@ List response `data[]` item:
 
 Documented refund statuses: `completed`, `completed-bank-transfer`, `completed-momo`, `completed-mpgs`, `completed-offline`, `completed-preauth`, `pending-momo`, `pending-bank-transfer`, `pending-mpgs`, `processing`. See §14.
 
+Fixture corrections for the refund object, 28 October 2026 (corrected from fixture):
+
+- The create fixture includes `destination` (string), `comments` (null), and `meta` as an object with `source`, `isPartialRefund`, and `uniquereference`. The fetch/list fixtures use `comment` (null) and `meta` as a string containing JSON.
+- The create fixture returns `status: "completed"`; the fetch/list fixtures return `status: "completed"` in the recorded case.
+
 ### 1.6 Transfer object
 
 Sources: [Create a transfer](https://developer.flutterwave.com/v3.0.0/reference/create-a-transfer), [Get a transfer](https://developer.flutterwave.com/v3.0.0/reference/get-a-transfer), [Get all transfers](https://developer.flutterwave.com/v3.0.0/reference/get-all-transfers), [Bank Account Transfer](https://developer.flutterwave.com/v3.0.0/docs/bank-account).
@@ -278,6 +283,17 @@ Resolve `data`:
 |---|---|---|
 | `account_number` | string | `"0690000032"` |
 | `account_name` | string | `"Pastor Bright"` |
+
+### 1.8 Fixture corrections from the recorded run (28 October 2026)
+
+Each item below is corrected from a recorded fixture:
+
+- Payment create validation errors add an `errors` array of `{ field, message }` objects; the fixture omits `data`.
+- The verify transaction fixture returns `meta` as an object with `__CheckoutInitAddress` and `__FingerprintConfidenceScore` rather than null. `amount_settled` is an integer in the fixture.
+- The refund create fixture adds `destination`, `comments` (null), and an object `meta` with `source`, `isPartialRefund`, and `uniquereference`. Fetch/list use `comment` and a string `meta`.
+- A non-integer `page` on payment list returned 200 with data, and an invalid `from` date on refund list returned 200 with data. These lenient responses are saved as `lenient-input` fixtures.
+- An invalid bank-list country returned 404 with `"No banks found for country code"`, not a 400.
+- `transfer.create` returns the account-limit response; `transfer.fetch` with a non-numeric id returns an HTML 200 page. Transfer create and fetch remain documentation-only.
 
 ## 2. Payments
 
@@ -344,7 +360,7 @@ The create-payment response does not include the transaction ID or customer obje
 
 - Action page sample: `200`, `400`.
 - Common v3 statuses: `401`, `500`, `503`, `429`; see §1.2 and §7.
-- Exact 400 body for this action: **UNCONFIRMED** (OpenAPI shows `{}`).
+- The OpenAPI schema shows `{}`; the recorded invalid-request fixture returns `status: "error"`, `errors: [{ field: "redirect_url", message: "Redirect URL is required" }]`, and `message: "One or more required parameters missing"` (corrected from fixture, 28 October 2026).
 
 #### Webhook events this action can trigger
 
@@ -373,7 +389,7 @@ Sources: [Verify transaction status](https://developer.flutterwave.com/v3.0.0/re
 #### Errors and documented statuses
 
 - Action page sample: `200`, `400`.
-- The guide shows a "Transaction Not Found" body but not its HTTP status. **UNCONFIRMED** whether it is `404`; the message is `"No transaction was found for this id"`.
+- The guide shows a "Transaction Not Found" body. The recorded non-numeric-ID fixture returns HTTP `400` with `status: "error"`, `message: "No transaction was found for this id"`, and `data: null` (corrected from fixture, 28 October 2026). Other invalid-ID cases are unconfirmed.
 - Common: `401`, `500`, `503`, `429`.
 
 #### Webhook events this action can trigger
@@ -539,7 +555,7 @@ Source: [Fetch a refunded transaction](https://developer.flutterwave.com/v3.0.0/
 
 | Field | Type | Required? | Notes |
 |---|---|---|---|
-| `id` | integer | Yes (path) | The docs call it a "unique transaction identifier" but the path is `/refunds/{id}`. The guide says use the refund ID returned as `data.id` from the refund call. **UNCONFIRMED** whether the path expects refund ID or transaction ID; the two official pages disagree. |
+| `id` | integer | Yes (path) | The docs call it a "unique transaction identifier" but the path is `/refunds/{id}`. The guide says use the refund ID returned as `data.id` from the refund call. The recorded success fixture used refund ID `110122` and returned the refund, confirming that refund ID works (corrected from fixture, 28 October 2026). Whether it also accepts a transaction ID remains unconfirmed. |
 
 #### Success response
 
@@ -756,7 +772,7 @@ Sources: [Retrieve Bank Account Name](https://developer.flutterwave.com/v3.0.0/r
 
 - Action page: `200`, `400`.
 - Common: `401`, `500`, `503`, `429`.
-- Exact validation body: **UNCONFIRMED**; common errors show the general error shape.
+- The recorded invalid-account fixture returns `400` with `status: "error"`, `message: "invalid account"`, and `data: null` (corrected from fixture, 28 October 2026).
 
 #### Webhook events this action can trigger
 

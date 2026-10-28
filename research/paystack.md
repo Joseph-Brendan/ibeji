@@ -44,15 +44,17 @@ Used by verify, fetch, and list. The docs examples do not contain every field in
 | `amount` | integer | `40333` | `40333` | `40333` |
 | `message` | string or null | `null` | `null` | `null` |
 | `gateway_response` | string | `"Successful"` | `"Successful"` | `"Successful"` |
+| `gateway_response_code` | string or null | `null` | `null` | `"do_not_honor"` (corrected from fixture, 28 October 2026) |
+| `response_code` | string or null | `null` | `null` | `"05"` (corrected from fixture, 28 October 2026) |
 | `helpdesk_link` | string or null | — | `null` | — |
 | `paid_at` | ISO date string or null | `"2024-08-22T09:15:02.000Z"` | `"2024-08-22T09:15:02.000Z"` | `"2024-08-22T09:15:02.000Z"` |
 | `created_at` | ISO date string | `"2024-08-22T09:14:24.000Z"` | `"2024-08-22T09:14:24.000Z"` | `"2024-08-22T09:14:24.000Z"` |
 | `channel` | string | `"card"` | `"card"` | `"card"` |
 | `currency` | string | `"NGN"` | `"NGN"` | `"NGN"` |
 | `ip_address` | string or null | `"197.210.54.33"` | `"197.210.54.33"` | `"197.210.54.33"` |
-| `metadata` | string or null in these samples; docs do not clarify object form | `""` | `""` | `null` |
-| `log` | object or null | Log object | Log object | Log object |
-| `fees` | integer | `10283` | `10283` | `10283` |
+| `metadata` | object, string, or null; fixtures return an object on verify/fetch/list and a stringified object on the nested refund transaction | `{ "recorder": "ibeji" }` (corrected from fixture, 28 October 2026) | same | same |
+| `log` | object or null | Log object | Log object | Log object or null (abandoned fixture) |
+| `fees` | integer or null | `10283` | `10283` | `null` in some list items (corrected from fixture, 28 October 2026) |
 | `fees_split` | null in samples | `null` | `null` | `null` |
 | `authorization` | object | Authorization object | Authorization object | Authorization object |
 | `customer` | object | Customer object | Customer object | Customer object |
@@ -107,6 +109,8 @@ The docs do not state the element types of `input` or the complete set of `histo
 | `reusable` | boolean | `true` |
 | `signature` | string | `"SIG_yEXu7dLBeqG0kU7g95Ke"` |
 | `account_name` | string or null | `null` |
+| `receiver_bank_account_number` | string or null | `null` (corrected from fixture, 28 October 2026) |
+| `receiver_bank` | string or null | `null` (corrected from fixture, 28 October 2026) |
 
 ### 0.5 Customer object
 
@@ -129,7 +133,7 @@ The docs do not state the element types of `input` or the complete set of `histo
 | `source` | string | `"merchant_api"` |
 | `type` | string | `"api"` |
 | `identifier` | null in samples | `null` |
-| `entry_point` | string | `"transaction_initialize"` |
+| `entry_point` | string or absent | `"transaction_initialize"`; absent from the fetch fixture (corrected from fixture, 28 October 2026) |
 
 ### 0.7 Refund object
 
@@ -144,7 +148,7 @@ The shape differs between create, list, and fetch. Types are inferred; `fully_de
 | `domain` | string | `"live"` | `"live"` | `"live"` |
 | `amount` | integer | `10000` | `500000` | `500000` |
 | `deducted_amount` | integer | `0` | `500000` | `500000` |
-| `fully_deducted` | boolean, integer `1`, or null; **UNCONFIRMED** | `false` | `1` or `null` | `true` |
+| `fully_deducted` | boolean, integer, or null | `false` | `1` or `null` | `true`; fixture create `false`, fetch/list `1` (corrected from fixture, 28 October 2026) |
 | `currency` | string | `"NGN"` | `"NGN"` | `"NGN"` |
 | `channel` | string or null | `null` | `"migs"` | `"migs"` |
 | `status` | string | `"pending"` | `"processed"` / `"pending"` | `"processed"` |
@@ -158,6 +162,12 @@ The shape differs between create, list, and fetch. Types are inferred; `fully_de
 | `created_at` | ISO date string (snake case) | — | `"2017-09-24T21:10:59.000Z"` | — |
 | `updatedAt` | ISO date string (camel case) | `"2021-12-07T09:21:17.122Z"` | — | `"2018-01-18T11:59:56.000Z"` |
 | `updated_at` | ISO date string (snake case) | — | `"2018-01-18T11:59:56.000Z"` | — |
+
+Fixture corrections for the refund object, 28 October 2026 (corrected from fixture):
+
+- The create fixture also returns `reason` (string), `customer` (null), `initiated_by` (string), and `session_id` (null). The fetch/list fixtures return `bank_reference` (null), `transaction_reference` (string), `reason` (string), `customer` (object), `initiated_by` (string), `refund_type` (string), `transaction_amount` (integer), `refund_channel` (string), `session_id` (null), and `retriable` (boolean).
+- `fully_deducted` is `false` (boolean) in create and `1` (integer) in fetch/list, confirming the documented inconsistency.
+- `transaction` is an object in create and an integer in fetch/list, as the table already notes.
 
 Refund transaction object (create sample only):
 
@@ -252,6 +262,8 @@ Two meta shapes appear in the official docs:
 
 Individual list endpoints use one or the other. The refunds guide shows the offset shape for `GET /refund`, while the Refund API page sample does not show `meta`. **UNCONFIRMED** whether both are always present.
 
+The transaction list fixture uses the offset shape with an extra `total_volume` integer field: `total`, `total_volume`, `skipped`, `perPage`, `page`, `pageCount`. It did not use the cursor shape in the API sample (corrected from fixture, 28 October 2026).
+
 ### 0.11 Error envelope and statuses
 
 Source: [Errors](https://paystack.com/docs/api/errors/). Every error response documented uses:
@@ -278,7 +290,19 @@ Documented HTTP codes, globally:
 | `429` | Rate limited; see the rate-limits page |
 | `5xx` | Paystack-side error; "shouldn't happen" |
 
-The exact error body, `message`, and `code` for an individual action are mostly **UNCONFIRMED**; the docs give the general shape and a validation sample. The 401 body for a missing/invalid key is **UNCONFIRMED**. The 429 body is documented separately in §7. A 5xx body is **UNCONFIRMED**.
+The exact error body, `message`, and `code` for an individual action are mostly **UNCONFIRMED**; the docs give the general shape and a validation sample. The recorded fixtures confirm this shape for several 400/401 responses: `status: false`, `message`, `meta.nextStep`, `type`, and `code`. Examples: `transaction.initialize` returns 400 `missing_params` with `"Email Address is required"`; `bank.resolve` returns 400 `invalid_account_number` with `"Account number should be numeric"`; `refund.fetch` returns 401 `missing_params` for a non-integer ID; `transfer.create` returns 400 `transfer_unavailable` for the starter-business limit (corrected from fixture, 28 October 2026). The 401 body for a missing/invalid key is still **UNCONFIRMED**. The 429 body is documented separately in §7. A 5xx body is **UNCONFIRMED**.
+
+### 0.12 Fixture corrections from the recorded run (28 October 2026)
+
+Each item below is corrected from a recorded fixture:
+
+- Transaction objects add `gateway_response_code` and `response_code` (string or null), return `metadata` as an object on verify/fetch/list and as a stringified object inside a refund's nested transaction, and may return `fees` as null. `paid_at`/`paidAt` can be null for failed or abandoned transactions. `authorization` adds `receiver_bank_account_number` and `receiver_bank` (null). `source.entry_point` is optional.
+- Transaction list `meta` uses the offset shape with `total`, `total_volume`, `skipped`, `perPage`, `page`, and `pageCount`; `total_volume` is extra compared with §0.10.
+- Refund objects add the fields listed in §0.7. `fully_deducted` is boolean `false` on create and integer `1` on fetch/list. Refund list `meta` adds `totalRetriable` (integer) and `partialAmountLeft` (null in the fixture) to the offset shape.
+- Bank objects add `supports_transfer` and `available_for_direct_debit`; `gateway` can be an empty string. The bank-list response has no `meta` field.
+- `bank.resolve` returns `bank_id` as an integer in the recorded success fixture.
+- A non-integer transaction-list `page` returns 200 with data, a non-integer refund-list `page` returns 200 with data, and an invalid bank-list `country` returns 200 with an empty array. These are real lenient responses saved as `lenient-input` fixtures; the twin should copy them only if exact endpoint fidelity is required.
+- The exact 400/401 error bodies for the recorded invalid cases are in §0.11 and the action sections.
 
 ## 1. Transactions
 
@@ -336,7 +360,7 @@ Source: [Transactions API: Initialize](https://paystack.com/docs/api/transaction
 
 - Action page sample: `200 Ok`.
 - Global documented statuses: `400`, `401`, `404`, `5xx`, `429`; `201` exists globally but is not shown for this action.
-- Exact error body/code: **UNCONFIRMED**.
+- The recorded missing-email fixture returns `400` with `status: false`, `message: "Email Address is required"`, `type: "validation_error"`, and `code: "missing_params"` (corrected from fixture, 28 October 2026).
 
 #### Webhook events this action can trigger
 
@@ -386,8 +410,7 @@ The sample also contains the full Customer, Authorization, and Log objects liste
 #### Errors and documented statuses
 
 - Action page sample: `200 Ok`, `400 Invalid`.
-- The Errors page also says Paystack "will always send a 200 if a charge or verify request was made" and the caller should inspect `data`; this conflicts with the action page's `400 Invalid` sample. **UNCONFIRMED** which behavior applies to which invalid-reference case.
-- Exact error body/code: **UNCONFIRMED**.
+- The Errors page also says Paystack "will always send a 200 if a charge or verify request was made" and the caller should inspect `data`; this conflicts with the action page's `400 Invalid` sample. The recorded invalid-reference fixture returned `400` with `message: "Transaction reference not found."` and `code: "transaction_not_found"` (corrected from fixture, 28 October 2026). Which behaviour applies to other invalid-reference cases is still **UNCONFIRMED**.
 
 #### Webhook events this action can trigger
 
@@ -416,7 +439,7 @@ Source: [Transactions API: Fetch](https://paystack.com/docs/api/transaction/#fet
 #### Errors and documented statuses
 
 - Action page sample: `200 Ok`, `400 Invalid`.
-- Exact error body/code: **UNCONFIRMED**.
+- The recorded non-integer ID fixture returns `400` with `message: "Transaction ID should be numeric."` and `code: "invalid_params"` (corrected from fixture, 28 October 2026).
 
 #### Webhook events this action can trigger
 
@@ -545,7 +568,7 @@ The full sample contains the nested transaction object listed in §0.7.
 
 - Action page sample: `200 Ok`.
 - Global documented statuses: `400`, `401`, `404`, `5xx`, `429`.
-- Exact error body/code: **UNCONFIRMED**.
+- The recorded invalid-transaction fixture returns `400` with `message: "Transaction not found"`, `type: "validation_error"`, and `code: "transaction_not_found"` (corrected from fixture, 28 October 2026).
 
 #### Webhook events this action can trigger
 
@@ -595,8 +618,8 @@ Source: [Refund API: List](https://paystack.com/docs/api/refund/#list), accessed
 
 | Field | Type | Required? | Notes |
 |---|---|---|---|
-| `transaction` | string | Docs do not mark optional | The transaction ID of the refunded transaction. The page's sample calls `GET /refund` with no query; **UNCONFIRMED** whether it is truly required. |
-| `currency` | string | Docs do not mark optional | Any supported currency; same ambiguity as `transaction`. |
+| `transaction` | string | Optional in practice | The transaction ID of the refunded transaction. The page's sample calls `GET /refund` with no query; the recorded fixture also lists refunds without it (corrected from fixture, 28 October 2026). |
+| `currency` | string | Optional in practice | Any supported currency; the recorded fixture lists refunds without it (corrected from fixture, 28 October 2026). |
 | `from` | date | Optional | Start date, e.g. `2016-09-21`. |
 | `to` | date | Optional | End date, e.g. `2016-09-21`. |
 | `perPage` | integer | Optional; default 50 | Page size. |
@@ -715,7 +738,7 @@ The page says the returned status is `pending` if OTP is disabled, and `otp` if 
 #### Errors and documented statuses
 
 - Action page sample: `200 Ok`, `400 Bad Request`.
-- Exact error body/code: **UNCONFIRMED**.
+- The recorded account-limit fixture returns `400` with `message: "You cannot initiate third party payouts as a starter business"`, `type: "api_error"`, and `code: "transfer_unavailable"` (corrected from fixture, 28 October 2026).
 - Documented validation errors include invalid reference characters, insufficient balance, invalid recipient, account closed, and invalid bank code. Exact error codes/statuses for each are **UNCONFIRMED**.
 
 #### Webhook events this action can trigger
@@ -820,8 +843,10 @@ Source: [Miscellaneous API: List Banks](https://paystack.com/docs/api/miscellane
 | `slug` | string | `"abbey-mortgage-bank"` |
 | `code` | string | `"801"` |
 | `longcode` | string | `""` |
-| `gateway` | null in sample | `null` |
+| `gateway` | null or empty string | `null`; some fixture items return `""` (corrected from fixture, 28 October 2026) |
 | `pay_with_bank` | boolean | `false` |
+| `supports_transfer` | boolean | `true` (corrected from fixture, 28 October 2026) |
+| `available_for_direct_debit` | boolean | `false` (corrected from fixture, 28 October 2026) |
 | `active` | boolean | `true` |
 | `is_deleted` | boolean | `false` |
 | `country` | string | `"Nigeria"` |
@@ -882,13 +907,13 @@ Sources: [Verification API: Resolve Account](https://paystack.com/docs/api/verif
 | `data.account_name` | string | `"WES GIBBONS"` |
 | `data.bank_id` | integer | `9` (appears in the guide sample; the API page sample shows only `account_number` and `account_name`) |
 
-The API page's resolve sample has only `account_number` and `account_name`; the guide sample includes `bank_id`. **UNCONFIRMED** whether `bank_id` is always returned.
+The API page's resolve sample has only `account_number` and `account_name`; the guide sample includes `bank_id`. The recorded success fixture includes `bank_id` as an integer, so the fixture confirms it for this action (corrected from fixture, 28 October 2026).
 
 #### Errors and documented statuses
 
 - Action page sample: `200 Ok`.
 - Global documented statuses: `400`, `401`, `404`, `5xx`, `429`.
-- Exact error body/code/message for an invalid account: **UNCONFIRMED**.
+- The recorded invalid-account fixture returns `400` with `message: "Account number should be numeric"`, `type: "validation_error"`, and `code: "invalid_account_number"` (corrected from fixture, 28 October 2026).
 - Test mode allows 3 live bank resolves per day; test bank code 001 is not limited. Observed while recording on 28 October 2026.
 - The recorded shape for the `rate-limited` failure is `fixtures/paystack/rate-limited-429.json`: HTTP 429 with `status: false`, `type: "api_error"`, code `unknown`, and the message "Test mode daily limit of 3 live bank resolves exceeded. Use test bank codes 001 or upgrade to live mode." This is a real rate-limit response.
 
@@ -1291,7 +1316,7 @@ These are facts SPEC.md needs that the official documentation did not answer, or
 16. Transfer currency/unit rules beyond NGN kobo and GHS pesewas.
 17. Amount and metadata type inconsistencies: initialize `amount` String vs refund/transfer Integer; response amounts integer but `refund.pending` webhook amount string; transaction `metadata` string vs recipient `metadata` object.
 18. `fully_deducted` is boolean in some samples and `1` in the list sample; `createdAt`/`updatedAt` and `created_at`/`updated_at` vary by endpoint.
-19. `bank_id` appears in the Resolve guide sample but not the Resolve API sample; whether it is always returned is UNCONFIRMED.
+19. `bank_id` appears in the Resolve guide sample but not the Resolve API sample. The recorded success fixture includes it; whether every account always returns it remains unconfirmed beyond that fixture.
 20. Whether `country` is required for `GET /bank`; the page does not mark it optional but its sample calls `/bank` without it.
 21. Exact bank fields for `nip institution code`, `supported_types`, and other filter-specific fields.
 22. Restricted/limited API key formats and key lengths; only `pk_test_`, `sk_test_`, `pk_live_`, `sk_live_` prefixes are documented.

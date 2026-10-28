@@ -1,0 +1,58 @@
+{
+  "action": "payment.verify_by_reference",
+  "outcome": "failed",
+  "recordedAt": "2026-10-28T13:13:15.746Z",
+  "method": "GET",
+  "path": "/v3/transactions/verify_by_reference",
+  "query": {
+    "tx_ref": "ibeji-failed_1793193103378_665a64a7b0dd"
+  },
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "success",
+    "message": "Transaction fetched successfully",
+    "data": {
+      "id": 10579771,
+      "tx_ref": "ibeji-failed_1793193103378_665a64a7b0dd",
+      "flw_ref": "FLW-MOCK-d69a55fe177abbafd9ae1b70ac6ac2da",
+      "device_fingerprint": "7a63c4da5c10656da8c526933c01f095019fe7a271d7c838403dba041102f0b6",
+      "amount": 7500,
+      "currency": "NGN",
+      "charged_amount": 7500,
+      "app_fee": 285,
+      "merchant_fee": 0,
+      "processor_response": "Do Not Honour: We're sorry, we cannot charge your card due to bank restrictions. Please contact your bank or financial institution.",
+      "auth_model": "AVS_VBVSECURECODE",
+      "ip": "203.0.113.1",
+      "narration": "CARD Transaction ",
+      "status": "failed",
+      "payment_type": "card",
+      "created_at": "2026-10-28T13:13:04.000Z",
+      "account_id": 1967796,
+      "card": {
+        "first_6digits": "514301",
+        "last_4digits": "9965",
+        "issuer": "JACK HENRY AND ASSOCIATES DEBITSTANDARD",
+        "country": "UNITED STATES US",
+        "type": "MASTERCARD",
+        "expiry": "12/2099"
+      },
+      "meta": {
+        "__CheckoutInitAddress": "N/A",
+        "__FingerprintConfidenceScore": "0.5"
+      },
+      "amount_settled": 0,
+      "customer": {
+        "id": 3655188,
+        "name": "Test Name 2",
+        "phone_number": "+15550000001",
+        "email": "customer.three@example.com",
+        "created_at": "2026-10-28T13:13:04.000Z"
+      }
+    }
+  }
+}

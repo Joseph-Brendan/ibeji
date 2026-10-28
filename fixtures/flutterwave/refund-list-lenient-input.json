@@ -1,0 +1,30 @@
+{
+  "action": "refund.list",
+  "outcome": "lenient-input",
+  "note": "Flutterwave accepted the deliberately wrong input with HTTP 200; saved as lenient-input instead of invalid-request.",
+  "recordedAt": "2026-10-28T12:59:20.856Z",
+  "method": "GET",
+  "path": "/v3/refunds",
+  "query": {
+    "from": "not-a-date",
+    "to": "2026-10-28"
+  },
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "success",
+    "message": "Refunds fetched",
+    "meta": {
+      "page_info": {
+        "total": 0,
+        "current_page": 0,
+        "total_pages": 0,
+        "page_size": 0
+      }
+    },
+    "data": []
+  }
+}

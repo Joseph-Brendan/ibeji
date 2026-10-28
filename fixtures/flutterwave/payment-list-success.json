@@ -1,0 +1,29 @@
+{
+  "action": "payment.list",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:59:00.933Z",
+  "method": "GET",
+  "path": "/v3/transactions",
+  "query": {
+    "from": "2026-10-28",
+    "to": "2026-10-28",
+    "page": 1
+  },
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "success",
+    "message": "Transactions fetched",
+    "meta": {
+      "page_info": {
+        "total": 0,
+        "current_page": 0,
+        "total_pages": 0
+      }
+    },
+    "data": []
+  }
+}

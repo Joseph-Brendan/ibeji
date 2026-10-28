@@ -1,0 +1,20 @@
+{
+  "action": "payment.create",
+  "outcome": "unpaid",
+  "recordedAt": "2026-10-28T13:11:43.109Z",
+  "method": "POST",
+  "path": "/v3/payments",
+  "query": null,
+  "requestBody": "{\"amount\":7500,\"tx_ref\":\"ibeji-unpaid_1793193102760_8997ba7cf9c9\",\"currency\":\"NGN\",\"redirect_url\":\"https://example.com/ibeji/flutterwave/unpaid\",\"customer\":{\"email\":\"customer.one@example.com\",\"name\":\"Test Name 1\"}}",
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "success",
+    "message": "Hosted Link",
+    "data": {
+      "link": "https://checkout-v2.dev-flutterwave.com/v3/hosted/pay/049de24b224748738f6c"
+    }
+  }
+}

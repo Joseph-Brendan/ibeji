@@ -1,0 +1,57 @@
+{
+  "action": "payment.verify",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:58:59.997Z",
+  "method": "GET",
+  "path": "/v3/transactions/10579745/verify",
+  "query": null,
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "success",
+    "message": "Transaction fetched successfully",
+    "data": {
+      "id": 10579745,
+      "tx_ref": "ibeji_1793192280112_1a87dbd56be3",
+      "flw_ref": "FLW-MOCK-1f880e899320a79fff8df457d83c3e07",
+      "device_fingerprint": "7a63c4da5c10656da8c526933c01f095019fe7a271d7c838403dba041102f0b6",
+      "amount": 7500,
+      "currency": "NGN",
+      "charged_amount": 7500,
+      "app_fee": 105,
+      "merchant_fee": 0,
+      "processor_response": "successful",
+      "auth_model": "PIN",
+      "ip": "203.0.113.1",
+      "narration": "CARD Transaction ",
+      "status": "successful",
+      "payment_type": "card",
+      "created_at": "2026-10-28T12:58:46.000Z",
+      "account_id": 1967796,
+      "card": {
+        "first_6digits": "553188",
+        "last_4digits": "2950",
+        "issuer": " CREDIT",
+        "country": "NIGERIA NG",
+        "type": "MASTERCARD",
+        "token": "[REDACTED_TOKEN_1]",
+        "expiry": "12/2099"
+      },
+      "meta": {
+        "__CheckoutInitAddress": "+15550000001",
+        "__FingerprintConfidenceScore": "0.5"
+      },
+      "amount_settled": 7387.12,
+      "customer": {
+        "id": 3655183,
+        "name": "Test Name 2",
+        "phone_number": "+15550000001",
+        "email": "customer.two@example.com",
+        "created_at": "2026-10-28T12:58:45.000Z"
+      }
+    }
+  }
+}

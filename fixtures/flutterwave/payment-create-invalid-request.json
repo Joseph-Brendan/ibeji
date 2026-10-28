@@ -1,0 +1,23 @@
+{
+  "action": "payment.create",
+  "outcome": "invalid-request",
+  "recordedAt": "2026-10-28T12:58:00.831Z",
+  "method": "POST",
+  "path": "/v3/payments",
+  "query": null,
+  "requestBody": "{\"tx_ref\":\"ibeji_1793192280112_1a87dbd56be3\",\"currency\":\"NGN\",\"customer\":{\"email\":\"customer.one@example.com\"}}",
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "error",
+    "errors": [
+      {
+        "field": "redirect_url",
+        "message": "Redirect URL is required"
+      }
+    ],
+    "message": "One or more required parameters missing"
+  }
+}

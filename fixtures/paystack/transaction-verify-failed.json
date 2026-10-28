@@ -1,0 +1,123 @@
+{
+  "action": "transaction.verify",
+  "outcome": "failed",
+  "recordedAt": "2026-10-28T12:28:38.001Z",
+  "method": "GET",
+  "path": "/transaction/verify/ibeji-1793190467579-27b6bcf84eff",
+  "query": null,
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "120",
+    "x-ratelimit-remaining": "117"
+  },
+  "responseBody": {
+    "status": true,
+    "message": "Verification successful",
+    "data": {
+      "id": 6704976747,
+      "domain": "test",
+      "status": "failed",
+      "reference": "ibeji-1793190467579-27b6bcf84eff",
+      "receipt_number": null,
+      "amount": 10000,
+      "message": null,
+      "gateway_response": "Declined",
+      "gateway_response_code": "do_not_honor",
+      "response_code": "05",
+      "paid_at": null,
+      "created_at": "2026-10-28T12:27:48.000Z",
+      "channel": "card",
+      "currency": "NGN",
+      "ip_address": "203.0.113.1",
+      "metadata": {
+        "recorder": "ibeji"
+      },
+      "log": {
+        "start_time": 1793190481,
+        "time_spent": 26,
+        "attempts": 1,
+        "errors": 1,
+        "success": false,
+        "mobile": false,
+        "input": [],
+        "history": [
+          {
+            "type": "input",
+            "message": "Filled this field: card number",
+            "time": 15
+          },
+          {
+            "type": "action",
+            "message": "User switched transaction currency to NGN",
+            "time": 15
+          },
+          {
+            "type": "input",
+            "message": "Filled this field: card expiry",
+            "time": 22
+          },
+          {
+            "type": "input",
+            "message": "Filled this field: card cvv",
+            "time": 24
+          },
+          {
+            "type": "action",
+            "message": "Attempted to pay with card",
+            "time": 25
+          },
+          {
+            "type": "error",
+            "message": "Error: Declined",
+            "time": 26
+          }
+        ]
+      },
+      "fees": null,
+      "fees_split": null,
+      "authorization": {
+        "authorization_code": "[REDACTED_AUTH_CODE_5]",
+        "bin": "408408",
+        "last4": "0000",
+        "exp_month": "12",
+        "exp_year": "2099",
+        "channel": "card",
+        "card_type": "visa ",
+        "bank": "TEST BANK",
+        "country_code": "NG",
+        "brand": "visa",
+        "reusable": true,
+        "signature": "[REDACTED_KEY_2]",
+        "account_name": null,
+        "receiver_bank_account_number": null,
+        "receiver_bank": null
+      },
+      "customer": {
+        "id": 412421623,
+        "first_name": null,
+        "last_name": null,
+        "email": "customer.three@example.com",
+        "customer_code": "CUS_mzdue8n4k3999e2",
+        "phone": null,
+        "metadata": null,
+        "risk_action": "default",
+        "international_format_phone": null
+      },
+      "plan": null,
+      "split": {},
+      "order_id": null,
+      "paidAt": null,
+      "createdAt": "2026-10-28T12:27:48.000Z",
+      "requested_amount": 10000,
+      "pos_transaction_data": null,
+      "source": null,
+      "fees_breakdown": null,
+      "connect": null,
+      "transaction_date": "2026-10-28T12:27:48.000Z",
+      "plan_object": {},
+      "subaccount": {}
+    }
+  }
+}

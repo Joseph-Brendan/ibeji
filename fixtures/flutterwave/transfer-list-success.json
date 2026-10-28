@@ -1,0 +1,27 @@
+{
+  "action": "transfer.list",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:59:22.044Z",
+  "method": "GET",
+  "path": "/v3/transfers",
+  "query": {
+    "page": 1
+  },
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "success",
+    "message": "Transfers fetched",
+    "meta": {
+      "page_info": {
+        "total": 0,
+        "current_page": 0,
+        "total_pages": 0
+      }
+    },
+    "data": []
+  }
+}

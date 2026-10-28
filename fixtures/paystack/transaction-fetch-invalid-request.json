@@ -1,0 +1,24 @@
+{
+  "action": "transaction.fetch",
+  "outcome": "invalid-request",
+  "recordedAt": "2026-10-28T12:27:46.898Z",
+  "method": "GET",
+  "path": "/transaction/not-a-number",
+  "query": null,
+  "requestBody": null,
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "97"
+  },
+  "responseBody": {
+    "status": false,
+    "message": "Transaction ID should be numeric.",
+    "meta": {
+      "nextStep": "Ensure that the value(s) you're passing are valid."
+    },
+    "type": "validation_error",
+    "code": "invalid_params"
+  }
+}

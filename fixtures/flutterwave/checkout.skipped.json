@@ -1,0 +1,14 @@
+{
+  "action": "checkout",
+  "outcome": "skipped",
+  "reason": "Flutterwave has no checkout-page API; payment.create returns the hosted link and the verify actions record the result",
+  "recordedAt": "2026-10-28T12:59:26.627Z",
+  "method": null,
+  "path": null,
+  "query": null,
+  "requestBody": null,
+  "requestContentType": null,
+  "status": null,
+  "responseHeaders": {},
+  "responseBody": null
+}

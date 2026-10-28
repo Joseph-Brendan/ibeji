@@ -1,0 +1,24 @@
+{
+  "action": "refund.create",
+  "outcome": "invalid-request",
+  "recordedAt": "2026-10-28T12:28:39.330Z",
+  "method": "POST",
+  "path": "/refund",
+  "query": null,
+  "requestBody": "{\"transaction\":\"ibeji-invalid-transaction\"}",
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "99"
+  },
+  "responseBody": {
+    "status": false,
+    "message": "Transaction not found",
+    "type": "validation_error",
+    "code": "transaction_not_found",
+    "meta": {
+      "nextStep": "Ensure the transaction reference or ID is correct"
+    }
+  }
+}

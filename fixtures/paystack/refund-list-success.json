@@ -1,0 +1,71 @@
+{
+  "action": "refund.list",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:28:40.310Z",
+  "method": "GET",
+  "path": "/refund",
+  "query": {
+    "perPage": 5,
+    "page": 1
+  },
+  "requestBody": null,
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "96"
+  },
+  "responseBody": {
+    "status": true,
+    "message": "Refunds retrieved",
+    "data": [
+      {
+        "integration": 1044674,
+        "transaction": 6704973978,
+        "dispute": null,
+        "settlement": null,
+        "id": 18884372,
+        "domain": "test",
+        "currency": "NGN",
+        "amount": 10000,
+        "status": "pending",
+        "refunded_at": null,
+        "refunded_by": "gmail",
+        "customer_note": "Refund for transaction ibeji-1793190415564-39ea4bc1863a",
+        "merchant_note": "Refund for transaction ibeji-1793190415564-39ea4bc1863a by customer.four@example.com",
+        "deducted_amount": 10000,
+        "fully_deducted": 1,
+        "createdAt": "2026-10-28T12:28:39.000Z",
+        "bank_reference": null,
+        "transaction_reference": "ibeji-1793190415564-39ea4bc1863a",
+        "reason": "PENDING",
+        "customer": {
+          "id": 412410465,
+          "first_name": null,
+          "last_name": null,
+          "email": "customer.one@example.com",
+          "customer_code": "CUS_04u1wadufvyzo7o",
+          "phone": null,
+          "metadata": null,
+          "risk_action": "default",
+          "international_format_phone": null
+        },
+        "initiated_by": "gmail",
+        "refund_type": "Full",
+        "transaction_amount": 10000,
+        "refund_channel": "Original Payment",
+        "session_id": null,
+        "retriable": false
+      }
+    ],
+    "meta": {
+      "total": 1,
+      "skipped": 0,
+      "perPage": 5,
+      "page": 1,
+      "pageCount": 1,
+      "totalRetriable": 0,
+      "partialAmountLeft": null
+    }
+  }
+}

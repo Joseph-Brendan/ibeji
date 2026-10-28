@@ -1,0 +1,43 @@
+{
+  "action": "transfer_recipient.create",
+  "outcome": "success",
+  "recordedAt": "2026-10-28T12:28:40.949Z",
+  "method": "POST",
+  "path": "/transferrecipient",
+  "query": null,
+  "requestBody": "{\"type\":\"nuban\",\"name\":\"Test Name 1\",\"account_number\":\"0000000001\",\"bank_code\":\"057\",\"currency\":\"NGN\"}",
+  "status": 201,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "94"
+  },
+  "responseBody": {
+    "status": true,
+    "message": "Transfer recipient created successfully",
+    "data": {
+      "active": true,
+      "createdAt": "2026-10-28T11:00:17.000Z",
+      "currency": "NGN",
+      "description": null,
+      "domain": "test",
+      "email": null,
+      "id": 137169645,
+      "integration": 1044674,
+      "metadata": null,
+      "name": "Test Name 1",
+      "recipient_code": "RCP_rnolhq7smwpju6s",
+      "type": "nuban",
+      "updatedAt": "2026-10-28T11:00:17.000Z",
+      "is_deleted": false,
+      "isDeleted": false,
+      "details": {
+        "authorization_code": null,
+        "account_number": "0000000001",
+        "account_name": "Test Name 2",
+        "bank_code": "057",
+        "bank_name": "Zenith Bank"
+      }
+    }
+  }
+}

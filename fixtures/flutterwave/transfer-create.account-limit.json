@@ -1,0 +1,19 @@
+{
+  "action": "transfer.create",
+  "outcome": "account-limit",
+  "note": "Recorded Flutterwave account-limit response: IP whitelisting is not enabled.",
+  "recordedAt": "2026-10-28T12:59:21.456Z",
+  "method": "POST",
+  "path": "/v3/transfers",
+  "query": null,
+  "requestBody": "{\"account_bank\":\"044\",\"amount\":100,\"currency\":\"NGN\"}",
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "error",
+    "message": "Please enable IP Whitelisting to access this service",
+    "data": null
+  }
+}

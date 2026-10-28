@@ -1,0 +1,18 @@
+{
+  "action": "refund.fetch",
+  "outcome": "invalid-request",
+  "recordedAt": "2026-10-28T12:59:15.873Z",
+  "method": "GET",
+  "path": "/v3/refunds/not-a-number",
+  "query": null,
+  "requestBody": null,
+  "status": 400,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8"
+  },
+  "responseBody": {
+    "status": "error",
+    "message": "Error: not-a-number failed isInt validation",
+    "data": null
+  }
+}

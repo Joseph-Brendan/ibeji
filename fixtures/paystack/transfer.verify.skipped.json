@@ -1,0 +1,14 @@
+{
+  "action": "transfer.verify",
+  "outcome": "skipped",
+  "reason": "transfer.create is documentation-only: Paystack returned transfer_unavailable (account limit)",
+  "recordedAt": "2026-10-28T12:28:42.150Z",
+  "method": null,
+  "path": null,
+  "query": null,
+  "requestBody": null,
+  "requestContentType": null,
+  "status": null,
+  "responseHeaders": {},
+  "responseBody": null
+}

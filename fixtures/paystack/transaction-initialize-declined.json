@@ -1,0 +1,24 @@
+{
+  "action": "transaction.initialize",
+  "outcome": "declined",
+  "recordedAt": "2026-10-28T12:27:48.108Z",
+  "method": "POST",
+  "path": "/transaction/initialize",
+  "query": null,
+  "requestBody": "{\"amount\":\"10000\",\"email\":\"customer.three@example.com\",\"currency\":\"NGN\",\"reference\":\"ibeji-1793190467579-27b6bcf84eff\",\"callback_url\":\"https://example.com/ibeji/paystack\",\"metadata\":\"{\\\"recorder\\\":\\\"ibeji\\\"}\"}",
+  "status": 200,
+  "responseHeaders": {
+    "content-type": "application/json; charset=utf-8",
+    "x-ratelimit-limit": "100",
+    "x-ratelimit-remaining": "95"
+  },
+  "responseBody": {
+    "status": true,
+    "message": "Authorization URL created",
+    "data": {
+      "authorization_url": "https://checkout.paystack.com/ulinue1vlasntwe",
+      "access_code": "[REDACTED_AUTH_CODE_4]",
+      "reference": "ibeji-1793190467579-27b6bcf84eff"
+    }
+  }
+}
