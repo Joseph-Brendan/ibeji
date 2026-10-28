@@ -1,4 +1,10 @@
-import { encodeJson, makeReference, responseData } from "./shared.mjs";
+import {
+  encodeJson,
+  extractServiceError,
+  makeReference,
+  RECORDER_EMAIL,
+  responseData,
+} from "./shared.mjs";
 
 export const meta = {
   id: "flutterwave",
@@ -15,6 +21,13 @@ export const meta = {
     path: "/v3/transfers",
     query: { page: "1", page_size: "10" },
   },
+  isKeyError(status, body) {
+    if (status !== 401 && status !== 403) {
+      return false;
+    }
+    const { message = "" } = extractServiceError(body);
+    return /^authorization required$/i.test(message.trim());
+  },
   isSuccess(status, body) {
     return (
       status >= 200 &&
@@ -26,7 +39,7 @@ export const meta = {
   },
 };
 
-const EMAIL = "recorder@ibeji.test";
+const EMAIL = RECORDER_EMAIL;
 
 function today() {
   return new Date().toISOString().slice(0, 10);

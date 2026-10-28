@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { printSummary, runCli } from "../../scripts/recorder/cli.mjs";
+import { meta as flutterwave } from "../../scripts/recorder/flutterwave.mjs";
 import { meta as paystack } from "../../scripts/recorder/paystack.mjs";
 import {
   createRecorderContext,
@@ -233,6 +234,134 @@ describe("C15 recorder key trimming and hidden characters", () => {
   });
 });
 
+describe("C15 recorder key-error detection", () => {
+  it("separates key errors from input errors using each service's own response shape", () => {
+    const refundInputError = {
+      status: false,
+      message: "Please provide a valid refund ID. ID should be a valid integer",
+      code: "missing_params",
+    };
+    expect(paystack.isKeyError(401, refundInputError)).toBe(false);
+    expect(
+      paystack.isKeyError(401, { status: false, message: "Invalid key", code: "invalid_key" }),
+    ).toBe(true);
+
+    expect(
+      stripe.isKeyError(401, {
+        error: { type: "invalid_request_error", message: "Missing required param: currency." },
+      }),
+    ).toBe(false);
+    expect(
+      stripe.isKeyError(401, {
+        error: { type: "invalid_request_error", code: "api_key_expired", message: "Expired." },
+      }),
+    ).toBe(true);
+
+    expect(
+      flutterwave.isKeyError(401, { status: "error", message: "Authorization required" }),
+    ).toBe(true);
+    expect(flutterwave.isKeyError(401, { status: "error", message: "Amount is required" })).toBe(
+      false,
+    );
+  });
+});
+
+describe("C15 recorder customer email values", () => {
+  it("sends Paystack's customer email on the fixed example.com list", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/transaction?")) {
+        return { status: 200, body: { status: true, message: "ok", data: [] } };
+      }
+      if (request.method === "POST" && request.url === "/transaction/initialize") {
+        return {
+          status: 200,
+          body: {
+            status: true,
+            message: "ok",
+            data: { authorization_url: "https://example.com/checkout" },
+          },
+        };
+      }
+      if (request.method === "GET" && request.url.startsWith("/transaction/verify/")) {
+        return {
+          status: 401,
+          body: { status: false, message: "Invalid key", code: "invalid_key" },
+        };
+      }
+      return { status: 500, body: { status: false, message: "unexpected request" } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      const initialize = server.requests.find(
+        (request) => request.method === "POST" && request.url === "/transaction/initialize",
+      );
+      const body = JSON.parse(initialize?.body ?? "{}") as { email?: string };
+      expect(body.email).toBe("customer.one@example.com");
+      expect(initialize?.body).not.toContain("@ibeji.test");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("sends Flutterwave's customer email on the fixed example.com list", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/v3/transfers?")) {
+        return { status: 200, body: { status: "success", message: "ok", data: [] } };
+      }
+      if (request.method === "POST" && request.url === "/v3/payments") {
+        return {
+          status: 200,
+          body: {
+            status: "success",
+            message: "ok",
+            data: { link: "https://example.com/checkout" },
+          },
+        };
+      }
+      if (
+        request.method === "GET" &&
+        request.url.startsWith("/v3/transactions/verify_by_reference?")
+      ) {
+        return {
+          status: 401,
+          body: { status: "error", message: "Authorization required", data: null },
+        };
+      }
+      return { status: 500, body: { status: "error", message: "unexpected request" } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    const flutterwaveKey = "FLWSECK_TEST-fake_recorder_key_123";
+    try {
+      await runCli(
+        ["--service", "flutterwave"],
+        { FLUTTERWAVE_TEST_SECRET_KEY: flutterwaveKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      const create = server.requests.find(
+        (request) => request.method === "POST" && request.url === "/v3/payments",
+      );
+      const body = JSON.parse(create?.body ?? "{}") as { customer?: { email?: string } };
+      expect(body.customer?.email).toBe("customer.one@example.com");
+      expect(create?.body).not.toContain("@ibeji.test");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("C15 recorder mid-run key rejection", () => {
   it("stops on a 401 from a call that should succeed and saves it only as skipped", async () => {
     const server = await startServer((request) => {
@@ -285,6 +414,136 @@ describe("C15 recorder mid-run key rejection", () => {
   });
 });
 
+describe("C15 recorder Paystack 401 input errors", () => {
+  it("does not stop the run on a 401 input error and still records transfers and banks", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/transaction?")) {
+        return { status: 200, body: { status: true, message: "ok", data: [] } };
+      }
+      if (request.method === "POST" && request.url === "/transaction/initialize") {
+        return {
+          status: 200,
+          body: {
+            status: true,
+            message: "ok",
+            data: { authorization_url: "https://example.com/checkout" },
+          },
+        };
+      }
+      if (request.method === "GET" && request.url.startsWith("/transaction/verify/")) {
+        return { status: 200, body: { status: true, message: "ok", data: { id: 123 } } };
+      }
+      if (request.method === "GET" && request.url === "/transaction/123") {
+        return { status: 200, body: { status: true, message: "ok", data: { id: 123 } } };
+      }
+      if (request.method === "POST" && request.url === "/refund") {
+        return { status: 200, body: { status: true, message: "ok", data: { id: 55 } } };
+      }
+      if (request.method === "GET" && request.url === "/refund/not-a-number") {
+        return {
+          status: 401,
+          body: {
+            status: false,
+            message: "Please provide a valid refund ID. ID should be a valid integer",
+            code: "missing_params",
+          },
+        };
+      }
+      if (request.method === "GET" && request.url.startsWith("/refund")) {
+        return { status: 200, body: { status: true, message: "ok", data: [] } };
+      }
+      if (request.method === "POST" && request.url === "/transferrecipient") {
+        return {
+          status: 200,
+          body: { status: true, message: "ok", data: { recipient_code: "RCP_fake" } },
+        };
+      }
+      if (request.method === "POST" && request.url === "/transfer") {
+        return {
+          status: 200,
+          body: {
+            status: true,
+            message: "ok",
+            data: { id: 77, reference: "transfer-ref" },
+          },
+        };
+      }
+      if (request.method === "GET" && request.url.startsWith("/transfer/verify/")) {
+        return {
+          status: 200,
+          body: { status: true, message: "ok", data: { id: 77, reference: "transfer-ref" } },
+        };
+      }
+      if (request.method === "GET" && request.url.startsWith("/transfer/")) {
+        return {
+          status: 200,
+          body: { status: true, message: "ok", data: { id: 77, reference: "transfer-ref" } },
+        };
+      }
+      if (request.method === "GET" && request.url.startsWith("/bank/resolve")) {
+        return {
+          status: 200,
+          body: {
+            status: true,
+            message: "ok",
+            data: { account_number: "0000000000", account_name: "Test Name 1" },
+          },
+        };
+      }
+      if (request.method === "GET" && request.url.startsWith("/bank")) {
+        if (request.headers.authorization === "Bearer invalid-ibeji-recorder") {
+          return {
+            status: 401,
+            body: { status: false, message: "Invalid key", code: "invalid_key" },
+          };
+        }
+        return { status: 200, body: { status: true, message: "ok", data: [] } };
+      }
+      return {
+        status: 400,
+        body: { status: false, message: "unexpected request", code: "invalid_params" },
+      };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      expect(code).toBe(0);
+      expect(output.errors.join("\n")).not.toContain("key was rejected");
+
+      const inputErrorIndex = server.requests.findIndex(
+        (request) => request.url === "/refund/not-a-number",
+      );
+      expect(inputErrorIndex).toBeGreaterThan(-1);
+      const laterUrls = server.requests.slice(inputErrorIndex + 1).map((request) => request.url);
+      expect(laterUrls.some((url) => url.startsWith("/refund?"))).toBe(true);
+      expect(laterUrls.some((url) => url.startsWith("/transferrecipient"))).toBe(true);
+      expect(laterUrls.some((url) => url.startsWith("/bank"))).toBe(true);
+
+      const saved = JSON.parse(
+        await readFile(
+          join(cwd, "fixtures", "paystack", "refund-fetch-invalid-request.json"),
+          "utf8",
+        ),
+      ) as { outcome: string; note: string };
+      expect(saved.outcome).toBe("invalid-request");
+      expect(saved.note).toBe("The service returned 401 for an input error, not a key error.");
+      expect(output.logs.join("\n")).toContain(
+        "The service returned 401 for an input error, not a key error.",
+      );
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("C15 recorder invalid-request and invalid-key classification", () => {
   it("saves a 400 to deliberately wrong input as invalid-request", async () => {
     const server = await startServer(() => ({
@@ -315,6 +574,61 @@ describe("C15 recorder invalid-request and invalid-key classification", () => {
       };
       expect(saved.outcome).toBe("invalid-request");
       expect(saved.status).toBe(400);
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("saves a 401 input error as invalid-request with the input-error note and keeps going", async () => {
+    const server = await startServer((request) => {
+      if (request.url === "/refund/not-a-number") {
+        return {
+          status: 401,
+          body: {
+            status: false,
+            message: "Please provide a valid refund ID. ID should be a valid integer",
+            code: "missing_params",
+          },
+        };
+      }
+      return { status: 200, body: { status: true, message: "ok", data: [] } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      const result = await ctx.recordInvalid("refund.fetch", {
+        method: "GET",
+        path: "/refund/not-a-number",
+      });
+
+      expect(result.file.endsWith("refund-fetch-invalid-request.json")).toBe(true);
+      const entry = ctx.results.at(-1);
+      expect(entry?.outcome).toBe("invalid-request");
+      expect(entry?.note).toBe("The service returned 401 for an input error, not a key error.");
+      const saved = JSON.parse(await readFile(result.file, "utf8")) as {
+        outcome: string;
+        note: string;
+      };
+      expect(saved.outcome).toBe("invalid-request");
+      expect(saved.note).toBe("The service returned 401 for an input error, not a key error.");
+
+      const next = await ctx.record({
+        action: "refund.list",
+        method: "GET",
+        path: "/refund",
+        query: { perPage: 5, page: 1 },
+      });
+      expect(next.status).toBe(200);
+      expect(server.requests).toHaveLength(2);
     } finally {
       output.restore();
       await server.close();
@@ -472,7 +786,7 @@ describe("C15 recorder failed-step summary and skipped files", () => {
       expect(saved.reason).toContain("Email Address is required");
       expect(saved.method).toBe("POST");
       expect(saved.path).toBe("/transaction/initialize");
-      expect(saved.requestBody).toContain("user1@ibeji.test");
+      expect(saved.requestBody).toContain("customer.one@example.com");
       expect(saved.requestBody).not.toContain("ada@real-customer.example");
       expect(saved.status).toBe(400);
       expect(saved.responseBody.message).toBe("Email Address is required");
@@ -595,7 +909,7 @@ describe("C15 recorder request printing", () => {
 
       const printed = output.logs.join("\n");
       expect(printed).toContain("Request: POST /transaction/initialize");
-      expect(printed).toContain("user1@ibeji.test");
+      expect(printed).toContain("customer.one@example.com");
       expect(printed).toContain("Test Name 1");
       expect(printed).toContain("0000000001");
       expect(printed).not.toContain("ada@real-customer.example");

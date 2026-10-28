@@ -618,3 +618,37 @@ Updated the hand-run recorder from two observed runs: a rejected key was being s
 - Run the recorder by hand with real test credentials to confirm the bank-list wrong-key observation and create the fixtures.
 - T3 must ignore `skipped`, `invalid-request`, `invalid-key`, and `lenient-input` fixtures as expected answers.
 - No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
+
+---
+
+## Phase 2, Step 2.8: example.com emails and Paystack 401 input errors
+
+Date: 28 October 2026.
+
+Fixed two problems from the last Paystack recorder run. No real key was used and no fixture was recorded in this task.
+
+### What was built
+
+- **Fake customer emails.** The recorder used `recorder@ibeji.test`. Paystack rejected it with HTTP 400 `invalid_params` and `"email" must be a valid email`, even though `.test` is a reserved domain; its email validator does not accept that address. The recorder now uses a fixed list of reserved `example.com` addresses: `customer.one@example.com`, `customer.two@example.com`, and `customer.three@example.com`. Paystack and Flutterwave send `customer.one@example.com`; Stripe sends no customer email. Redaction draws from the same list, and T13 accepts only addresses on that list. Any other email, including another `example.com` address, is still rejected.
+- **Key errors versus input errors.** The preflight request remains the only unconditional key check. During recording, a 401 or 403 stops the run only when that service's own response identifies a key or authorization problem. Otherwise the response continues under its normal label with the note "The service returned 401 for an input error, not a key error." in both the fixture and the summary.
+- **Per-service key-error detection.** Paystack matches key/authorization codes or messages such as `invalid_key`, `Invalid key`, `Unauthorized`, or `Authorization required`. Stripe matches the documented `api_key_expired` and `secret_key_required` codes or key messages. Flutterwave matches its documented `Authorization required` message. The exact Paystack invalid-key body is still **UNCONFIRMED** in `research/paystack.md`; the detection is deliberately limited to responses that name a key or authorization problem.
+- **Research note.** `research/paystack.md` section 3.2 now records that a non-integer refund id returns HTTP 401 with code `missing_params`, observed while recording on 28 October 2026, and that the twin must copy this behaviour.
+- **Fixture notes.** `saveFixture` and `saveSkippedFixture` can now store a `note`. The summary already had a note column, so the 401 input-error note appears in both places.
+
+### Decisions
+
+- A 401 from `refund.fetch` with code `missing_params` and the refund-ID message is an input error. It is saved as `refund-fetch-invalid-request.json`, not as a key rejection, and the run continues to refunds, transfers, and banks.
+- A mid-run 401 that names a key or authorization problem still stops the run. This is the only exception to "the preflight decides key rejection"; it is required by point 2b of the task and protects a run whose key stops working mid-way.
+- `example.com` addresses are kept in one exported list in `shared.mjs`, so the recorder, redaction, and T13 cannot drift apart.
+
+### Tests
+
+- Added fake-server tests for the Paystack and Flutterwave customer email bodies, the fixed example.com list, and T13 rejecting an `example.com` address that is not on the list.
+- Added a fake-server test where Paystack `refund.fetch` returns HTTP 401 `missing_params` for a non-integer id. The run continues to refunds, transfers, and banks, and the fixture and summary carry the input-error note.
+- Added a per-service key-error detection test for Paystack, Stripe, and Flutterwave response shapes.
+
+### Later
+
+- When the Paystack twin is built, `refund.fetch` must return the observed HTTP 401 `missing_params` response for a non-integer refund id.
+- Any future recorder email field must use `RECORDER_EMAIL` or another address from `FAKE_EMAILS`.
+- No SPEC.md section was edited; the changes implement C15 and do not change its meaning.

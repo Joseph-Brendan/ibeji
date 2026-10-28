@@ -6,6 +6,18 @@ import { createInterface } from "node:readline/promises";
 
 export const VALID_SERVICES = ["paystack", "flutterwave", "stripe"];
 
+/**
+ * Reserved example.com addresses used for every customer email the recorder
+ * sends or saves. T13 accepts only these addresses, so a real address can never
+ * pass the fixture privacy scan.
+ */
+export const FAKE_EMAILS = [
+  "customer.one@example.com",
+  "customer.two@example.com",
+  "customer.three@example.com",
+];
+export const RECORDER_EMAIL = FAKE_EMAILS[0];
+
 const RESPONSE_HEADER_ALLOWLIST = new Set([
   "content-type",
   "request-id",
@@ -438,7 +450,7 @@ export class Redactor {
     let fake;
     switch (category) {
       case "email":
-        fake = `user${next}@ibeji.test`;
+        fake = FAKE_EMAILS[(next - 1) % FAKE_EMAILS.length];
         break;
       case "name":
         fake = `Test Name ${next}`;
@@ -489,7 +501,8 @@ export class Redactor {
 }
 
 export function isFakeEmail(value) {
-  return /^[A-Z0-9._%+-]+@ibeji\.test$/i.test(value);
+  const normalized = value.toLowerCase();
+  return FAKE_EMAILS.some((email) => email.toLowerCase() === normalized);
 }
 
 export function isFakePhone(value) {
@@ -587,6 +600,7 @@ export async function saveFixture({
   status,
   responseHeaders,
   responseBody,
+  note,
 }) {
   const directory = join(cwd, "fixtures", service);
   await mkdir(directory, { recursive: true });
@@ -595,6 +609,7 @@ export async function saveFixture({
   const fixture = {
     action,
     outcome,
+    ...(note === undefined ? {} : { note }),
     recordedAt,
     method,
     path,
@@ -626,6 +641,7 @@ export async function saveSkippedFixture({
   status,
   responseHeaders,
   responseBody,
+  note,
 }) {
   const directory = join(cwd, "fixtures", service);
   await mkdir(directory, { recursive: true });
@@ -636,6 +652,7 @@ export async function saveSkippedFixture({
     action,
     outcome: "skipped",
     reason,
+    ...(note === undefined ? {} : { note }),
     recordedAt,
     method: method ?? null,
     path: path ?? null,
@@ -702,6 +719,10 @@ export function createRecorderContext({
     return `HTTP ${result.status}: ${error.message ?? "service error"}${code}`;
   }
 
+  function inputErrorNote(status) {
+    return `The service returned ${status} for an input error, not a key error.`;
+  }
+
   function pushResult(action, result, outcome, reason, file, note) {
     const error = serviceError(result);
     results.push({
@@ -716,13 +737,14 @@ export function createRecorderContext({
     });
   }
 
-  async function saveSkipped(result, action, reason) {
+  async function saveSkipped(result, action, reason, note) {
     const redacted = redactedRequestResponse(result);
     return saveSkippedFixture({
       cwd,
       service: meta.id,
       action,
       reason,
+      note,
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,
@@ -855,8 +877,12 @@ export function createRecorderContext({
     headers,
   }) {
     const result = await send({ method, path, query, body, contentType, invalidKey, headers });
+    const authStatus = result.status === 401 || result.status === 403;
+    const keyError =
+      !invalidKey && authStatus && meta.isKeyError(result.status, result.responseBody);
+    const note = !invalidKey && authStatus && !keyError ? inputErrorNote(result.status) : undefined;
 
-    if (!invalidKey && (result.status === 401 || result.status === 403)) {
+    if (keyError) {
       const reason = `key rejected: ${failureReason(result)}`;
       const file = await saveSkipped(result, action, reason);
       pushResult(action, result, "skipped", reason, file);
@@ -880,8 +906,8 @@ export function createRecorderContext({
 
     if (result.status === 0 || (expectedSuccess && !success)) {
       const reason = failureReason(result);
-      const file = await saveSkipped(result, action, reason);
-      pushResult(action, result, "skipped", reason, file);
+      const file = await saveSkipped(result, action, reason, note);
+      pushResult(action, result, "skipped", reason, file, note);
       return { ...result, ok: false, file };
     }
 
@@ -893,6 +919,7 @@ export function createRecorderContext({
       service: meta.id,
       action,
       outcome: effectiveOutcome,
+      note,
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,
@@ -902,7 +929,7 @@ export function createRecorderContext({
       responseHeaders: redacted.responseHeaders,
       responseBody: redacted.responseBody,
     });
-    pushResult(action, result, effectiveOutcome, undefined, stored);
+    pushResult(action, result, effectiveOutcome, undefined, stored, note);
     return { ...result, ok: success, file: stored };
   }
 
@@ -927,8 +954,10 @@ export function createRecorderContext({
 
   async function recordInvalid(action, request) {
     const result = await send({ ...request, invalidKey: false });
+    const authStatus = result.status === 401 || result.status === 403;
+    const keyError = authStatus && meta.isKeyError(result.status, result.responseBody);
 
-    if (result.status === 401 || result.status === 403) {
+    if (keyError) {
       const reason = `key rejected: ${failureReason(result)}`;
       const file = await saveSkipped(result, action, reason);
       pushResult(action, result, "skipped", reason, file);
@@ -959,15 +988,17 @@ export function createRecorderContext({
 
     const lenient = result.status >= 200 && result.status < 300;
     const effectiveOutcome = lenient ? "lenient-input" : "invalid-request";
+    const inputNote = authStatus ? inputErrorNote(result.status) : undefined;
     const note = lenient
       ? `${meta.displayName} accepted the deliberately wrong input with HTTP ${result.status}; saved as lenient-input instead of invalid-request.`
-      : undefined;
+      : inputNote;
     const redacted = redactedRequestResponse(result);
     const stored = await saveFixture({
       cwd,
       service: meta.id,
       action,
       outcome: effectiveOutcome,
+      note,
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,

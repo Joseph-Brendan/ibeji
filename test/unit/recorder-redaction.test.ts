@@ -79,7 +79,7 @@ describe("C15 recorder redaction", () => {
       expect(text).not.toContain(original);
     }
 
-    expect(text).toContain("user1@ibeji.test");
+    expect(text).toContain("customer.one@example.com");
     expect(text).toContain("+15550000001");
     expect(text).toContain("0000000001");
     expect(text).toContain("203.0.113.1");
@@ -101,7 +101,7 @@ describe("C15 recorder redaction", () => {
     expect(text).not.toContain("ada@real-customer.example");
     expect(text).not.toContain("+234 801 234 5678");
     expect(text).not.toContain("sk_test_paystack_redaction_sample_123");
-    expect(text).toContain("@ibeji.test");
+    expect(text).toContain("@example.com");
     expect(text).toContain("+1555");
   });
 });

@@ -575,6 +575,7 @@ Source: [Refund API: Fetch](https://paystack.com/docs/api/refund/#fetch), access
 
 - Action page sample: `200 Ok`.
 - Exact error body/code: **UNCONFIRMED**.
+- A non-integer refund id returns HTTP `401` with code `missing_params`. Observed while recording on 28 October 2026. The twin must copy this behaviour.
 
 #### Webhook events this action can trigger
 

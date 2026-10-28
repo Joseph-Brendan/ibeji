@@ -1,4 +1,10 @@
-import { encodeJson, makeReference, responseData } from "./shared.mjs";
+import {
+  encodeJson,
+  extractServiceError,
+  makeReference,
+  RECORDER_EMAIL,
+  responseData,
+} from "./shared.mjs";
 
 export const meta = {
   id: "paystack",
@@ -15,6 +21,16 @@ export const meta = {
     path: "/transaction",
     query: { perPage: 50, page: 1 },
   },
+  isKeyError(status, body) {
+    if (status !== 401 && status !== 403) {
+      return false;
+    }
+    const { message = "", code = "" } = extractServiceError(body);
+    return (
+      /key|auth/i.test(code) ||
+      /invalid (api )?key|unauthori[sz]ed|authorization required/i.test(message)
+    );
+  },
   isSuccess(status, body) {
     return (
       status >= 200 &&
@@ -26,7 +42,7 @@ export const meta = {
   },
 };
 
-const EMAIL = "recorder@ibeji.test";
+const EMAIL = RECORDER_EMAIL;
 
 export async function record(ctx) {
   // Paystack transaction references allow only "-", ".", "=" and alphanumeric

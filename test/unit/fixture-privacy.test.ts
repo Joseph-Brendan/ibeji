@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { meta as flutterwave } from "../../scripts/recorder/flutterwave.mjs";
 import { meta as paystack } from "../../scripts/recorder/paystack.mjs";
-import { scanFixtures } from "../../scripts/recorder/shared.mjs";
+import { FAKE_EMAILS, scanFixtures } from "../../scripts/recorder/shared.mjs";
 import { meta as stripe } from "../../scripts/recorder/stripe.mjs";
 
 const keyPatterns = [...paystack.keyPatterns, ...flutterwave.keyPatterns, ...stripe.keyPatterns];
@@ -64,7 +64,8 @@ describe("T13 fixture privacy", () => {
       await writeFile(
         join(root, "paystack", "fake.json"),
         JSON.stringify({
-          email: "user1@ibeji.test",
+          email: "customer.one@example.com",
+          emails: FAKE_EMAILS,
           phone: "+15550000001",
           account_number: "0000000001",
           customer_name: "Test Name 1",
@@ -72,6 +73,21 @@ describe("T13 fixture privacy", () => {
       );
       const scan = await scanFixtures(root, keyPatterns);
       expect(scan.problems).toEqual([]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects an example.com address that is not on the fixed fake list", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ibeji-fixture-other-email-"));
+    try {
+      await mkdir(join(root, "paystack"), { recursive: true });
+      await writeFile(
+        join(root, "paystack", "other-email.json"),
+        JSON.stringify({ email: "someone.else@example.com" }),
+      );
+      const scan = await scanFixtures(root, keyPatterns);
+      expect(scan.problems.some((problem) => problem.kind === "email")).toBe(true);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

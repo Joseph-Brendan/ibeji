@@ -15,6 +15,7 @@ export type ServiceMeta = {
     readonly path: string;
     readonly query?: Record<string, string | number | boolean | readonly (string | number)[]>;
   };
+  readonly isKeyError: (status: number, body: unknown) => boolean;
   readonly isSuccess: (status: number, body: unknown) => boolean;
 };
 
@@ -103,6 +104,9 @@ export type FixtureScanResult = {
 };
 
 export const VALID_SERVICES: readonly RecorderService[];
+export const FAKE_EMAILS: readonly string[];
+export const RECORDER_EMAIL: string;
+export function isFakeEmail(value: string): boolean;
 export class RecorderStopError extends Error {}
 export class KeyRejectedError extends RecorderStopError {}
 export function fingerprintKey(key: string): string;

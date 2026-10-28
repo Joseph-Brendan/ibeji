@@ -1,4 +1,4 @@
-import { encodeForm, makeReference } from "./shared.mjs";
+import { encodeForm, extractServiceError, makeReference } from "./shared.mjs";
 
 const API_VERSION = "2026-09-30.endive";
 const STRIPE_HEADERS = { "stripe-version": API_VERSION };
@@ -21,6 +21,17 @@ export const meta = {
     method: "GET",
     path: "/v1/payment_intents",
     query: { limit: 1 },
+  },
+  isKeyError(status, body) {
+    if (status !== 401 && status !== 403) {
+      return false;
+    }
+    const { message = "", code = "" } = extractServiceError(body);
+    return (
+      code === "api_key_expired" ||
+      code === "secret_key_required" ||
+      /no valid api key|invalid api key|api key provided/i.test(message)
+    );
   },
   isSuccess(status, body) {
     return (
