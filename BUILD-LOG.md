@@ -478,3 +478,41 @@ No code, runtime dependency, fixture, or twin was written. No SPEC.md section wa
 - Record Stripe fixtures in `fixtures/stripe/` when the recorder exists.
 - Resolve the `charge.refunded` payload decision, the local checkout event order, and the T15 Stripe Node compatibility test.
 - Re-check the pinned API version before each minor release.
+
+---
+
+## Phase 2, Step 2.4: Twin framework design
+
+Date: 28 October 2026.
+
+Wrote `TWIN-DESIGN.md`. No code, runtime dependency, action implementation, or SPEC.md edit was made.
+
+### What was designed
+
+- A row-by-row comparison of Paystack, Flutterwave, and Stripe with a research-file citation in every cell.
+- One `TwinDefinition` interface covering id, display name, default port, action catalog, state schema, authentication and live-key detection, route registration, response/error builders, the shared failure step, webhook building/signing/verification/summaries, checkout outcomes, credentials, money rules, retry schedule, and C5 support.
+- Explicit action catalogs for all three twins, including the local `checkout.open` and `checkout.submit` actions.
+- A shared failure pipeline in which the core applies the C5 order and each twin shapes the HTTP error or action result.
+- A webhook adapter in which the core stores the twin-built body and calls the twin's signer on each attempt, without knowing whether the service uses HMAC-SHA512, `verif-hash`, or `Stripe-Signature`.
+- A shared checkout page renderer, with each twin owning the outcome semantics and resulting webhook drafts.
+- A shared-versus-twin-only split. Shared code contains only the HTTP/session/state/failure/dispatcher/credentials/control/UI orchestration and the common checkout shell; parsers, envelopes, signatures, money, pagination, idempotency, outcomes, and C5 shaping stay in the twin.
+- A T14 conformance suite description covering definition contract, lifecycle, 127 binding, Host checks, 1 MB body limits, no CORS, credentials, missing/wrong/live keys, action/route parity, request events, declared failure support and refusal, failure order, checkout outcomes, webhook signing/verification, verification-failure methods, retry schedules, money rules, idempotency, summaries, and registry extensibility.
+- The dispatcher-to-signer design using `registry.require(delivery.twinId)` and the `twin.webhooks.sign` interface.
+
+### Proposed C21 decisions
+
+- Keep the existing open Flutterwave v3 and Stripe `2026-09-30.endive` decisions.
+- Adopt the final C5 support matrix in `TWIN-DESIGN.md` §2.11.
+- Flutterwave has no separate `payment.fetch`; verify-by-id is the fetch.
+- Remove `transfer-reversed` from Flutterwave v3 because v3 has no reversal status or event.
+- Stripe may build a minimal `charge` snapshot for `charge.refunded`, without adding a Charge API.
+- Use the test-mode retry schedules in `TWIN-DESIGN.md` §2.10; Stripe's exact delays are assumed.
+- Flutterwave's local "cancelled" checkout choice maps to the documented failed result.
+
+These are proposed only; SPEC.md is unchanged.
+
+### Later
+
+- Joseph must approve or revise the proposed C21 decisions before Phase 3.
+- The framework type names and state-store boundaries will be hardened during implementation.
+- Write the conformance suite before the first twin implementation.
