@@ -1008,3 +1008,40 @@ Built the C5 failure catalog, the pure request and webhook decision engines, the
 - Wire the rule store to the registry and the control API when those layers exist.
 - Have the webhook dispatcher consume `WebhookPlan` and the twin adapters consume `RequestPlan`.
 - Add the real failure descriptions in Step 5.2.
+
+---
+
+## Phase 3, Step 3.3: webhook dispatcher
+
+Date: 28 October 2026.
+
+Built the generic webhook dispatcher and address policy in `src/core/webhooks/`. It has no service-specific code: every twin supplies its own signer, retry schedule, URL and credentials.
+
+### What was built
+
+- **Types.** `WebhookSigner` and `RetrySchedule` match TWIN-DESIGN.md. `RawWebhook`, `WebhookHeaders`, `WebhookSignOptions` and `VerificationFailureMethod` are the shared signer types.
+- **Dispatcher.** Deliveries move through all eight C7 statuses. Every attempt is an immutable record with the time, target, remote address, response status, sanitised headers, at most 4 KB of body, and error details. Retries preserve the delivery and add attempts. `webhook-never-sent` records not-sent; delayed, duplicated and out-of-order plans set due times and duplicate copies; verification failures pass the chosen method to the twin's signer. Resend creates a new delivery linked by `resendOf`, using the current URL and current credentials but the same body. Resetting a twin abandons its queued and scheduled deliveries; stopping the session abandons pending and in-flight deliveries and aborts in-flight requests.
+- **Address policy.** Every attempt resolves the host through the injected resolver, checks every IPv4 and IPv6 address with Node's `BlockList`, and connects to a returned IP literal with no second lookup. The rules cover loopback by default, all the private ranges with `--allow-private-webhooks`, public addresses with `--allow-public-webhooks`, and always-refused unspecified, link-local, multicast and broadcast ranges. `host.docker.internal` follows the same address rules. Refused addresses raise `WEBHOOK_URL_NOT_ALLOWED` with the flag that would allow them. Redirects are never followed.
+- **Timeout.** Each HTTP or HTTPS attempt has a 10-second timeout from the injected clock and is recorded `unreachable` if no answer arrives.
+- **Tests.** Added local HTTP and HTTPS servers on random loopback ports, two fake twins with different signers and URLs, a fake DNS resolver, and a self-signed test certificate. No test contacts the internet.
+
+### Decisions
+
+- **Assumed schedules use C7's fallback.** As this task specifies, a retry schedule with `source: "assumed"` uses the five C7 delays (1, 5, 15, 30 and 60 minutes) with up to 10 percent seeded jitter. `delaysSeconds` is used as supplied for `source: "docs"`. This is noted for Phase 4 because TWIN-DESIGN section 2.10 gives Stripe an approved assumed 1/2/4-hour schedule; the Stripe twin will need either a docs marking or a C21 clarification then.
+- **`dispatchDue` drives sending.** The dispatcher records `scheduledAt` from the engine plan and the twin's retry schedule. The session loop calls `dispatchDue` after the injected clock advances. This keeps retries deterministic in tests and avoids a second hidden timer loop.
+- **Out-of-order releases newest first.** Deliveries sharing the same hold window are sorted by their creation sequence, newest first, when the window closes.
+- **A refused address is recorded as an unreachable attempt** when it happens during dispatch; the address helper itself throws `WEBHOOK_URL_NOT_ALLOWED` so the control API can reject a bad URL before saving it.
+- **No SPEC.md change.** No C21 entry is needed for this implementation.
+
+### Tests
+
+- Added 39 tests across address and dispatcher files. Total suite: 314 tests.
+- Status test reaches `queued`, `scheduled`, `sending`, `delivered`, `failed`, `unreachable`, `not-sent` and `abandoned`.
+- Retry tests cover two different documented schedules, assumed fallback with jitter, and exhaustion.
+- Address tests cover every allowed and refused range for each option, IPv4 and IPv6, mixed resolutions, tricky host names and redirects.
+- Coverage is 100% of statements, branches, functions and lines for `src/core/`.
+
+### Later
+
+- Wire the dispatcher to the session loop and event log in the control layer.
+- Confirm the assumed-schedule rule when the Stripe twin is built in Phase 4.
