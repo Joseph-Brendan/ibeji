@@ -103,7 +103,7 @@ function makeExpectedStatusOutcome(ctx, expectedStatus, stepLabel) {
       );
       const choice = answer.trim().toLowerCase();
       if (choice === "s") {
-        return { outcome: actualStatus, allowDuplicate: true };
+        return actualStatus;
       }
       if (choice === "r") {
         throw new RetryCheckoutSignal();

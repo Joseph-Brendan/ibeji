@@ -37,6 +37,7 @@ export type RecorderResult = {
   readonly serviceCode?: string;
   readonly note?: string;
   readonly paymentStatus?: string;
+  readonly duplicateOf?: string;
 };
 
 export type RecorderPrompt = {
@@ -63,16 +64,7 @@ export type ResponseClassifierInput = {
   readonly responseBody: unknown;
 };
 
-export type OutcomeDecision =
-  | string
-  | {
-      readonly outcome: string;
-      readonly allowDuplicate?: boolean;
-    };
-
-export type OutcomeResolver = (
-  result: ResponseClassifierInput,
-) => OutcomeDecision | Promise<OutcomeDecision>;
+export type OutcomeResolver = (result: ResponseClassifierInput) => string | Promise<string>;
 
 export type RecorderContext = {
   readonly meta: ServiceMeta;

@@ -761,8 +761,8 @@ describe("C15 recorder fixture labels from real status", () => {
     }
   });
 
-  it("stops with both step names instead of overwriting a fixture", async () => {
-    const server = await startPaystackFlowServer(["success", "success"]);
+  it("continues when two different steps produce the same fixture name", async () => {
+    const server = await startPaystackFlowServer(["success", "success", "failed"]);
     const cwd = await makeTempDir();
     const output = captureConsole();
     try {
@@ -772,15 +772,19 @@ describe("C15 recorder fixture labels from real status", () => {
         { baseUrl: server.baseUrl, cwd, prompt: makeScriptedPrompt([""]) },
       );
 
-      expect(code).toBe(1);
-      const errors = output.errors.join("\n");
-      expect(errors).toContain(
-        "Two steps tried to save the same fixture transaction-verify-success.json",
+      expect(code).toBe(0);
+      expect(output.logs.join("\n")).toContain(
+        "Already recorded as transaction-verify-success.json; not saved again",
       );
-      expect(errors).toContain("transaction.verify (success checkout)");
-      expect(errors).toContain("transaction.verify (unpaid)");
+      expect(output.logs.join("\n")).toContain(
+        "not saved (duplicate of transaction-verify-success.json)",
+      );
+      expect(output.errors.join("\n")).not.toContain("Two steps tried to save the same fixture");
+      expect(server.requests.some((request) => request.url.startsWith("/bank"))).toBe(true);
+      expect(server.requests.some((request) => request.url.startsWith("/bank/resolve"))).toBe(true);
       const files = await readdir(join(cwd, "fixtures", "paystack"));
       expect(files).toContain("transaction-verify-success.json");
+      expect(files).toContain("transaction-verify-failed.json");
     } finally {
       output.restore();
       await server.close();

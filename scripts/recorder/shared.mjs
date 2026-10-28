@@ -739,23 +739,20 @@ export function createRecorderContext({
   const results = [];
   const state = new Map();
   const savedFiles = new Map();
+  const duplicateFiles = new Set();
 
-  function registerFile(file, stepLabel, allowDuplicate = false) {
+  function fileNameOf(file) {
+    return file.split(/[\\/]/).at(-1) ?? file;
+  }
+
+  function registerFile(file) {
     const existing = savedFiles.get(file);
     if (existing !== undefined) {
-      const fileName = file.split(/[\\/]/).at(-1) ?? file;
-      if (allowDuplicate) {
-        console.log(`Already recorded as ${fileName}; not saved again`);
-        return false;
-      }
-      throw new RecorderStopError(
-        `Two steps tried to save the same fixture ${fileName}: ${existing} and ${stepLabel}. ` +
-          `What: the recorder stopped before the second step could overwrite the first. ` +
-          `Why: fixture names must be unique within one recorder run. ` +
-          `Fix: change one step's outcome label or remove the duplicate step, then run the recorder again.`,
-      );
+      duplicateFiles.add(file);
+      console.log(`Already recorded as ${fileNameOf(file)}; not saved again`);
+      return false;
     }
-    savedFiles.set(file, stepLabel);
+    savedFiles.set(file, file);
     return true;
   }
 
@@ -799,6 +796,8 @@ export function createRecorderContext({
 
   function pushResult(action, result, outcome, reason, file, note, paymentStatus) {
     const error = serviceError(result);
+    const duplicateOf =
+      typeof file === "string" && duplicateFiles.has(file) ? fileNameOf(file) : undefined;
     results.push({
       action,
       outcome,
@@ -809,10 +808,11 @@ export function createRecorderContext({
       serviceCode: error.code,
       note,
       paymentStatus,
+      duplicateOf,
     });
   }
 
-  async function saveSkipped(result, action, reason, note, stepLabel = action) {
+  async function saveSkipped(result, action, reason, note) {
     const redacted = redactedRequestResponse(result);
     return saveSkippedFixture({
       cwd,
@@ -820,7 +820,7 @@ export function createRecorderContext({
       action,
       reason,
       note,
-      register: (file) => registerFile(file, stepLabel),
+      register: (file) => registerFile(file),
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,
@@ -954,7 +954,6 @@ export function createRecorderContext({
     failureFileName,
     invalidKey = false,
     headers,
-    stepLabel = action,
     paymentStatusPath,
   }) {
     const result = await send({ method, path, query, body, contentType, invalidKey, headers });
@@ -964,7 +963,7 @@ export function createRecorderContext({
 
     if (keyError) {
       const reason = `key rejected: ${failureReason(result)}`;
-      const file = await saveSkipped(result, action, reason, undefined, stepLabel);
+      const file = await saveSkipped(result, action, reason, undefined);
       pushResult(action, result, "skipped", reason, file);
       throw new KeyRejectedError(
         keyRejectionMessage({
@@ -1000,7 +999,7 @@ export function createRecorderContext({
         outcome: failureOutcome,
         note,
         fileName: failureFileName,
-        register: (file) => registerFile(file, stepLabel),
+        register: (file) => registerFile(file),
         recordedAt: now().toISOString(),
         method: result.method,
         path: redacted.path,
@@ -1023,25 +1022,14 @@ export function createRecorderContext({
 
     if (result.status === 0 || (expectedSuccess && !success) || (outcomeIsResolver && !success)) {
       const reason = failureReason(result);
-      const file = await saveSkipped(result, action, reason, note, stepLabel);
+      const file = await saveSkipped(result, action, reason, note);
       pushResult(action, result, "skipped", reason, file, note, paymentStatus);
       return { ...result, ok: false, file };
     }
 
-    const decision = outcomeIsResolver
-      ? await outcome({ status: result.status, responseBody: result.responseBody, ok: success })
-      : undefined;
     const effectiveOutcome = outcomeIsResolver
-      ? typeof decision === "string"
-        ? decision
-        : typeof decision === "object" && decision !== null
-          ? decision.outcome
-          : "skipped"
+      ? await outcome({ status: result.status, responseBody: result.responseBody, ok: success })
       : (outcome ?? (invalidKey ? "invalid-key" : success ? "success" : "skipped"));
-    const allowDuplicate =
-      outcomeIsResolver && typeof decision === "object" && decision !== null
-        ? decision.allowDuplicate === true
-        : false;
     const redacted = redactedRequestResponse(result);
     const stored = await saveFixture({
       cwd,
@@ -1049,7 +1037,7 @@ export function createRecorderContext({
       action,
       outcome: effectiveOutcome,
       note,
-      register: (file) => registerFile(file, stepLabel, allowDuplicate),
+      register: (file) => registerFile(file),
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,
@@ -1069,7 +1057,7 @@ export function createRecorderContext({
       service: meta.id,
       action,
       reason,
-      register: (path) => registerFile(path, action),
+      register: (path) => registerFile(path),
       recordedAt: now().toISOString(),
       method: null,
       path: null,
@@ -1080,7 +1068,8 @@ export function createRecorderContext({
       responseHeaders: {},
       responseBody: null,
     });
-    results.push({ action, outcome: "skipped", status: null, reason, file });
+    const duplicateOf = duplicateFiles.has(file) ? fileNameOf(file) : undefined;
+    results.push({ action, outcome: "skipped", status: null, reason, file, duplicateOf });
   }
 
   async function recordInvalid(action, request) {
@@ -1130,7 +1119,7 @@ export function createRecorderContext({
       action,
       outcome: effectiveOutcome,
       note,
-      register: (file) => registerFile(file, `${action} (invalid request)`),
+      register: (file) => registerFile(file),
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,
@@ -1164,7 +1153,7 @@ export function createRecorderContext({
       service: meta.id,
       action,
       outcome: "invalid-key",
-      register: (file) => registerFile(file, `${action} (invalid key)`),
+      register: (file) => registerFile(file),
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,

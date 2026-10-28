@@ -54,27 +54,29 @@ export function printSummary(results) {
   console.log("---|---|---|---|---|---|---|");
   for (const result of results) {
     const resultLabel =
-      result.outcome === "skipped"
-        ? "skipped"
-        : result.outcome === "invalid-request"
-          ? "recorded (invalid request)"
-          : result.outcome === "invalid-key"
-            ? "recorded (invalid key)"
-            : result.outcome === "lenient-input"
-              ? "recorded (lenient input)"
-              : result.outcome === "account-limit"
-                ? "recorded (account limit)"
-                : result.outcome === "unpaid"
-                  ? "recorded (unpaid)"
-                  : result.outcome === "declined"
-                    ? "recorded (declined)"
-                    : result.outcome === "idempotent-replay"
-                      ? "recorded (idempotent replay)"
-                      : result.outcome === "idempotency-mismatch"
-                        ? "recorded (idempotency mismatch)"
-                        : result.outcome === "setup"
-                          ? "recorded (setup)"
-                          : "recorded";
+      result.duplicateOf !== undefined
+        ? `not saved (duplicate of ${result.duplicateOf})`
+        : result.outcome === "skipped"
+          ? "skipped"
+          : result.outcome === "invalid-request"
+            ? "recorded (invalid request)"
+            : result.outcome === "invalid-key"
+              ? "recorded (invalid key)"
+              : result.outcome === "lenient-input"
+                ? "recorded (lenient input)"
+                : result.outcome === "account-limit"
+                  ? "recorded (account limit)"
+                  : result.outcome === "unpaid"
+                    ? "recorded (unpaid)"
+                    : result.outcome === "declined"
+                      ? "recorded (declined)"
+                      : result.outcome === "idempotent-replay"
+                        ? "recorded (idempotent replay)"
+                        : result.outcome === "idempotency-mismatch"
+                          ? "recorded (idempotency mismatch)"
+                          : result.outcome === "setup"
+                            ? "recorded (setup)"
+                            : "recorded";
     const detail = [result.note, result.reason, result.file]
       .filter((value) => value !== undefined && value !== null && value !== "")
       .join(" ");

@@ -769,3 +769,34 @@ Fixed Paystack offering the card saved from an earlier checkout, made duplicate 
 - Add recorder steps for the three refund test cards: pay with the card, create a refund, and record the refund outcome. "Failed", "Needs attention", and "Insufficent funds" are documented in `research/paystack.md` section 11.1.1 but are not recorded yet.
 - Run the recorder by hand against Paystack to confirm the per-checkout emails prevent saved-card offers.
 - No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
+
+---
+
+## Phase 2, Step 2.12: Duplicates never stop a recording
+
+Date: 28 October 2026.
+
+Changed duplicate fixture names from a fatal error into a no-op, so two verifies that end with the same real status no longer stop the run. No real key was used and no fixture was recorded in this task.
+
+### What was built
+
+- **Duplicate no-op everywhere.** If any step would save a fixture name already saved in this run, the recorder prints `Already recorded as <file name>; not saved again`, does not write the file, and continues with the next step. This applies to normal fixtures, skipped fixtures, invalid-request fixtures, invalid-key fixtures, and account-limit fixtures.
+- **No overwrite.** Existing files are still never rewritten.
+- **Summary label.** Duplicate rows show `not saved (duplicate of <file name>)` in the Result column instead of the original outcome.
+- **Simplified `s` path.** The special duplicate handling for the `s` choice is no longer needed because duplicates are now safe for every step.
+
+### Decisions
+
+- The duplicate check still uses the files written in the current run, not files already on disk from an earlier run.
+- The first saved file is kept; later duplicate steps are recorded in the summary as not saved, so the run stays auditable.
+- This replaces the earlier rule that stopped the run on a duplicate.
+
+### Tests
+
+- Changed the duplicate fixture test so two different verify steps both return `success`: the run completes, prints the duplicate message, shows `not saved (duplicate of transaction-verify-success.json)` in the summary, and continues through banks.
+- The existing duplicate `s` test still passes with the new global behavior.
+
+### Later
+
+- Run the recorder by hand against Paystack to confirm a run with repeated statuses completes and leaves one copy of each fixture name.
+- No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
