@@ -148,7 +148,7 @@ export function createRecorderContext(options: {
   prompt?: RecorderPrompt;
   redactor?: Redactor;
   now?: () => Date;
-  only?: string;
+  only?: readonly string[];
 }): RecorderContext;
 export class Redactor {
   constructor(options?: { keyPatterns?: readonly RegExp[] });

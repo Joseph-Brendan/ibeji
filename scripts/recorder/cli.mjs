@@ -119,11 +119,21 @@ export async function runCli(args, env = process.env, deps = {}) {
     printUsage();
     return 2;
   }
-  if (parsed.only !== undefined && !serviceModule.onlyActions.includes(parsed.only)) {
-    console.error(`Unknown action: ${parsed.only}`);
-    console.error(`Valid actions for ${serviceModule.meta.displayName}:`);
-    console.error(serviceModule.onlyActions.join(", "));
-    return 2;
+  const only =
+    parsed.only === undefined
+      ? undefined
+      : parsed.only
+          .split(",")
+          .map((action) => action.trim())
+          .filter((action) => action !== "");
+  if (only !== undefined) {
+    const unknown = only.find((action) => !serviceModule.onlyActions.includes(action));
+    if (only.length === 0 || unknown !== undefined) {
+      console.error(`Unknown action: ${unknown ?? parsed.only}`);
+      console.error(`Valid actions for ${serviceModule.meta.displayName}:`);
+      console.error(serviceModule.onlyActions.join(", "));
+      return 2;
+    }
   }
   const meta = serviceModule.meta;
   const keyResult = validateKey(meta, env[meta.envName]);
@@ -148,7 +158,7 @@ export async function runCli(args, env = process.env, deps = {}) {
     fetchImpl: deps.fetchImpl ?? globalThis.fetch,
     prompt,
     redactor,
-    only: parsed.only,
+    only,
   });
 
   console.log(

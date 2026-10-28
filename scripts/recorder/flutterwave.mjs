@@ -1,8 +1,8 @@
 import {
   encodeJson,
   extractServiceError,
+  FAKE_EMAILS,
   makeReference,
-  RECORDER_EMAIL,
   requireResponseField,
 } from "./shared.mjs";
 
@@ -40,6 +40,8 @@ export const meta = {
 };
 
 export const onlyActions = [
+  "checkout.unpaid",
+  "checkout.failed",
   "payment.create",
   "payment.list",
   "refund.list",
@@ -49,13 +51,33 @@ export const onlyActions = [
   "bank.resolve",
 ];
 
-const EMAIL = RECORDER_EMAIL;
+const SUCCESS_CARD = "5531 8866 5214 2950, CVV 564, expiry 09/32, PIN 3310, OTP 12345";
+const FAILED_CARD = "5143 0105 2233 9965, CVV 276, expiry 08/32, PIN 3310, OTP 12345";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function makeCheckoutEmailPicker() {
+  let index = 0;
+  return () => FAKE_EMAILS[index++] ?? FAKE_EMAILS[FAKE_EMAILS.length - 1];
+}
+
+function makeActualStatusOutcome(stepLabel) {
+  return async (result) => {
+    const status = requireResponseField(result, stepLabel, "data.status", "string");
+    console.log(`${stepLabel} status: ${status}.`);
+    return status;
+  };
+}
+
+function isTransferAccountLimit(result) {
+  const { message = "", code = "" } = extractServiceError(result.responseBody);
+  return /enable IP Whitelisting/i.test(message) || /ip[_-]?whitelist/i.test(code);
+}
+
 export async function record(ctx) {
+  const nextEmail = makeCheckoutEmailPicker();
   const txRef = makeReference("ibeji");
 
   const createPayment = await ctx.record({
@@ -68,7 +90,7 @@ export async function record(ctx) {
       currency: "NGN",
       redirect_url: "https://example.com/ibeji/flutterwave",
       customer: {
-        email: EMAIL,
+        email: nextEmail(),
         name: "Test Customer",
       },
     }),
@@ -79,7 +101,7 @@ export async function record(ctx) {
     body: encodeJson({
       tx_ref: txRef,
       currency: "NGN",
-      customer: { email: EMAIL },
+      customer: { email: nextEmail() },
     }),
   });
 
@@ -88,7 +110,7 @@ export async function record(ctx) {
     await ctx.promptCheckout({
       title: "Flutterwave test checkout",
       url: link,
-      card: "5531 8866 5214 2950, CVV 564, expiry 09/32, PIN 3310, OTP 12345",
+      card: SUCCESS_CARD,
       extra: "Use the Mastercard test values shown above.",
     });
   } else {
@@ -97,6 +119,8 @@ export async function record(ctx) {
 
   const verifyReference = await ctx.record({
     action: "payment.verify_by_reference",
+    outcome: makeActualStatusOutcome("payment.verify_by_reference"),
+    paymentStatusPath: "data.status",
     method: "GET",
     path: "/v3/transactions/verify_by_reference",
     query: { tx_ref: txRef },
@@ -113,6 +137,8 @@ export async function record(ctx) {
   if (transactionId !== undefined) {
     await ctx.record({
       action: "payment.verify",
+      outcome: makeActualStatusOutcome("payment.verify"),
+      paymentStatusPath: "data.status",
       method: "GET",
       path: `/v3/transactions/${String(transactionId)}/verify`,
     });
@@ -123,6 +149,71 @@ export async function record(ctx) {
     method: "GET",
     path: "/v3/transactions/not-a-number/verify",
   });
+
+  const unpaidRef = makeReference("ibeji-unpaid");
+  const unpaidCreate = await ctx.record({
+    action: "checkout.unpaid",
+    method: "POST",
+    path: "/v3/payments",
+    body: encodeJson({
+      amount: 7500,
+      tx_ref: unpaidRef,
+      currency: "NGN",
+      redirect_url: "https://example.com/ibeji/flutterwave/unpaid",
+      customer: {
+        email: nextEmail(),
+        name: "Test Customer",
+      },
+    }),
+  });
+  if (unpaidCreate.ok) {
+    await ctx.record({
+      action: "checkout.unpaid",
+      outcome: makeActualStatusOutcome("checkout.unpaid (verify)"),
+      paymentStatusPath: "data.status",
+      method: "GET",
+      path: "/v3/transactions/verify_by_reference",
+      query: { tx_ref: unpaidRef },
+    });
+  } else {
+    await ctx.skip("checkout.unpaid", "payment create did not return a successful response");
+  }
+
+  const failedRef = makeReference("ibeji-failed");
+  const failedCreate = await ctx.record({
+    action: "checkout.failed",
+    method: "POST",
+    path: "/v3/payments",
+    body: encodeJson({
+      amount: 7500,
+      tx_ref: failedRef,
+      currency: "NGN",
+      redirect_url: "https://example.com/ibeji/flutterwave/failed",
+      customer: {
+        email: nextEmail(),
+        name: "Test Customer",
+      },
+    }),
+  });
+  if (failedCreate.ok) {
+    const link = requireResponseField(failedCreate, "checkout.failed", "data.link", "string");
+    await ctx.promptCheckout({
+      title: "Flutterwave failed-card checkout",
+      url: link,
+      card: FAILED_CARD,
+      extra: "Use the failing Mastercard test values shown above. The PIN and OTP are required.",
+    });
+    await ctx.record({
+      action: "checkout.failed",
+      outcome: makeActualStatusOutcome("checkout.failed (verify)"),
+      paymentStatusPath: "data.status",
+      method: "GET",
+      path: "/v3/transactions/verify_by_reference",
+      query: { tx_ref: failedRef },
+    });
+  } else {
+    await ctx.skip("checkout.failed", "payment create did not return a successful response");
+  }
 
   await ctx.record({
     action: "payment.list",
@@ -189,6 +280,9 @@ export async function record(ctx) {
 
   const transfer = await ctx.record({
     action: "transfer.create",
+    failureOutcome: "account-limit",
+    failureMatches: isTransferAccountLimit,
+    failureFileName: "transfer-create.account-limit.json",
     method: "POST",
     path: "/v3/transfers",
     body: encodeJson({
@@ -200,15 +294,18 @@ export async function record(ctx) {
       reference: makeReference("ibeji"),
     }),
   });
-  await ctx.recordInvalid("transfer.create", {
-    method: "POST",
-    path: "/v3/transfers",
-    body: encodeJson({
-      account_bank: "044",
-      amount: 100,
-      currency: "NGN",
-    }),
-  });
+  const accountLimit = !transfer.ok && isTransferAccountLimit(transfer);
+  if (!accountLimit) {
+    await ctx.recordInvalid("transfer.create", {
+      method: "POST",
+      path: "/v3/transfers",
+      body: encodeJson({
+        account_bank: "044",
+        amount: 100,
+        currency: "NGN",
+      }),
+    });
+  }
 
   const transferId = transfer.ok
     ? requireResponseField(transfer, "transfer.create", "data.id", "number")
@@ -219,8 +316,6 @@ export async function record(ctx) {
       method: "GET",
       path: `/v3/transfers/${String(transferId)}`,
     });
-  } else {
-    await ctx.skip("transfer.fetch", "transfer.create did not return data.id");
   }
   await ctx.recordInvalid("transfer.fetch", {
     method: "GET",
@@ -261,10 +356,6 @@ export async function record(ctx) {
     body: encodeJson({ account_number: "not-an-account", account_bank: "044" }),
   });
 
-  await ctx.skip(
-    "checkout",
-    "Flutterwave has no checkout-page API; payment.create returns the hosted link and the verify actions record the result",
-  );
   await ctx.recordInvalidKey("bank.list", {
     method: "GET",
     path: "/v3/banks/NG",

@@ -836,3 +836,41 @@ Added a single-action recorder mode and fixed Paystack bank resolution to use th
 - Run `--only bank.resolve` against Paystack with a real test key to confirm the 001 test bank code works without the daily limit.
 - Add recorder steps for the refund test cards listed in `research/paystack.md` section 11.1.1.
 - No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
+
+---
+
+## Phase 2, Step 2.14: Flutterwave recorder finished
+
+Date: 28 October 2026.
+
+Finished the Flutterwave recorder: verify statuses now appear in the console and summary, unpaid and failed checkouts are recorded, the transfer account limit is labelled correctly, and `--only` handles existing files and several actions. No real key was used and no fixture was committed.
+
+### What was built
+
+- **Verify status.** Flutterwave verify steps now pass `data.status` into the summary and print it in the console, the same way the Paystack recorder does. Fixture outcomes use the real status, such as `successful`, `pending`, or `failed`.
+- **Unpaid and failed checkouts.** New recorder actions `checkout.unpaid` and `checkout.failed` each create a payment and verify it by reference. The unpaid checkout never opens a payment page. The failed checkout pauses with a documented failing Mastercard: `5143 0105 2233 9965`, CVV `276`, expiry `08/32`, PIN `3310`, OTP `12345`. Both actions can be run with `--only`.
+- **Flutterwave account limit.** `transfer.create` recognises “Please enable IP Whitelisting to access this service” as an account limit, saves `transfer-create.account-limit.json`, and does not send the invalid-request case. The old invalid-request fixture was renamed and its outcome changed to `account-limit`; `transfer.create.skipped.json` and `transfer.fetch.skipped.json` were deleted.
+- **Transfer fetch HTML response.** The saved `transfer-fetch-lenient-input.json` status is confirmed as `200`. `research/flutterwave.md` records the HTML “Cannot GET /v3/transfers/not-a-number” response as observed on 28 October 2026 and says the twin must not copy it; the documented JSON 404 is the correct behaviour.
+- **`--only` improvements.** Existing files are no longer fatal: the recorder prints `Already recorded as <file name>; not saved again` and continues. `--only` now accepts comma-separated actions such as `--only bank.resolve,bank.list`.
+
+### Decisions
+
+- Flutterwave checkout creates and verifies use separate emails from the fixed fake list so the failed-card attempt does not inherit a saved card.
+- The failed checkout uses the documented “Do Not Honour” Mastercard because `research/flutterwave.md` lists failing cards with PIN and OTP.
+- Composite `checkout.unpaid` and `checkout.failed` actions are allowed to make both their create and verify requests under the same action name; ordinary actions still run once.
+- On the account limit, the recorder keeps the transfer fetch invalid-request probe because it is a separate action, but it does not run the transfer create invalid-request case.
+- No fixture file is committed in this task.
+
+### Tests
+
+- Added a fake-server test proving `checkout.unpaid` prints `pending` in the console and summary and saves `checkout-unpaid-pending.json`.
+- Added a fake-server test proving the Flutterwave IP-whitelist response is saved as `transfer-create.account-limit.json` and the invalid-request case is not sent.
+- Updated the `--only` existing-file test to expect continuation, the duplicate message, and unchanged file contents.
+- Added a comma-separated `--only bank.resolve,bank.list` test.
+
+### Later
+
+- Run the Flutterwave recorder by hand to capture the new unpaid and failed checkout fixtures.
+- Add recorder steps for the Flutterwave failing-card outcomes if the twin needs more than one failure flavour.
+- The Flutterwave twin must not copy the HTML 200 transfer-fetch response; use the documented JSON 404 instead.
+- No SPEC.md section was edited; the changes implement C15 and do not change its meaning.

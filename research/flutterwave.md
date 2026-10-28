@@ -657,6 +657,7 @@ Source: [Get a transfer](https://developer.flutterwave.com/v3.0.0/reference/get-
 
 - Action page: `200`, `400`, `404`; exact 404 `"Transfer not found"`.
 - Common: `401`, `500`, `503`, `429`.
+- **observed while recording on 28 October 2026:** `GET /v3/transfers/not-a-number` returned HTTP `200` with an HTML page `Cannot GET /v3/transfers/not-a-number`. The twin should **not** copy this: the documented v3 response for a missing transfer is a JSON `404` with message `"Transfer not found"`. The HTML fixture is kept only as evidence of the real endpoint's lenient Express-style response.
 
 #### Webhook events this action can trigger
 

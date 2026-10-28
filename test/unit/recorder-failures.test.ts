@@ -219,6 +219,7 @@ function makeScriptedPrompt(answers: readonly string[]) {
 }
 
 const paystackKey = "sk_test_fake_recorder_key_123";
+const flutterwaveKey = "FLWSECK_TEST-fake_recorder_key_123";
 
 describe("C15 recorder preflight key check", () => {
   it("stops before recording on a 401 from Paystack's list call and saves nothing", async () => {
@@ -1418,6 +1419,108 @@ describe("C15 recorder transfer account limit", () => {
   });
 });
 
+describe("C15 Flutterwave verify status", () => {
+  it("prints the payment status in the console and summary for checkout.unpaid", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/v3/transfers?")) {
+        return { status: 200, body: { status: "success", message: "ok", data: [] } };
+      }
+      if (request.method === "POST" && request.url === "/v3/payments") {
+        return {
+          status: 200,
+          body: {
+            status: "success",
+            message: "Hosted Link",
+            data: { link: "https://example.com/checkout" },
+          },
+        };
+      }
+      if (
+        request.method === "GET" &&
+        request.url.startsWith("/v3/transactions/verify_by_reference?")
+      ) {
+        return {
+          status: 200,
+          body: {
+            status: "success",
+            message: "Transaction fetched successfully",
+            data: { id: 123, status: "pending" },
+          },
+        };
+      }
+      return { status: 500, body: { status: "error", message: "unexpected request" } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "flutterwave", "--only", "checkout.unpaid"],
+        { FLUTTERWAVE_TEST_SECRET_KEY: flutterwaveKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      expect(code).toBe(0);
+      expect(server.requests).toHaveLength(3);
+      expect(output.logs.join("\n")).toContain("checkout.unpaid (verify) status: pending.");
+      expect(output.logs.join("\n")).toContain("| 200 | pending |");
+      const files = await readdir(join(cwd, "fixtures", "flutterwave"));
+      expect(files).toContain("checkout-unpaid-pending.json");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 Flutterwave transfer account limit", () => {
+  it("saves the IP-whitelist response as account-limit and skips the invalid case", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/v3/transfers?")) {
+        return { status: 200, body: { status: "success", message: "ok", data: [] } };
+      }
+      if (request.method === "POST" && request.url === "/v3/transfers") {
+        return {
+          status: 400,
+          body: {
+            status: "error",
+            message: "Please enable IP Whitelisting to access this service",
+            data: null,
+          },
+        };
+      }
+      return { status: 500, body: { status: "error", message: "unexpected request" } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "flutterwave", "--only", "transfer.create"],
+        { FLUTTERWAVE_TEST_SECRET_KEY: flutterwaveKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      expect(code).toBe(0);
+      expect(server.requests).toHaveLength(2);
+      const files = await readdir(join(cwd, "fixtures", "flutterwave"));
+      expect(files).toContain("transfer-create.account-limit.json");
+      expect(files).not.toContain("transfer-create-invalid-request.json");
+      const saved = JSON.parse(
+        await readFile(
+          join(cwd, "fixtures", "flutterwave", "transfer-create.account-limit.json"),
+          "utf8",
+        ),
+      ) as { outcome: string; responseBody: { message: string } };
+      expect(saved.outcome).toBe("account-limit");
+      expect(saved.responseBody.message).toContain("IP Whitelisting");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("C15 recorder --only option", () => {
   it("runs only bank.resolve and its invalid-request case", async () => {
     const server = await startServer((request) => {
@@ -1477,7 +1580,62 @@ describe("C15 recorder --only option", () => {
     }
   });
 
-  it("never touches an existing fixture file", async () => {
+  it("runs several comma-separated actions", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/transaction?")) {
+        return { status: 200, body: { status: true, message: "ok", data: [] } };
+      }
+      if (request.method === "GET" && request.url.startsWith("/bank/resolve?")) {
+        if (request.url.includes("account_number=not-an-account")) {
+          return {
+            status: 400,
+            body: { status: false, message: "Account number should be numeric" },
+          };
+        }
+        return {
+          status: 200,
+          body: {
+            status: true,
+            message: "Account number resolved",
+            data: { account_number: "0000000000", account_name: "Test Name 1" },
+          },
+        };
+      }
+      if (request.method === "GET" && request.url.startsWith("/bank?")) {
+        if (request.url.includes("country=not-a-country")) {
+          return {
+            status: 400,
+            body: { status: false, message: "Country not supported" },
+          };
+        }
+        return { status: 200, body: { status: true, message: "ok", data: [] } };
+      }
+      return { status: 500, body: { status: false, message: "unexpected request" } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack", "--only", "bank.resolve,bank.list"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      expect(code).toBe(0);
+      expect(server.requests).toHaveLength(5);
+      const files = await readdir(join(cwd, "fixtures", "paystack"));
+      expect(files).toContain("bank-resolve-success.json");
+      expect(files).toContain("bank-resolve-invalid-request.json");
+      expect(files).toContain("bank-list-success.json");
+      expect(files).toContain("bank-list-invalid-request.json");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("never touches an existing fixture file and continues", async () => {
     const server = await startServer((request) => {
       if (request.method === "GET" && request.url.startsWith("/transaction?")) {
         return { status: 200, body: { status: true, message: "ok", data: [] } };
@@ -1506,12 +1664,15 @@ describe("C15 recorder --only option", () => {
         { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
       );
 
-      expect(code).toBe(1);
-      expect(output.errors.join("\n")).toContain(
-        "Fixture bank-resolve-success.json already exists",
+      expect(code).toBe(0);
+      expect(output.logs.join("\n")).toContain(
+        "Already recorded as bank-resolve-success.json; not saved again",
+      );
+      expect(output.logs.join("\n")).toContain(
+        "not saved (duplicate of bank-resolve-success.json)",
       );
       expect(await readFile(existing, "utf8")).toBe('{"kept":true}\n');
-      expect(server.requests).toHaveLength(2);
+      expect(server.requests).toHaveLength(3);
     } finally {
       output.restore();
       await server.close();
