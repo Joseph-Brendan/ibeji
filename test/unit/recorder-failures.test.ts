@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { IncomingHttpHeaders } from "node:http";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -1414,6 +1414,132 @@ describe("C15 recorder transfer account limit", () => {
       output.restore();
       await server.close();
       await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder --only option", () => {
+  it("runs only bank.resolve and its invalid-request case", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/transaction?")) {
+        return { status: 200, body: { status: true, message: "ok", data: [] } };
+      }
+      if (request.method === "GET" && request.url.startsWith("/bank/resolve?")) {
+        if (request.url.includes("account_number=not-an-account")) {
+          return {
+            status: 400,
+            body: {
+              status: false,
+              message: "Account number should be numeric",
+              code: "invalid_account_number",
+            },
+          };
+        }
+        return {
+          status: 200,
+          body: {
+            status: true,
+            message: "Account number resolved",
+            data: { account_number: "0000000000", account_name: "Test Name 1" },
+          },
+        };
+      }
+      return {
+        status: 500,
+        body: { status: false, message: "unexpected request", code: "unexpected" },
+      };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack", "--only", "bank.resolve"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      expect(code).toBe(0);
+      expect(server.requests).toHaveLength(3);
+      expect(server.requests[0]?.url.startsWith("/transaction?")).toBe(true);
+      const resolveUrls = server.requests.slice(1).map((request) => request.url);
+      for (const url of resolveUrls) {
+        const parsed = new URL(url, server.baseUrl);
+        expect(parsed.pathname).toBe("/bank/resolve");
+        expect(parsed.searchParams.get("bank_code")).toBe("001");
+      }
+      const files = await readdir(join(cwd, "fixtures", "paystack"));
+      expect(files).toContain("bank-resolve-success.json");
+      expect(files).toContain("bank-resolve-invalid-request.json");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("never touches an existing fixture file", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/transaction?")) {
+        return { status: 200, body: { status: true, message: "ok", data: [] } };
+      }
+      if (request.method === "GET" && request.url.startsWith("/bank/resolve?")) {
+        return {
+          status: 200,
+          body: {
+            status: true,
+            message: "Account number resolved",
+            data: { account_number: "0000000000", account_name: "Test Name 1" },
+          },
+        };
+      }
+      return { status: 500, body: { status: false, message: "unexpected request" } };
+    });
+    const cwd = await makeTempDir();
+    const existing = join(cwd, "fixtures", "paystack", "bank-resolve-success.json");
+    await mkdir(join(cwd, "fixtures", "paystack"), { recursive: true });
+    await writeFile(existing, '{"kept":true}\n', "utf8");
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack", "--only", "bank.resolve"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      expect(code).toBe(1);
+      expect(output.errors.join("\n")).toContain(
+        "Fixture bank-resolve-success.json already exists",
+      );
+      expect(await readFile(existing, "utf8")).toBe('{"kept":true}\n');
+      expect(server.requests).toHaveLength(2);
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("lists valid actions for an unknown action", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error("an unknown --only action must not make a request");
+    });
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack", "--only", "bank.nope"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        {
+          fetchImpl: fetchImpl as unknown as typeof fetch,
+          prompt: makePrompt(),
+        },
+      );
+
+      expect(code).toBe(2);
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(output.errors.join("\n")).toContain("Unknown action: bank.nope");
+      expect(output.errors.join("\n")).toContain("bank.resolve");
+    } finally {
+      output.restore();
     }
   });
 });

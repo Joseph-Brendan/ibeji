@@ -39,6 +39,16 @@ export const meta = {
   },
 };
 
+export const onlyActions = [
+  "payment.create",
+  "payment.list",
+  "refund.list",
+  "transfer.create",
+  "transfer.list",
+  "bank.list",
+  "bank.resolve",
+];
+
 const EMAIL = RECORDER_EMAIL;
 
 function today() {

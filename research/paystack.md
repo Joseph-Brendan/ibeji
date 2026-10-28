@@ -889,6 +889,8 @@ The API page's resolve sample has only `account_number` and `account_name`; the 
 - Action page sample: `200 Ok`.
 - Global documented statuses: `400`, `401`, `404`, `5xx`, `429`.
 - Exact error body/code/message for an invalid account: **UNCONFIRMED**.
+- Test mode allows 3 live bank resolves per day; test bank code 001 is not limited. Observed while recording on 28 October 2026.
+- The recorded shape for the `rate-limited` failure is `fixtures/paystack/rate-limited-429.json`: HTTP 429 with `status: false`, `type: "api_error"`, code `unknown`, and the message "Test mode daily limit of 3 live bank resolves exceeded. Use test bank codes 001 or upgrade to live mode." This is a real rate-limit response.
 
 #### Webhook events this action can trigger
 

@@ -42,6 +42,15 @@ export const meta = {
   },
 };
 
+export const onlyActions = [
+  "payment_intent.create",
+  "payment_intent.list",
+  "checkout_session.create",
+  "checkout_session.list",
+  "refund.list",
+  "event.list",
+];
+
 const PI_BODY = {
   amount: 2000,
   currency: "usd",

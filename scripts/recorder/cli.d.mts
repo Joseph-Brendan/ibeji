@@ -12,10 +12,12 @@ export type RunCliDeps = {
 
 export function printSummary(results: readonly RecorderResult[]): void;
 
-export function parseArgs(
-  args: readonly string[],
-):
-  | { readonly ok: true; readonly service: "paystack" | "flutterwave" | "stripe" }
+export function parseArgs(args: readonly string[]):
+  | {
+      readonly ok: true;
+      readonly service: "paystack" | "flutterwave" | "stripe";
+      readonly only?: string;
+    }
   | { readonly ok: false };
 
 export function runCli(

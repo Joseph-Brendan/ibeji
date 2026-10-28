@@ -800,3 +800,39 @@ Changed duplicate fixture names from a fatal error into a no-op, so two verifies
 
 - Run the recorder by hand against Paystack to confirm a run with repeated statuses completes and leaves one copy of each fixture name.
 - No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
+
+---
+
+## Phase 2, Step 2.13: Recorder --only option and test bank code
+
+Date: 28 October 2026.
+
+Added a single-action recorder mode and fixed Paystack bank resolution to use the unlimited test bank code. No real key was used. Fixture files changed in this task were left uncommitted.
+
+### What was built
+
+- **`--only <action>`.** `node scripts/record-fixtures.mjs --service paystack --only bank.resolve` still runs the key-check preflight, then runs only that action’s normal request and its own invalid-request case. Other steps, prompts, skips, invalid-key probes, and retries are suppressed.
+- **Existing files are protected.** In `--only` mode the recorder refuses to write a fixture file that already exists on disk, stops with the file name, and leaves the file untouched.
+- **Valid action list.** Each service exports the actions it can run alone. An unknown action exits with code 2 and lists those actions.
+- **Paystack bank code 001.** The bank resolve success and invalid-request cases now use `bank_code: "001"`. `research/paystack.md` records that test mode allows 3 live bank resolves per day and that code 001 is not limited, observed on 28 October 2026.
+- **Rate-limit fixture.** The recorded 429 response was renamed from `fixtures/paystack/bank.resolve.skipped.json` to `fixtures/paystack/rate-limited-429.json` and marked with `"realRateLimit": true` plus a note. `research/paystack.md` records this as the shape for the `rate-limited` failure.
+
+### Decisions
+
+- `--only` is limited to actions that can run without values from earlier responses, such as `bank.resolve`, `bank.list`, list actions, and create actions that do not need an existing record.
+- Suppressing other steps means their absence cannot break the selected action. The recorder returns a local "not run" result instead of sending their requests.
+- The key check still runs first, so a bad key is refused before the selected action.
+- No fixture file is committed by this task.
+
+### Tests
+
+- Added fake-server tests proving `--only bank.resolve` sends only the preflight, the success request with bank code 001, and the invalid-request case.
+- Added a fake-server test with an existing fixture file, proving the run stops, names the file, and leaves its contents unchanged.
+- Added a test proving an unknown action lists the valid ones and makes no request.
+- Updated the argument parser test for `--only`.
+
+### Later
+
+- Run `--only bank.resolve` against Paystack with a real test key to confirm the 001 test bank code works without the daily limit.
+- Add recorder steps for the refund test cards listed in `research/paystack.md` section 11.1.1.
+- No SPEC.md section was edited; the changes implement C15 and do not change its meaning.

@@ -43,6 +43,15 @@ export const meta = {
   },
 };
 
+export const onlyActions = [
+  "transaction.initialize",
+  "transaction.list",
+  "refund.list",
+  "transfer_recipient.create",
+  "bank.list",
+  "bank.resolve",
+];
+
 const SUCCESS_CARD = "4084 0840 8408 4081, CVV 408, expiry 10/27 (no PIN or OTP)";
 const DECLINED_CARD = "4084 0800 0000 5408, CVV 001, expiry 10/27 (declines)";
 
@@ -460,12 +469,12 @@ export async function record(ctx) {
     action: "bank.resolve",
     method: "GET",
     path: "/bank/resolve",
-    query: { account_number: "0000000000", bank_code: "057" },
+    query: { account_number: "0000000000", bank_code: "001" },
   });
   await ctx.recordInvalid("bank.resolve", {
     method: "GET",
     path: "/bank/resolve",
-    query: { account_number: "not-an-account", bank_code: "057" },
+    query: { account_number: "not-an-account", bank_code: "001" },
   });
 
   await ctx.recordInvalidKey("bank.list", {

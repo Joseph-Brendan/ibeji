@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
@@ -632,6 +632,24 @@ function redactResponseHeaders(headers, redactor) {
   return output;
 }
 
+async function refuseExistingFile(file) {
+  try {
+    await stat(file);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return;
+    }
+    throw error;
+  }
+  const fileName = file.split(/[\\/]/).at(-1) ?? file;
+  throw new RecorderStopError(
+    `Fixture ${fileName} already exists. ` +
+      `What: --only never deletes or overwrites an existing fixture. ` +
+      `Why: this file was recorded before this run. ` +
+      `Fix: move or rename ${fileName}, then run --only again.`,
+  );
+}
+
 export async function saveFixture({
   cwd,
   service,
@@ -648,11 +666,15 @@ export async function saveFixture({
   note,
   fileName,
   register,
+  refuseOverwrite = false,
 }) {
   const directory = join(cwd, "fixtures", service);
   await mkdir(directory, { recursive: true });
   const slug = action.replaceAll(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
   const file = join(directory, fileName ?? `${slug}-${outcome}.json`);
+  if (refuseOverwrite) {
+    await refuseExistingFile(file);
+  }
   if (register !== undefined && register(file) === false) {
     return file;
   }
@@ -693,12 +715,16 @@ export async function saveSkippedFixture({
   responseBody,
   note,
   register,
+  refuseOverwrite = false,
 }) {
   const directory = join(cwd, "fixtures", service);
   await mkdir(directory, { recursive: true });
   const safeAction =
     action.replaceAll(/[^a-z0-9._-]+/gi, "-").replace(/^[.-]+|[.-]+$/g, "") || "step";
   const file = join(directory, `${safeAction}.skipped.json`);
+  if (refuseOverwrite) {
+    await refuseExistingFile(file);
+  }
   if (register !== undefined && register(file) === false) {
     return file;
   }
@@ -734,12 +760,38 @@ export function createRecorderContext({
   prompt = createPrompt(),
   redactor,
   now = () => new Date(),
+  only,
 }) {
   const activeRedactor = redactor ?? new Redactor({ keyPatterns: meta.keyPatterns });
   const results = [];
   const state = new Map();
   const savedFiles = new Map();
   const duplicateFiles = new Set();
+  const onlyMode = only !== undefined;
+  let onlyNormalRecorded = false;
+  let onlyInvalidRecorded = false;
+
+  function suppressedResult({ method, path, query, body, contentType }) {
+    return {
+      method,
+      path,
+      query: query ?? null,
+      requestBody: body,
+      requestContentType: body === null ? null : contentType,
+      status: 0,
+      responseHeaders: {},
+      responseBody: null,
+      file: null,
+      ok: false,
+    };
+  }
+
+  function shouldRunNormal(action, outcome) {
+    if (!onlyMode) {
+      return true;
+    }
+    return action === only && outcome === undefined && !onlyNormalRecorded;
+  }
 
   function fileNameOf(file) {
     return file.split(/[\\/]/).at(-1) ?? file;
@@ -821,6 +873,7 @@ export function createRecorderContext({
       reason,
       note,
       register: (file) => registerFile(file),
+      refuseOverwrite: onlyMode,
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,
@@ -956,6 +1009,12 @@ export function createRecorderContext({
     headers,
     paymentStatusPath,
   }) {
+    if (!shouldRunNormal(action, outcome)) {
+      return suppressedResult({ method, path, query, body, contentType });
+    }
+    if (onlyMode) {
+      onlyNormalRecorded = true;
+    }
     const result = await send({ method, path, query, body, contentType, invalidKey, headers });
     const authStatus = result.status === 401 || result.status === 403;
     const keyError =
@@ -1000,6 +1059,7 @@ export function createRecorderContext({
         note,
         fileName: failureFileName,
         register: (file) => registerFile(file),
+        refuseOverwrite: onlyMode,
         recordedAt: now().toISOString(),
         method: result.method,
         path: redacted.path,
@@ -1038,6 +1098,7 @@ export function createRecorderContext({
       outcome: effectiveOutcome,
       note,
       register: (file) => registerFile(file),
+      refuseOverwrite: onlyMode,
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,
@@ -1052,12 +1113,16 @@ export function createRecorderContext({
   }
 
   async function skip(action, reason) {
+    if (onlyMode && action !== only) {
+      return;
+    }
     const file = await saveSkippedFixture({
       cwd,
       service: meta.id,
       action,
       reason,
       register: (path) => registerFile(path),
+      refuseOverwrite: onlyMode,
       recordedAt: now().toISOString(),
       method: null,
       path: null,
@@ -1073,6 +1138,22 @@ export function createRecorderContext({
   }
 
   async function recordInvalid(action, request) {
+    if (onlyMode && (action !== only || onlyInvalidRecorded)) {
+      return suppressedResult({
+        method: request.method,
+        path: request.path,
+        query: request.query,
+        body: request.body ?? null,
+        contentType:
+          request.contentType ??
+          (meta.requestFormat === "form"
+            ? "application/x-www-form-urlencoded"
+            : "application/json"),
+      });
+    }
+    if (onlyMode) {
+      onlyInvalidRecorded = true;
+    }
     const result = await send({ ...request, invalidKey: false });
     const authStatus = result.status === 401 || result.status === 403;
     const keyError = authStatus && meta.isKeyError(result.status, result.responseBody);
@@ -1120,6 +1201,7 @@ export function createRecorderContext({
       outcome: effectiveOutcome,
       note,
       register: (file) => registerFile(file),
+      refuseOverwrite: onlyMode,
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,
@@ -1134,6 +1216,19 @@ export function createRecorderContext({
   }
 
   async function recordInvalidKey(action, request) {
+    if (onlyMode) {
+      return suppressedResult({
+        method: request.method,
+        path: request.path,
+        query: request.query,
+        body: request.body ?? null,
+        contentType:
+          request.contentType ??
+          (meta.requestFormat === "form"
+            ? "application/x-www-form-urlencoded"
+            : "application/json"),
+      });
+    }
     const result = await send({ ...request, invalidKey: true });
 
     if (result.status === 0) {
@@ -1154,6 +1249,7 @@ export function createRecorderContext({
       action,
       outcome: "invalid-key",
       register: (file) => registerFile(file),
+      refuseOverwrite: onlyMode,
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,
@@ -1168,6 +1264,9 @@ export function createRecorderContext({
   }
 
   async function promptCheckout({ title, url, card, extra }) {
+    if (onlyMode) {
+      return;
+    }
     console.log("");
     console.log(title);
     console.log(`Link: ${url}`);

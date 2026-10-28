@@ -16,13 +16,34 @@ const SERVICES = {
   stripe,
 };
 
-const USAGE = "Usage: node scripts/record-fixtures.mjs --service <paystack|flutterwave|stripe>";
+const USAGE =
+  "Usage: node scripts/record-fixtures.mjs --service <paystack|flutterwave|stripe> [--only <action>]";
 
 export function parseArgs(args) {
-  if (args.length === 2 && args[0] === "--service") {
-    return parseService(args[1]);
+  let service;
+  let only;
+  for (let index = 0; index < args.length; index += 2) {
+    const flag = args[index];
+    const value = args[index + 1];
+    if (typeof flag !== "string" || typeof value !== "string") {
+      return { ok: false };
+    }
+    if (flag === "--service" && service === undefined) {
+      service = value;
+    } else if (flag === "--only" && only === undefined) {
+      only = value;
+    } else {
+      return { ok: false };
+    }
   }
-  return { ok: false };
+  if (service === undefined) {
+    return { ok: false };
+  }
+  const parsed = parseService(service);
+  if (!parsed.ok) {
+    return { ok: false };
+  }
+  return only === undefined ? parsed : { ...parsed, only };
 }
 
 function parseService(value) {
@@ -98,6 +119,12 @@ export async function runCli(args, env = process.env, deps = {}) {
     printUsage();
     return 2;
   }
+  if (parsed.only !== undefined && !serviceModule.onlyActions.includes(parsed.only)) {
+    console.error(`Unknown action: ${parsed.only}`);
+    console.error(`Valid actions for ${serviceModule.meta.displayName}:`);
+    console.error(serviceModule.onlyActions.join(", "));
+    return 2;
+  }
   const meta = serviceModule.meta;
   const keyResult = validateKey(meta, env[meta.envName]);
   if (!keyResult.ok) {
@@ -121,6 +148,7 @@ export async function runCli(args, env = process.env, deps = {}) {
     fetchImpl: deps.fetchImpl ?? globalThis.fetch,
     prompt,
     redactor,
+    only: parsed.only,
   });
 
   console.log(

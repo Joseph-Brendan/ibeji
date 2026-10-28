@@ -37,6 +37,11 @@ describe("C15 recorder key checks", () => {
   it("parses only the three supported --service choices", () => {
     for (const service of services) {
       expect(parseArgs(["--service", service.id])).toEqual({ ok: true, service: service.id });
+      expect(parseArgs(["--service", service.id, "--only", "bank.resolve"])).toEqual({
+        ok: true,
+        service: service.id,
+        only: "bank.resolve",
+      });
       expect(parseArgs([`--service=${service.id}`])).toEqual({ ok: false });
     }
     expect(parseArgs([])).toEqual({ ok: false });
