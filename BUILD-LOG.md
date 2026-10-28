@@ -432,3 +432,49 @@ No code, runtime dependency, fixture, or twin was written. No SPEC.md section wa
 - Record Flutterwave fixtures in `fixtures/flutterwave/` when the recorder exists.
 - Resolve the C4b fetch gap, v3 refund event name, transfer reversal, and T15 library mapping decisions.
 - Research Stripe separately; never reuse v3 facts.
+
+---
+
+## Phase 2, Step 2.3: Stripe research
+
+Date: 28 October 2026.
+
+Wrote `research/stripe.md` from `docs.stripe.com` and Stripe's API reference. No Paystack or Flutterwave research file was read, and no fact from either was used. The only non-`docs.stripe.com` sources are labelled source exceptions: the official `stripe` Node package 23.0.1 (base-URL options and pinned API version) and the official `stripe-mock` repository README (because `docs.stripe.com` has no stripe-mock page).
+
+### Version decision
+
+- Stripe's current API version is **`2026-09-30.endive`**.
+- The official `stripe` Node package 23.0.1 pins `2026-09-30.endive` in `cjs/apiVersion.js`; `stripe-node` v12+ sends the version current at its release.
+- **Recommendation: imitate `2026-09-30.endive`.** The twin has only one implementation, so it should pin the version the official library emits.
+- Proposed header policy: accept an absent `Stripe-Version` or the exact pinned value; reject any other value with a Stripe-shaped `400 invalid_request_error` and a plain message. Stripe's docs do not document its own response to an unsupported version, so this rejection is a twin policy, not a Stripe fact.
+- Webhook snapshot Event objects use `api_version: "2026-09-30.endive"`.
+
+Proposed C21 entry (not applied to SPEC.md; needs Joseph's approval):
+
+> **28 October 2026: imitate Stripe API version `2026-09-30.endive`.** Stripe's current version on the research date is `2026-09-30.endive`, and the official `stripe` Node package 23.0.1 pins the same version. The twin will serve only that version: an absent header or the exact version is accepted; any other `Stripe-Version` value is rejected with a Stripe-shaped `400 invalid_request_error` and a plain message. The docs do not document Stripe's own response to an unsupported version, so the rejection rule is a twin policy, not a claim about Stripe. Webhook Event objects use `api_version: "2026-09-30.endive"`.
+
+### Key findings
+
+- Stripe v1 requests are form-encoded (`application/x-www-form-urlencoded`), not JSON: `metadata[key]=value`, `line_items[0][price]=...`, scalar arrays as `name[]=value`, and `expand[]=...`.
+- Base URL `https://api.stripe.com`; HTTP Basic Auth with the secret/restricted key as username and an empty password; bearer auth is also documented.
+- Test secret keys start `sk_test_`, live secret `sk_live_`, test restricted `rk_test_`, live restricted `rk_live_`. Publishable keys cannot authenticate server calls.
+- Common error envelope is `{ "error": { type, code, message, param, ... } }`; documented types are `api_error`, `card_error`, `idempotency_error`, and `invalid_request_error`.
+- Documented HTTP statuses: 200, 400, 401, 402, 403, 404, 409, 424, 429, 500, 502, 503, 504.
+- Idempotency keys are up to 255 characters, retained at least 24 hours, return the saved status/body for the same parameters, add `Idempotent-Replayed: true`, and use `409 idempotency_key_in_use` for concurrent same-key requests. The exact status/code for a parameter mismatch is not documented; the twin uses `400 idempotency_error` as its policy.
+- Webhook signing uses `Stripe-Signature: t=...,v1=...`; HMAC-SHA256 over `timestamp.rawBody` with the `whsec_` endpoint secret; default tolerance 5 minutes; raw body required.
+- Stripe retries webhooks for up to three days with exponential backoff in live mode and three times over a few hours in sandbox; exact delays are not documented.
+- Lists use cursor pagination: `limit` 1–100 default 10, `starting_after`/`ending_before`, and `object: "list"`, `data`, `has_more`, `url`.
+- Test mode documents success cards, declines, and 3DS cards; the key cards and outcomes are recorded in the research file.
+- Money is in the smallest currency unit; zero-decimal currencies are listed, and ISK/UGX use two-decimal representations.
+- The official `stripe` Node library can be pointed at a local twin with `host`, `port`, and `protocol` options; `telemetry` defaults to true and must be disabled for local compatibility tests.
+- Stripe already provides test mode, the Stripe CLI (`stripe trigger`, `stripe listen`, `stripe events resend`), and the official stateless `stripe-mock`; Ibeji must not claim those do not exist. Ibeji's difference is stateful records, failure injection, scenarios, and one dashboard across all three services.
+
+C4c gaps: `charge.refunded` carries a `charge` object although Charge is outside C4c; some checkout optional fields and `next_action` variants are outside scope; exact Stripe status for unsupported API versions and idempotency parameter mismatch are undocumented; exact webhook retry delays are undocumented; the local checkout page's event order is an Ibeji design decision.
+
+No code, runtime dependency, fixture, or twin was written. No SPEC.md section was edited.
+
+### Later
+
+- Record Stripe fixtures in `fixtures/stripe/` when the recorder exists.
+- Resolve the `charge.refunded` payload decision, the local checkout event order, and the T15 Stripe Node compatibility test.
+- Re-check the pinned API version before each minor release.
