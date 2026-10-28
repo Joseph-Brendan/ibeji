@@ -541,3 +541,44 @@ No SPEC.md edit was made by this task; the v1.3 changes and C21 entries were alr
 
 - Proceed to implementation using the approved design.
 - Write the conformance suite before the first twin implementation.
+
+---
+
+## Phase 2, Step 2.6: Fixture recorder
+
+Date: 28 October 2026.
+
+Built the hand-run fixture recorder from SPEC.md C15. It was not run against any service; no real key was used and no fixture was created.
+
+### What was built
+
+- `scripts/record-fixtures.mjs` and `scripts/recorder/`:
+  - `shared.mjs`: key validation and fingerprints, redaction, fixture saving, prompts, request sending, summary helpers, and the T13 fixture scanner.
+  - `cli.mjs`: `--service` parsing, pre-request key refusal, service dispatch, and the summary table.
+  - `paystack.mjs`, `flutterwave.mjs`, and `stripe.mjs`: each service's test action order, request shapes, invalid-request cases, prompts, test details, and invalid-key request.
+- The recorder uses only Node built-in modules. No dependency was added.
+- Redaction covers keys, tokens, authorization and access codes, client secrets, emails, names, phone numbers, account numbers, IP addresses, card numbers, CVCs, expiry values, and card last-4 values. Replacements are stable within one recording.
+- T13 scans every JSON fixture under all three service folders and rejects keys, non-Ibeji email domains, non-fake phones, non-fake account numbers, and non-fake names.
+- Unit tests cover redaction, key refusal before any request, the `--service` argument, and T13's detector.
+
+### Exact commands to run by hand
+
+Do not put a real key in shell history or source code. Set the variable for the current shell only.
+
+```sh
+PAYSTACK_TEST_SECRET_KEY="<paystack-test-secret-key>" node scripts/record-fixtures.mjs --service paystack
+FLUTTERWAVE_TEST_SECRET_KEY="<flutterwave-test-secret-key>" node scripts/record-fixtures.mjs --service flutterwave
+STRIPE_TEST_SECRET_KEY="<stripe-test-secret-key>" node scripts/record-fixtures.mjs --service stripe
+```
+
+The recorder prints the valid choices and exits with code 2 for any other argument. Missing, wrong-format, or live keys exit with code 1 before any request.
+
+### Package proof
+
+`pnpm pack --dry-run` lists no `scripts/` or `scripts/recorder/` files. The current tarball contents are `dist/cli/index.js`, `LICENSE`, `package.json`, `README.md`, and `scenarios/.gitkeep`.
+
+### Later
+
+- Joseph will run the recorder by hand with test credentials.
+- Copy any runtime bank data from fixtures into the relevant `src/twins/<twin>/data/` folder.
+- T3 will use only recorded, non-skipped fixtures.
