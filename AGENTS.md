@@ -1,6 +1,6 @@
 # Rules for the coding agent
 
-You are building Ibeji: local twins of Paystack, Flutterwave, and Stripe. SPEC.md in this folder is the single source of truth. These rules apply to every task, in every chat.
+You are building Ibeji: local twins of Paystack, Flutterwave, and Stripe. Version 0.1.0 builds Paystack and Flutterwave only; Stripe comes in version 0.2.0 (SPEC.md C21 D42). Do not build, register, or require the Stripe twin unless the task says it is for version 0.2.0. SPEC.md in this folder is the single source of truth. These rules apply to every task, in every chat.
 
 ## Before you start any task
 

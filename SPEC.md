@@ -1,10 +1,10 @@
-# Ibeji: Build Specification v1.2
+# Ibeji: Build Specification v1.4
 
 Owner: Joseph Brendan, Dev and Design HQ
 Build tool: Antigravity, on a personal Mac
 Status: ready to build
 Date: 27 October 2026
-Change from v1.1: decisions from the Step 1.1 kickoff review are applied throughout and listed in C21 (D1 to D30). The biggest changes: how the dashboard signs in (C8), exact failure settings and the order failures apply in (C5), the webhook address rules (C7, C13), the control API route table (C8), and the split of the "no native code" rule into a runtime rule and a development rule (C1).
+Change from v1.3: version 0.1.0 ships the Paystack and Flutterwave twins; the Stripe twin follows in version 0.2.0 (C21 D42). Stripe's scope (C4c) and design stay in this file for 0.2.0. Change from v1.2: decisions from the Phase 2 research and twin design are applied (C21, D31 to D41): the Flutterwave and Stripe API versions, the per-twin failure table, Stripe version-header handling, how money is stored, and idempotency. Change from v1.1: decisions from the Step 1.1 kickoff review are applied throughout and listed in C21 (D1 to D30). The biggest changes: how the dashboard signs in (C8), exact failure settings and the order failures apply in (C5), the webhook address rules (C7, C13), the control API route table (C8), and the split of the "no native code" rule into a runtime rule and a development rule (C1).
 
 This file is the single source of truth for the project. The coding agent reads it before every task. If the code and this file disagree, the agent stops and asks.
 
@@ -41,7 +41,7 @@ Real services do not always behave well. Webhooks arrive late or twice. Transfer
 
 Ibeji is a set of local "twins" of payment services. A twin is a small program that runs on the developer's own computer and answers requests the same way the real service does, for the actions listed in C4: same paths, same request shapes, same responses, same webhooks.
 
-v1 has three twins:
+v1 covers three twins, released in two steps (C21 D42): Paystack and Flutterwave in version 0.1.0, and Stripe in version 0.2.0.
 
 | Twin | Why it is included |
 |---|---|
@@ -87,7 +87,7 @@ The name: Ìbejì is the Yoruba word for twins.
 
 ### B5. Name and packages
 
-- npm package: `ibeji` (one package that contains all three twins, the CLI, the UI, and the MCP server)
+- npm package: `ibeji` (one package that contains the twins, the CLI, the UI, and the MCP server)
 - Command: `ibeji`
 - npm organisation to reserve for the future: `ibeji`
 - GitHub repository: `ibeji`
@@ -148,8 +148,8 @@ Adding any package not in these two tables needs Joseph's approval and a C21 ent
 | Term | Meaning |
 |---|---|
 | Twin | A local imitation of one real service. v1 has three: `paystack`, `flutterwave`, `stripe`. |
-| Twin registry | `src/twins/registry.ts`: the one list of twin definitions. Everything else asks the registry, or the control API, which twins exist. No other code lists twin ids. |
-| Twin definition | The single object each twin provides to the core: its id, display name, default port, actions, supported failures, credential rules, live-key detection, request parser, response and error builders, webhook signer, retry schedule, event summaries, checkout outcomes, and currency rules. See C3. |
+| Twin registry | `src/twins/registry.ts`: the one list of twin definitions. Everything else asks the registry, or the control API, which twins exist. No other code lists twin ids. In version 0.1.0 it holds Paystack and Flutterwave; Stripe is added in 0.2.0. |
+| Twin definition | The single object each twin provides to the core: its id, display name, default port, actions, supported failures, credential rules, live-key detection, request parser, response and error builders, webhook signer, retry schedule, event summaries, checkout outcomes, currency rules, and idempotency handling (or none). See C3 and TWIN-DESIGN.md. |
 | Action | One thing a twin can do. Its local id is `<resource>.<verb>`, such as `refund.create`. Its full id is `<twin>.<resource>.<verb>`, such as `paystack.refund.create`. |
 | Action selector | How a person chooses actions: a resource (`refund`, meaning every refund action), a local id (`refund.create`), or a full id. Several can be given, separated by commas. |
 | Session | One run of Ibeji, from `ibeji start` until it stops. All state lives in the session. Only one session runs per user at a time. |
@@ -206,7 +206,7 @@ The exact paths, field names, request formats, and response shapes for each twin
 
 **Rules for all twins:**
 
-- Money is handled as whole numbers in the unit each service uses. Each service's rules, including currencies with no minor unit, are recorded in its research file and followed exactly.
+- Money. Inside Ibeji, every amount is stored as a whole number in the currency's smallest unit (kobo, cents), never as a floating-point number. At the edge, each twin reads and writes amounts exactly the way its service does, using its own money rules: Paystack and Stripe send whole numbers in the smallest unit; Flutterwave v3 sends amounts in the main unit (naira, dollars). If a service accepts decimal amounts, the twin converts them from the text of the request without floating-point arithmetic, and rejects more decimal places than the currency has, in the service's own error shape. Each service's rules, including currencies with no minor unit, are recorded in its research file and followed exactly.
 - Each twin accepts only the test credentials Ibeji issued for it (C7). A missing key, a wrong key, or a key in another format gets that service's own 401 error shape.
 - Each twin detects its service's live key formats (all of them, including restricted keys where the service has them), refuses the request with the service's error shape, and records a warning event. The UI shows a red banner: "A live key was sent to the [Service] twin. Live keys must never be used with Ibeji. Remove it from your app's test settings." Neither the event nor the banner contains any part of the key, only a fingerprint (C12).
 - Each twin checks the Host header of every request (C8 rule 4), limits request bodies to 1 MB, and sends no CORS headers. Apps call twins from their server, not from a browser.
@@ -227,12 +227,12 @@ The exact paths, field names, request formats, and response shapes for each twin
 
 #### C4b. Flutterwave twin
 
-The research step (Phase 2) decides which Flutterwave API version to imitate: a version that Flutterwave's current documentation describes and its official Node library uses. The evidence, the date, and the decision go into `research/flutterwave.md` and C21, and are approved before Phase 3.
+The Flutterwave twin imitates **API v3** (C21 D40): the version Flutterwave's official Node library uses, with `/v3` paths, bearer authentication, and the `verif-hash` webhook header. Flutterwave also documents a newer v4 API; it is not imitated in v1, and `docs/limits.md` says so.
 
 | Area | Actions |
 |---|---|
-| Payments | Create a hosted payment (the checkout link flow); verify a transaction by id and by reference; fetch; list |
-| Checkout | Local test checkout page where the tester picks success, failed, or cancelled |
+| Payments | Create a hosted payment (the checkout link flow); verify a transaction by id (this is also how v3 fetches one transaction, C21 D32); verify by reference; list |
+| Checkout | Local test checkout page where the tester picks success, failed, or cancelled. "Cancelled" produces Flutterwave's documented failed result, because v3 has no separate cancelled status (C21 D36). |
 | Refunds | Refund a transaction; fetch and list refunds |
 | Transfers | Initiate a transfer; fetch a transfer; list transfers |
 | Banks | List banks for a country; resolve an account number |
@@ -240,7 +240,13 @@ The research step (Phase 2) decides which Flutterwave API version to imitate: a 
 
 #### C4c. Stripe twin
 
-Stripe's requests are form-encoded rather than JSON, with nested fields written as `metadata[key]` and arrays as `items[0]`. Its errors have their own shape, and it supports idempotency keys and API version headers. The twin follows all of these exactly as recorded in `research/stripe.md`. Research decides which Stripe API version the twin imitates and what it does with a different `Stripe-Version` header, and records both in C21.
+**Version 0.2.0.** The Stripe twin is not built or registered for version 0.1.0 (C21 D42). This section is its approved scope for 0.2.0.
+
+Stripe's requests are form-encoded rather than JSON, with nested fields written as `metadata[key]` and arrays as `items[0]`. Its errors have their own shape, and it supports idempotency keys and API version headers. The twin follows all of these exactly as recorded in `research/stripe.md`. The twin imitates Stripe API version `2026-09-30.endive` (C21 D41). For the `Stripe-Version` header (C21 D37):
+
+- No header: the twin answers as `2026-09-30.endive`.
+- A well-formed version (a date, optionally followed by a dot and a name, such as `2025-09-30.clover`): the twin accepts it, answers in the `2026-09-30.endive` shape, and records a warning event once per version: "Your app asked for Stripe API version X. The Stripe twin answers as 2026-09-30.endive, so some fields may differ." Rejecting these would break every app whose Stripe library is pinned to another version.
+- A malformed value: the twin rejects it with Stripe's own error shape for an invalid version, as `research/stripe.md` records it.
 
 | Area | Actions |
 |---|---|
@@ -251,13 +257,17 @@ Stripe's requests are form-encoded rather than JSON, with nested fields written 
 | Events | Retrieve and list events, since some apps poll Stripe's events instead of relying on webhooks |
 | Webhooks | The events Stripe sends for the above, with Stripe's documented signature method |
 
-Stripe payouts and Stripe Connect transfers are not in v1. They are listed in `docs/limits.md`.
+Stripe's `charge.refunded` event carries a Charge object. The twin builds that Charge from the PaymentIntent's own data, following the Charge shape in `research/stripe.md`, and the PaymentIntent's `latest_charge` holds the same Charge id (C21 D34). There is no Charge API in v1.
+
+Stripe payouts, Stripe Connect transfers, and the Charges API are not in v1. They are listed in `docs/limits.md`.
 
 ### C5. The failure library
 
 Each failure has: a stable id, a plain-English name, a "when this happens in real life" paragraph, a "what to check in your app" paragraph, a settings schema, the twins and actions it can apply to, and a `source` for each twin (`docs`, `real-story`, or `assumed`).
 
-**Which twins a failure applies to.** Each twin definition declares the failures it supports, based on its research. The table below is the v1 target, not a confirmed fact. After Phase 2, any change to it is approved in C21. A failure with `source: assumed` is still offered, but the UI, CLI help, and docs label it "Assumed: not confirmed by the service's documentation."
+**Which twins a failure applies to.** Each twin definition declares the failures it supports, with a source for each. The table below is the approved v1 matrix (C21 D31). Any change to it is approved in C21. The source for each failure on each twin is in TWIN-DESIGN.md section 2.11. A failure with `source: assumed` is still offered, but the UI, CLI help, and docs label it "Assumed: not confirmed by the service's documentation."
+
+**Failures no registered twin supports.** A failure that no twin in the registry supports, such as `authentication-required` in version 0.1.0, stays in the catalog but is not shown in the UI, in `ibeji fail --help` lists, in `GET /failures`, or in MCP lists. Asking for it gives `FAILURE_NOT_SUPPORTED_BY_TWIN`, naming the twins that would support it once released.
 
 **Settings every rule has:** `twins` (default: every running twin that supports the failure), `actions` (an action selector, default: every action the failure applies to on that twin).
 
@@ -275,9 +285,9 @@ Each failure has: a stable id, a plain-English name, a "when this happens in rea
 | `webhook-never-sent` | Missing webhook | Records the webhook but never sends it | `percent` 1 to 100 (100) | All |
 | `webhook-verification-fails` | Forged webhook | Sends a webhook that fails the service's verification method, to test that the app rejects it | `method`: one of the methods the twin declares, such as `wrong-secret`, `corrupted`, or `missing` (`wrong-secret`) | All |
 | `payment-declined` | Declined payment | Payments end as declined, in the service's own way | `percent` 1 to 100 (100) | All |
-| `authentication-required` | Extra check needed | Payments need an extra authentication step before they finish | `then`: `succeed` or `fail` (`fail`) | Stripe (research confirms) |
-| `transfer-stuck-pending` | Stuck transfer | Leaves transfers pending | `seconds` 1 to 86400, or empty for "until switched off" (empty) | Paystack, Flutterwave |
-| `transfer-reversed` | Reversed transfer | Later marks a successful transfer as reversed or failed, as the service does, and sends the matching webhook | `afterSeconds` 1 to 86400 (60); `percent` 1 to 100 (100) | Paystack, Flutterwave |
+| `authentication-required` | Extra check needed | Payments need an extra authentication step before they finish | `then`: `succeed` or `fail` (`fail`) | Stripe |
+| `transfer-stuck-pending` | Stuck transfer | Leaves transfers pending, then ends them as successful or failed, using the service's own statuses and webhooks | `seconds` 1 to 86400, or empty for "until switched off" (empty); `thenFailPercent` 0 to 100, the share that end as failed instead of successful (0) | Paystack, Flutterwave |
+| `transfer-reversed` | Reversed transfer | Later marks a successful transfer as reversed, as the service does, and sends the matching webhook | `afterSeconds` 1 to 86400 (60); `percent` 1 to 100 (100) | Paystack (C21 D33) |
 | `bank-resolve-fails` | Account lookup fails | Account-name lookup fails | `mode`: `error` or `timeout` (`error`) | Paystack, Flutterwave |
 
 A counter (`times`) belongs to one rule on one twin, and counts across all actions the rule covers. When it runs out, the rule stays listed but shows "used up" and stops firing.
@@ -293,7 +303,7 @@ A counter (`times`) belongs to one rule on one twin, and counts across all actio
 7. `flaky-network` with `when: after`: the action stays performed, and the connection drops.
 8. `slow-response`: if a response is still being sent, it is delayed.
 
-A repeated request with the same idempotency key (where the twin supports one) never performs the action twice, whatever failures are on.
+**Idempotency and failures** (C21 D39). Where a twin supports idempotency keys, the twin checks the key before the failure step. A repeated key whose action was performed returns the stored result and never performs the action again, whatever failures are on. Results are stored only when the action was performed (step 5). When steps 1 to 4 fired, the action never began, nothing is stored, and a retry with the same key runs normally. So after `timeout-after-commit`, a retry with the same key returns the original success; after `server-error`, a retry with the same key can succeed.
 
 **Order of application for a webhook.**
 
@@ -323,7 +333,7 @@ v1 ships with these scenarios and these exact settings:
 | `slow-friday` | Everything is slow, and webhooks arrive 1 to 3 minutes late. | `slow-response` 8 seconds on all actions; `webhook-delayed` 60 seconds with `jitterSeconds` 120 | All |
 | `bank-outage` | Transfers fail with server errors for 2 minutes, then recover. | `server-error` every time on `transfer`; after 120 seconds, removed | Paystack, Flutterwave |
 | `webhook-storm` | Every webhook arrives twice, some out of order. | `webhook-duplicated` 2 copies, 3 seconds apart; `webhook-out-of-order` 15-second window | All |
-| `stuck-payouts` | Transfers stay pending for 10 minutes, then half are reversed. | `transfer-stuck-pending` 600 seconds; `transfer-reversed` 50 percent, `afterSeconds` 600 | Paystack, Flutterwave |
+| `stuck-payouts` | Transfers stay pending for 10 minutes, then half of them fail. | `transfer-stuck-pending` 600 seconds, `thenFailPercent` 50 | Paystack, Flutterwave |
 | `checkout-declines` | Half of all checkout payments are declined. Tests how the app tells the customer and lets them try again. | `payment-declined` 50 percent | All |
 
 **Lifecycle.** One scenario runs at a time. Starting a scenario stops the running one; the UI asks for confirmation first. A scenario owns the rules it adds, and they are marked with its id. Clearing failures (`ibeji clear`) removes every rule, including a scenario's, and stops the scenario. Resetting state does not touch rules or scenarios. If a twin stops, the scenario's rules for that twin are removed and an event says so.
@@ -338,7 +348,7 @@ v1 ships with these scenarios and these exact settings:
 - Each twin signs or marks its webhooks exactly as its service does. The method is confirmed from the documentation in Phase 2, recorded in that twin's research file, and tested against a known-good example.
 - Each webhook is one delivery, made of one or more attempts. Every attempt is recorded and never changed afterwards.
 - Delivery statuses: `queued`, `scheduled` (waiting for a delay or a retry), `sending`, `delivered` (the app answered 2xx), `failed` (the app answered with another status), `unreachable` (no connection, or no answer within 10 seconds), `not-sent` (no URL was set, or `webhook-never-sent` fired; the reason is recorded), and `abandoned` (the session stopped first).
-- Failed and unreachable attempts are retried on each service's documented schedule. Where a schedule is not documented, the twin uses: 5 retries after 1, 5, 15, 30, and 60 minutes, each with up to 10 percent seeded jitter, marked `assumed` in its research file.
+- Failed and unreachable attempts are retried on each service's schedule, declared by its twin (C21 D35): Paystack 10 retries an hour apart (documented test-mode schedule); Flutterwave 3 retries 30 minutes apart (documented, treated as switched on); Stripe 3 retries after 1, 2, and 4 hours (assumed: Stripe documents three retries over a few hours but not the exact times). The Resend button exists so a tester never has to wait for a retry. Where a future twin's service documents no schedule at all, it uses: 5 retries after 1, 5, 15, 30, and 60 minutes, each with up to 10 percent seeded jitter, marked `assumed` in its research file.
 - A person can resend any webhook. A resend goes to the twin's current URL, is signed with the current credentials, has the same body, and is a new delivery linked to the original.
 - Ibeji keeps at most the first 4 KB of each response from the app, with any authorization or signature headers removed.
 
@@ -718,7 +728,8 @@ TypeScript settings must include `strict`, `noUncheckedIndexedAccess`, `exactOpt
 - `docs/limits.md`: what is not supported yet, for each twin.
 - `docs/stripe-and-ibeji.md`: a factual comparison with Stripe's own testing tools (Part F).
 - `docs/cli.md`: every command with an example.
-- A clear line in the README: "Ibeji is not affiliated with or endorsed by Paystack, Flutterwave, or Stripe."
+- A clear line in the README naming every service the released twins imitate. For 0.1.0: "Ibeji is not affiliated with or endorsed by Paystack or Flutterwave." Stripe is added to the line in 0.2.0.
+- `docs/stripe-and-ibeji.md` is written in version 0.2.0.
 
 ### C20. Branding and legal
 
@@ -766,8 +777,29 @@ Every decision made during the build that changes or clarifies this spec is reco
 | D29 | Stack: missing packages added; `@arethetypeswrong/cli` removed because v1 publishes no types; Node `^22.18.0 \|\| >=24.11.0`; pnpm 10 pinned; `"types": ["node"]`; browser install step; `docs/`, published files, and lockfile defined. | 103, 104, 111 to 115 | C1, C16, C18 |
 | D30 | B2 says "for the actions listed in C4". Release scope stays all three twins in 0.1.0 unless Joseph decides otherwise before Phase 4. Stories are used only with permission. | 119, 120, 121 | B2, Part F, C20 |
 
-Still open, decided in Phase 2 and recorded here then: the Flutterwave API version (116), the Stripe API version and version header behaviour (117), the C4 action lists (118), the C5 per-twin table (32 to 35), each service's credentials and webhook verification method (53), and which official libraries can be pointed at a twin (109).
+**28 October 2026: decisions from Phase 2 research and the twin design.** Section numbers refer to TWIN-DESIGN.md and the research files.
 
+| Id | Decision | Reason | Sections |
+|---|---|---|---|
+| D31 | The per-twin failure matrix in TWIN-DESIGN.md 2.11 is approved, as changed by D33. Paystack supports every failure except `authentication-required`. Flutterwave supports every failure except `authentication-required` and `transfer-reversed`. Stripe supports every failure except the three transfer and bank failures. Assumed entries are offered with the "Assumed" label. | Research cites a source for every cell. | C5 |
+| D32 | Flutterwave has no separate fetch action. Verify by id is the fetch. Verify by id and verify by reference are separate actions (`payment.verify` and `payment.verify_by_reference`), because each route maps to exactly one action and T14 checks that. | v3 documents no distinct fetch endpoint. | C4b |
+| D33 | `transfer-reversed` applies to Paystack only. | Flutterwave v3 documents no reversal status or event. A v4 fact must not be used in a v3 twin. | C5 |
+| D34 | Stripe's `charge.refunded` event carries a Charge built from the PaymentIntent, in the documented Charge shape, with an id matching the PaymentIntent's `latest_charge`. No Charge API in v1. | Apps that listen for `charge.refunded` read the Charge. A thin, made-up Charge would pass tests and then break real apps. | C4c |
+| D35 | Retry schedules: Paystack 10 hourly (docs), Flutterwave 3 at 30 minutes (docs), Stripe 3 at 1, 2, 4 hours (assumed). The C7 fallback stays for future twins. | Research. | C7 |
+| D36 | Flutterwave's local "Cancelled" button produces the documented failed result. | v3 has no cancelled status. | C4b |
+| D37 | The Stripe twin accepts any well-formed `Stripe-Version`, answers as `2026-09-30.endive`, and records a warning once per version. Only malformed values are rejected. This replaces the design's proposal to reject every other version. | Stripe's official library sends its own pinned version on every request. Rejecting other versions would make the twin unusable for most apps. | C4c |
+| D38 | Money is stored inside Ibeji as whole numbers in the smallest unit. Each twin converts at the edge with its own rules. Decimal amounts are parsed from text, never with floating-point arithmetic. | Flutterwave v3 uses main units, which can carry decimals. `0.1 + 0.2` is not `0.3` in floating point, which is how money bugs start. | C4 |
+| D39 | `TwinDefinition` gains an `idempotency` part: an adapter, or `none`. The core calls it before the failure step. Results are stored only when the action was performed. | The design described idempotency but its type had no place for it. Without the storage rule, `server-error` plus retries with the same key could never succeed. | C2, C5 |
+| D40 | Flutterwave API v3 is approved. | Its official Node library uses v3, and the research recommends it. Risk: Flutterwave documents a newer v4. If v3 is retired or new accounts can only use v4, a v4 twin is added through C21. | C4b, Part F |
+| D41 | Stripe API version `2026-09-30.endive` is approved. | Research, `research/stripe.md` section 17.3. | C4c |
+
+**28 October 2026: release scope.**
+
+| Id | Decision | Reason | Sections |
+|---|---|---|---|
+| D42 | Version 0.1.0 ships the Paystack and Flutterwave twins. The Stripe twin is built and released in version 0.2.0, in build guide Phase 12. Stripe's research, its design in TWIN-DESIGN.md, its scope in C4c, and its decisions (D34, D37, D41) stay approved for 0.2.0. Until then, the registry holds two twins, failures that only Stripe supports are hidden (C5), the README's not-affiliated line names two services, and no 0.1.0 test, smoke run, example or doc requires Stripe. Paystack transfer create, fetch, and verify are built from documentation, because the test account cannot make transfers ("You cannot initiate third party payouts as a starter business"). | Joseph has Paystack and Flutterwave test keys, not a Stripe account. Part F open question 1 already allowed this split. | B2, B5, C2, C4c, C5, C19, Part F |
+
+Still open, decided in Step 4.7 and recorded here then: which official Node libraries can be pointed at a twin (review item 109).
 ---
 
 ## Part E. Rules for the coding agent
@@ -797,7 +829,7 @@ These rules apply to every task. The full text is in `AGENTS.md`.
 |---|---|
 | A twin drifts from its real service | Contract tests against recorded fixtures, a "last recorded" date for each twin in the README, and re-recording before each minor release |
 | Apps cannot change a service's base URL | The Connect your app guide explains how for each twin, with a copy-ready instruction for coding agents. Research checks which official and common libraries allow a custom base URL. |
-| Flutterwave changes API versions | Research picks one version and records why. The twin and docs name the version clearly. |
+| Flutterwave changes API versions | The twin imitates v3 (D40) and the docs name it clearly. If Flutterwave retires v3, or new accounts can only use v4, a v4 twin is added as a new twin folder. |
 | Stripe already has official testing tools | Stripe offers a test mode with test cards, a command-line tool that can trigger webhook events, and an official mock server that returns example responses. Ibeji's difference is stateful records, failure injection, scenarios, and the dashboard, shared across all three services. Research records what Stripe's own tools already do, so Ibeji does not claim otherwise. |
 | Legal or brand complaint | Neutral name, no service branding, a clear not-affiliated line, and readiness to change wording quickly |
 | Fake success webhooks reach a real server | Webhooks go to this computer only by default; wider addresses need explicit flags (C13) |
@@ -808,5 +840,5 @@ These rules apply to every task. The full text is in `AGENTS.md`.
 
 Open questions for Joseph:
 
-1. Release 0.1.0 with all three twins, or release 0.1.0 with Paystack and Flutterwave and add Stripe in 0.2.0? The default is all three. Decide before Phase 4.
+1. Decided: 0.1.0 ships Paystack and Flutterwave; Stripe in 0.2.0 (D42).
 2. Which real stories can be published in the failure library, and with what credit? Until a story is cleared, its failures use `docs` or `assumed`.
