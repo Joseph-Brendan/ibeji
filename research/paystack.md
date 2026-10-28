@@ -1151,6 +1151,16 @@ The docs state the expiry date can be any future date.
 | Refund: Needs attention | `4084 0800 0067 1902` | `10/27` | `190` | — |
 | API errors: Insufficient funds | `4084 0800 0067 0037` | `10/27` | `787` | — |
 
+### 11.1.1 Refund test cards
+
+The entries recorded from the [Test Payments](https://paystack.com/docs/payments/test-payments/) page were re-checked on 28 October 2026. It lists these refund test cards under the outcome labels below:
+
+| Outcome (as written) | Card number | Expiry | CVV |
+|---|---|---|---|
+| Failed | `4084 0800 0067 1803` | `10/27` | `180` |
+| Needs attention | `4084 0800 0067 1902` | `10/27` | `190` |
+| Insufficent funds | `4084 0800 0067 0037` | `10/27` | `787` |
+
 ### 11.2 EFT test accounts
 
 | Behaviour | Account number |

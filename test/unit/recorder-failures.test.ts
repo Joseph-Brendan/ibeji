@@ -12,6 +12,7 @@ import {
   createRecorderContext,
   encodeForm,
   encodeJson,
+  FAKE_EMAILS,
   fingerprintKey,
   KeyRejectedError,
   type RecorderResult,
@@ -780,6 +781,76 @@ describe("C15 recorder fixture labels from real status", () => {
       expect(errors).toContain("transaction.verify (unpaid)");
       const files = await readdir(join(cwd, "fixtures", "paystack"));
       expect(files).toContain("transaction-verify-success.json");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder checkout emails", () => {
+  it("uses a different example.com email for every checkout, including retries", async () => {
+    expect(FAKE_EMAILS).toContain("customer.four@example.com");
+    const server = await startPaystackFlowServer(["abandoned", "success", "pending", "failed"]);
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makeScriptedPrompt(["", "r", ""]) },
+      );
+
+      expect(code).toBe(0);
+      const emails = server.requests
+        .filter(
+          (request) =>
+            request.method === "POST" &&
+            request.url === "/transaction/initialize" &&
+            request.body.includes('"reference"'),
+        )
+        .map((request) => {
+          const body = JSON.parse(request.body) as { email?: string };
+          return body.email;
+        });
+      expect(emails).toEqual([
+        "customer.one@example.com",
+        "customer.two@example.com",
+        "customer.three@example.com",
+        "customer.four@example.com",
+      ]);
+      expect(output.logs.join("\n")).toContain(
+        "If the checkout offers a saved card, choose to pay with a new or different card, and type the card number shown here.",
+      );
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder duplicate save after s", () => {
+  it("prints the existing fixture name, does not rewrite it, and continues", async () => {
+    const server = await startPaystackFlowServer(["success", "abandoned", "success"]);
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makeScriptedPrompt(["", "", "s"]) },
+      );
+
+      expect(code).toBe(0);
+      expect(output.logs.join("\n")).toContain(
+        "Already recorded as transaction-verify-success.json; not saved again",
+      );
+      expect(output.errors.join("\n")).not.toContain("Two steps tried to save the same fixture");
+      const files = await readdir(join(cwd, "fixtures", "paystack"));
+      expect(files).toContain("transaction-verify-success.json");
+      expect(files).toContain("transaction-verify-abandoned.json");
     } finally {
       output.restore();
       await server.close();

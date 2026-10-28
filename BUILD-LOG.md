@@ -735,3 +735,37 @@ Fixed fixtures being saved under expected status labels instead of the status Pa
 - Run the recorder by hand against Paystack to capture the status-labelled fixtures.
 - T3 should use the real-status files (`success`, `abandoned`, `failed`, and any other recorded status) as named expected outcomes.
 - No SPEC.md section was edited; the changes implement C15 and do not change its meaning.
+
+---
+
+## Phase 2, Step 2.11: One customer email per checkout
+
+Date: 28 October 2026.
+
+Fixed Paystack offering the card saved from an earlier checkout, made duplicate `s` saves harmless, and recorded the refund test cards from the Test Payments page. No real key was used and no fixture was recorded in this task.
+
+### What was built
+
+- **One email per checkout.** Paystack now takes the next address from the fixed `example.com` list for every `transaction.initialize`, including retries. The list now runs from `customer.one@example.com` through `customer.ten@example.com`, so a run does not reuse a customer and Paystack does not offer a card saved from an earlier payment.
+- **Checkout warning.** Every checkout pause now prints, before the card details: "If the checkout offers a saved card, choose to pay with a new or different card, and type the card number shown here."
+- **Duplicate `s` saves.** When the person chooses `s` and the real-status fixture already exists in this run, the recorder prints "Already recorded as <file name>; not saved again" and continues without writing. Other duplicate saves still stop as before.
+- **Refund test cards.** `research/paystack.md` section 11.1.1 records the Test Payments refund cards, re-checked on 28 October 2026: Failed, Needs attention, and "Insufficent funds" (as written on the page), with numbers, expiry, and CVV.
+
+### Decisions
+
+- The email picker is per recorder run and only advances for real checkouts, not the deliberately invalid initialize request.
+- If a run needs more than ten checkouts, the recorder stops with a clear message instead of reusing an address and risking a saved-card offer.
+- Only the `s` choice allows a duplicate no-op. An automatic same-status collision still stops, as required by the previous task.
+- No recorder steps were added for the refund cards in this task.
+
+### Tests
+
+- Added a fake-server test proving the main checkout, retry, unpaid checkout, and declined checkout use four different `example.com` emails, and that the checkout warning is printed.
+- Added a fake-server test where a declined checkout returns `success`, the person chooses `s`, and the existing `transaction-verify-success.json` is not rewritten; the exact "Already recorded as ..." line is printed and the run continues.
+- Updated the fixture privacy fake list to accept all ten addresses.
+
+### Later
+
+- Add recorder steps for the three refund test cards: pay with the card, create a refund, and record the refund outcome. "Failed", "Needs attention", and "Insufficent funds" are documented in `research/paystack.md` section 11.1.1 but are not recorded yet.
+- Run the recorder by hand against Paystack to confirm the per-checkout emails prevent saved-card offers.
+- No SPEC.md section was edited; the changes implement C15 and do not change its meaning.

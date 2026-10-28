@@ -1,8 +1,8 @@
 import {
   encodeJson,
   extractServiceError,
+  FAKE_EMAILS,
   makeReference,
-  RECORDER_EMAIL,
   RecorderStopError,
   requireResponseField,
 } from "./shared.mjs";
@@ -43,9 +43,25 @@ export const meta = {
   },
 };
 
-const EMAIL = RECORDER_EMAIL;
 const SUCCESS_CARD = "4084 0840 8408 4081, CVV 408, expiry 10/27 (no PIN or OTP)";
 const DECLINED_CARD = "4084 0800 0000 5408, CVV 001, expiry 10/27 (declines)";
+
+function makeCheckoutEmailPicker() {
+  let index = 0;
+  return () => {
+    const email = FAKE_EMAILS[index];
+    if (email === undefined) {
+      throw new RecorderStopError(
+        "The recorder ran out of fake customer emails for this run. " +
+          "What: a checkout needed a new example.com address but the fixed list was exhausted. " +
+          "Why: too many checkout retries happened in one run. " +
+          "Fix: add more addresses to FAKE_EMAILS or start a new recorder run.",
+      );
+    }
+    index += 1;
+    return email;
+  };
+}
 
 class RetryCheckoutSignal extends Error {
   constructor() {
@@ -87,7 +103,7 @@ function makeExpectedStatusOutcome(ctx, expectedStatus, stepLabel) {
       );
       const choice = answer.trim().toLowerCase();
       if (choice === "s") {
-        return actualStatus;
+        return { outcome: actualStatus, allowDuplicate: true };
       }
       if (choice === "r") {
         throw new RetryCheckoutSignal();
@@ -111,7 +127,7 @@ function isTransferUnavailable(result) {
   return code === "transfer_unavailable" || /starter business/i.test(message);
 }
 
-async function initializeTransaction(ctx, outcome, stepLabel) {
+async function initializeTransaction(ctx, outcome, stepLabel, email) {
   const reference = makeReference("ibeji", "-");
   const result = await ctx.record({
     action: "transaction.initialize",
@@ -121,7 +137,7 @@ async function initializeTransaction(ctx, outcome, stepLabel) {
     path: "/transaction/initialize",
     body: encodeJson({
       amount: "10000",
-      email: EMAIL,
+      email,
       currency: "NGN",
       reference,
       callback_url: "https://example.com/ibeji/paystack",
@@ -183,6 +199,7 @@ async function runExpectedCheckout(ctx, initial, options) {
           ctx,
           options.retryOutcome(retryCount),
           options.retryStepLabel(retryCount),
+          options.nextEmail(),
         );
         continue;
       }
@@ -192,9 +209,15 @@ async function runExpectedCheckout(ctx, initial, options) {
 }
 
 export async function record(ctx) {
+  const nextEmail = makeCheckoutEmailPicker();
   // Paystack transaction references allow only "-", ".", "=" and alphanumeric
   // characters (research/paystack.md section 1.1), so use hyphens here.
-  const main = await initializeTransaction(ctx, undefined, "transaction.initialize (main)");
+  const main = await initializeTransaction(
+    ctx,
+    undefined,
+    "transaction.initialize (main)",
+    nextEmail(),
+  );
   let mainReference = main.reference;
 
   await ctx.recordInvalid("transaction.initialize", {
@@ -214,6 +237,7 @@ export async function record(ctx) {
       stepLabel: "transaction.verify (success checkout)",
       retryOutcome: (attempt) => (attempt === 1 ? "retry" : `retry-${attempt}`),
       retryStepLabel: (attempt) => `transaction.initialize (retry ${attempt})`,
+      nextEmail,
     });
     mainReference = mainRun.current.reference;
     verify = mainRun.verify;
@@ -249,7 +273,12 @@ export async function record(ctx) {
     path: "/transaction/not-a-number",
   });
 
-  const unpaid = await initializeTransaction(ctx, "unpaid", "transaction.initialize (unpaid)");
+  const unpaid = await initializeTransaction(
+    ctx,
+    "unpaid",
+    "transaction.initialize (unpaid)",
+    nextEmail(),
+  );
   if (unpaid.result.ok) {
     await verifyTransaction(
       ctx,
@@ -265,6 +294,7 @@ export async function record(ctx) {
     ctx,
     "declined",
     "transaction.initialize (declined)",
+    nextEmail(),
   );
   if (declined.result.ok) {
     await runExpectedCheckout(ctx, declined, {
@@ -276,6 +306,7 @@ export async function record(ctx) {
       stepLabel: "transaction.verify (declined checkout)",
       retryOutcome: (attempt) => (attempt === 1 ? "declined-retry" : `declined-retry-${attempt}`),
       retryStepLabel: (attempt) => `transaction.initialize (declined retry ${attempt})`,
+      nextEmail,
     });
   } else {
     await ctx.skip("transaction.verify", "declined transaction.initialize did not succeed");

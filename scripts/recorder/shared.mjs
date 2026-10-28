@@ -15,6 +15,13 @@ export const FAKE_EMAILS = [
   "customer.one@example.com",
   "customer.two@example.com",
   "customer.three@example.com",
+  "customer.four@example.com",
+  "customer.five@example.com",
+  "customer.six@example.com",
+  "customer.seven@example.com",
+  "customer.eight@example.com",
+  "customer.nine@example.com",
+  "customer.ten@example.com",
 ];
 export const RECORDER_EMAIL = FAKE_EMAILS[0];
 
@@ -646,8 +653,8 @@ export async function saveFixture({
   await mkdir(directory, { recursive: true });
   const slug = action.replaceAll(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
   const file = join(directory, fileName ?? `${slug}-${outcome}.json`);
-  if (register !== undefined) {
-    register(file);
+  if (register !== undefined && register(file) === false) {
+    return file;
   }
   const fixture = {
     action,
@@ -692,8 +699,8 @@ export async function saveSkippedFixture({
   const safeAction =
     action.replaceAll(/[^a-z0-9._-]+/gi, "-").replace(/^[.-]+|[.-]+$/g, "") || "step";
   const file = join(directory, `${safeAction}.skipped.json`);
-  if (register !== undefined) {
-    register(file);
+  if (register !== undefined && register(file) === false) {
+    return file;
   }
   const fixture = {
     action,
@@ -733,10 +740,14 @@ export function createRecorderContext({
   const state = new Map();
   const savedFiles = new Map();
 
-  function registerFile(file, stepLabel) {
+  function registerFile(file, stepLabel, allowDuplicate = false) {
     const existing = savedFiles.get(file);
     if (existing !== undefined) {
       const fileName = file.split(/[\\/]/).at(-1) ?? file;
+      if (allowDuplicate) {
+        console.log(`Already recorded as ${fileName}; not saved again`);
+        return false;
+      }
       throw new RecorderStopError(
         `Two steps tried to save the same fixture ${fileName}: ${existing} and ${stepLabel}. ` +
           `What: the recorder stopped before the second step could overwrite the first. ` +
@@ -745,6 +756,7 @@ export function createRecorderContext({
       );
     }
     savedFiles.set(file, stepLabel);
+    return true;
   }
 
   function redactedRequestResponse(result) {
@@ -1016,9 +1028,20 @@ export function createRecorderContext({
       return { ...result, ok: false, file };
     }
 
-    const effectiveOutcome = outcomeIsResolver
+    const decision = outcomeIsResolver
       ? await outcome({ status: result.status, responseBody: result.responseBody, ok: success })
+      : undefined;
+    const effectiveOutcome = outcomeIsResolver
+      ? typeof decision === "string"
+        ? decision
+        : typeof decision === "object" && decision !== null
+          ? decision.outcome
+          : "skipped"
       : (outcome ?? (invalidKey ? "invalid-key" : success ? "success" : "skipped"));
+    const allowDuplicate =
+      outcomeIsResolver && typeof decision === "object" && decision !== null
+        ? decision.allowDuplicate === true
+        : false;
     const redacted = redactedRequestResponse(result);
     const stored = await saveFixture({
       cwd,
@@ -1026,7 +1049,7 @@ export function createRecorderContext({
       action,
       outcome: effectiveOutcome,
       note,
-      register: (file) => registerFile(file, stepLabel),
+      register: (file) => registerFile(file, stepLabel, allowDuplicate),
       recordedAt: now().toISOString(),
       method: result.method,
       path: redacted.path,
@@ -1159,6 +1182,9 @@ export function createRecorderContext({
     console.log("");
     console.log(title);
     console.log(`Link: ${url}`);
+    console.log(
+      "If the checkout offers a saved card, choose to pay with a new or different card, and type the card number shown here.",
+    );
     console.log(`Test card: ${card}`);
     if (extra !== undefined && extra !== "") {
       console.log(extra);

@@ -63,7 +63,16 @@ export type ResponseClassifierInput = {
   readonly responseBody: unknown;
 };
 
-export type OutcomeResolver = (result: ResponseClassifierInput) => string | Promise<string>;
+export type OutcomeDecision =
+  | string
+  | {
+      readonly outcome: string;
+      readonly allowDuplicate?: boolean;
+    };
+
+export type OutcomeResolver = (
+  result: ResponseClassifierInput,
+) => OutcomeDecision | Promise<OutcomeDecision>;
 
 export type RecorderContext = {
   readonly meta: ServiceMeta;
