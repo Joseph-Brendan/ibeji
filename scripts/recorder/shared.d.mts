@@ -10,11 +10,16 @@ export type ServiceMeta = {
   readonly testKey: RegExp;
   readonly liveKeys: readonly RegExp[];
   readonly keyPatterns: readonly RegExp[];
+  readonly preflight: {
+    readonly method: string;
+    readonly path: string;
+    readonly query?: Record<string, string | number | boolean | readonly (string | number)[]>;
+  };
   readonly isSuccess: (status: number, body: unknown) => boolean;
 };
 
 export type KeyValidation =
-  | { readonly ok: true; readonly code: "valid" }
+  | { readonly ok: true; readonly code: "valid"; readonly key: string }
   | {
       readonly ok: false;
       readonly code: "missing" | "wrong-format" | "live";
@@ -27,6 +32,9 @@ export type RecorderResult = {
   readonly status: number | null;
   readonly reason?: string;
   readonly file: string | null;
+  readonly serviceMessage?: string;
+  readonly serviceCode?: string;
+  readonly note?: string;
 };
 
 export type RecorderPrompt = {
@@ -34,11 +42,25 @@ export type RecorderPrompt = {
   readonly close: () => void;
 };
 
+export type RecorderRequestResult = {
+  readonly ok: boolean;
+  readonly method: string;
+  readonly path: string;
+  readonly query: unknown;
+  readonly requestBody: string | null;
+  readonly requestContentType: string | null;
+  readonly status: number;
+  readonly responseHeaders: Record<string, string>;
+  readonly responseBody: unknown;
+  readonly file: string;
+};
+
 export type RecorderContext = {
   readonly meta: ServiceMeta;
   readonly keyFingerprint: string;
   readonly state: Map<string, unknown>;
   readonly results: RecorderResult[];
+  readonly preflight: () => Promise<unknown>;
   readonly record: (request: {
     action: string;
     method: string;
@@ -49,21 +71,16 @@ export type RecorderContext = {
     outcome?: string;
     invalidKey?: boolean;
     headers?: Record<string, string>;
-  }) => Promise<{
-    readonly ok: boolean;
-    readonly status: number;
-    readonly body: unknown;
-    readonly file: string;
-  }>;
+  }) => Promise<RecorderRequestResult>;
   readonly skip: (action: string, reason: string) => Promise<void>;
   readonly recordInvalid: (
     action: string,
     request: Omit<Parameters<RecorderContext["record"]>[0], "action" | "outcome">,
-  ) => Promise<unknown>;
+  ) => Promise<RecorderRequestResult>;
   readonly recordInvalidKey: (
     action: string,
     request: Omit<Parameters<RecorderContext["record"]>[0], "action" | "outcome">,
-  ) => Promise<unknown>;
+  ) => Promise<RecorderRequestResult>;
   readonly promptCheckout: (details: {
     title: string;
     url: string;
@@ -86,12 +103,24 @@ export type FixtureScanResult = {
 };
 
 export const VALID_SERVICES: readonly RecorderService[];
+export class RecorderStopError extends Error {}
+export class KeyRejectedError extends RecorderStopError {}
 export function fingerprintKey(key: string): string;
 export function validateKey(meta: ServiceMeta, key: string | undefined): KeyValidation;
 export function encodeJson(value: unknown): string;
 export function encodeForm(value: unknown): string;
-export function makeReference(prefix: string): string;
+export function makeReference(prefix: string, separator?: string): string;
 export function createPrompt(): RecorderPrompt;
+export function createRecorderContext(options: {
+  meta: ServiceMeta;
+  key: string;
+  baseUrl?: string;
+  cwd?: string;
+  fetchImpl?: typeof fetch;
+  prompt?: RecorderPrompt;
+  redactor?: Redactor;
+  now?: () => Date;
+}): RecorderContext;
 export class Redactor {
   constructor(options?: { keyPatterns?: readonly RegExp[] });
   redact(value: unknown, fieldName?: string, path?: readonly string[]): unknown;

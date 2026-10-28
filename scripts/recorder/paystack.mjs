@@ -7,9 +7,14 @@ export const meta = {
   baseUrl: "https://api.paystack.co",
   requestFormat: "json",
   auth: "bearer",
-  testKey: /^sk_test_\S+$/,
-  liveKeys: [/^(?:pk|sk)_live_\S+$/],
+  testKey: /^sk_test_[A-Za-z0-9._~+/=-]+$/,
+  liveKeys: [/^(?:pk|sk)_live_[A-Za-z0-9._~+/=-]+$/],
   keyPatterns: [/\b(?:pk|sk)_(?:test|live)_[A-Za-z0-9._~+/=-]+\b/g],
+  preflight: {
+    method: "GET",
+    path: "/transaction",
+    query: { perPage: 50, page: 1 },
+  },
   isSuccess(status, body) {
     return (
       status >= 200 &&
@@ -24,7 +29,9 @@ export const meta = {
 const EMAIL = "recorder@ibeji.test";
 
 export async function record(ctx) {
-  const reference = makeReference("ibeji");
+  // Paystack transaction references allow only "-", ".", "=" and alphanumeric
+  // characters (research/paystack.md section 1.1), so use hyphens here.
+  const reference = makeReference("ibeji", "-");
 
   const initialize = await ctx.record({
     action: "transaction.initialize",
@@ -165,26 +172,34 @@ export async function record(ctx) {
     recipientData !== null && typeof recipientData === "object"
       ? recipientData.recipient_code
       : undefined;
-  const transfer = await ctx.record({
-    action: "transfer.create",
-    method: "POST",
-    path: "/transfer",
-    body: encodeJson({
-      source: "balance",
-      amount: 100,
-      recipient: typeof recipientCode === "string" ? recipientCode : "RCP_ibeji_invalid",
-      reference: makeReference("ibeji"),
-      reason: "Ibeji recorder",
-      currency: "NGN",
-    }),
-  });
+  let transfer = null;
+  if (typeof recipientCode === "string") {
+    transfer = await ctx.record({
+      action: "transfer.create",
+      method: "POST",
+      path: "/transfer",
+      body: encodeJson({
+        source: "balance",
+        amount: 100,
+        recipient: recipientCode,
+        reference: makeReference("ibeji"),
+        reason: "Ibeji recorder",
+        currency: "NGN",
+      }),
+    });
+  } else {
+    await ctx.skip(
+      "transfer.create",
+      "transfer_recipient.create did not return data.recipient_code",
+    );
+  }
   await ctx.recordInvalid("transfer.create", {
     method: "POST",
     path: "/transfer",
     body: encodeJson({ source: "balance", amount: 100 }),
   });
 
-  const transferData = responseData(transfer);
+  const transferData = transfer === null ? undefined : responseData(transfer);
   const transferId =
     transferData !== null && typeof transferData === "object" ? transferData.id : undefined;
   if (transferId !== undefined) {

@@ -10,13 +10,18 @@ export const meta = {
   baseUrl: "https://api.stripe.com",
   requestFormat: "form",
   auth: "basic",
-  testKey: /^sk_test_\S+$/,
-  liveKeys: [/^(?:pk|sk|rk)_live_\S+$/],
+  testKey: /^sk_test_[A-Za-z0-9._~+/=-]+$/,
+  liveKeys: [/^(?:pk|sk|rk)_live_[A-Za-z0-9._~+/=-]+$/],
   keyPatterns: [
     /\b(?:pk|sk|rk)_(?:test|live)_[A-Za-z0-9._~+/=-]+\b/g,
     /\bwhsec_[A-Za-z0-9._~+/=-]+\b/g,
     /\b(?:pi|cs|seti)_[A-Za-z0-9]+_secret_[A-Za-z0-9]+\b/g,
   ],
+  preflight: {
+    method: "GET",
+    path: "/v1/payment_intents",
+    query: { limit: 1 },
+  },
   isSuccess(status, body) {
     return (
       status >= 200 &&
@@ -226,17 +231,21 @@ export async function record(ctx) {
     headers: STRIPE_HEADERS,
   });
 
-  const refund = await ctx.record({
-    action: "refund.create",
-    method: "POST",
-    path: "/v1/refunds",
-    body: encodeForm(
-      paymentIntentId === undefined
-        ? { payment_intent: "pi_invalid", reason: "requested_by_customer" }
-        : { payment_intent: paymentIntentId, reason: "requested_by_customer" },
-    ),
-    headers: STRIPE_HEADERS,
-  });
+  let refund = null;
+  if (paymentIntentId !== undefined) {
+    refund = await ctx.record({
+      action: "refund.create",
+      method: "POST",
+      path: "/v1/refunds",
+      body: encodeForm({
+        payment_intent: paymentIntentId,
+        reason: "requested_by_customer",
+      }),
+      headers: STRIPE_HEADERS,
+    });
+  } else {
+    await ctx.skip("refund.create", "payment_intent.create did not return an id");
+  }
   await ctx.recordInvalid("refund.create", {
     method: "POST",
     path: "/v1/refunds",
@@ -244,7 +253,7 @@ export async function record(ctx) {
     headers: STRIPE_HEADERS,
   });
 
-  const refundId = idFrom(refund);
+  const refundId = refund === null ? undefined : idFrom(refund);
   if (refundId !== undefined) {
     await ctx.record({
       action: "refund.retrieve",

@@ -12,7 +12,7 @@ Markings:
 - Types in response tables are inferred from the documented JSON examples unless the page states a type. The docs publish examples, not a response schema.
 - "Not documented" means no statement was found on the cited Paystack pages on the research date.
 
-Base URL for all API calls: `https://api.paystack.co`. All requests must use HTTPS; unencrypted HTTP is not supported. Requests and responses are JSON, `Content-Type: application/json`. Sources: [API introduction](https://paystack.com/docs/api/), [Authentication](https://paystack.com/docs/api/authentication/).
+Base URL for all API calls: `https://api.paystack.com`. All requests must use HTTPS; unencrypted HTTP is not supported. Requests and responses are JSON, `Content-Type: application/json`. Sources: [API introduction](https://paystack.com/docs/api/), [Authentication](https://paystack.com/docs/api/authentication/).
 
 ## 0. Shared response envelopes and objects
 
@@ -834,6 +834,7 @@ Source: [Miscellaneous API: List Banks](https://paystack.com/docs/api/miscellane
 
 - Action page sample: `200 Ok`.
 - Exact error body/code: **UNCONFIRMED**.
+- **observed while recording, needs a fixture to confirm:** in a recorded run on 28 October 2026, `GET /bank` answered `200` with a deliberately wrong key. This conflicts with the documented `401` for a missing or invalid secret key in §7. Do not use the bank list as an authentication check until a fixture confirms it.
 
 #### Webhook events this action can trigger
 

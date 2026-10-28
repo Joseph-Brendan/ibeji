@@ -1,0 +1,636 @@
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import type { IncomingHttpHeaders } from "node:http";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
+import { printSummary, runCli } from "../../scripts/recorder/cli.mjs";
+import { meta as paystack } from "../../scripts/recorder/paystack.mjs";
+import {
+  createRecorderContext,
+  encodeForm,
+  encodeJson,
+  fingerprintKey,
+  KeyRejectedError,
+  type RecorderResult,
+  validateKey,
+} from "../../scripts/recorder/shared.mjs";
+import { meta as stripe } from "../../scripts/recorder/stripe.mjs";
+
+type CapturedRequest = {
+  readonly method: string;
+  readonly url: string;
+  readonly headers: IncomingHttpHeaders;
+  readonly body: string;
+};
+
+type FakeResponse = {
+  readonly status: number;
+  readonly body?: unknown;
+  readonly contentType?: string;
+};
+
+type FakeHandler = (request: CapturedRequest) => FakeResponse;
+
+async function startServer(handler: FakeHandler) {
+  const requests: CapturedRequest[] = [];
+  const server = createServer((request, response) => {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk: string) => {
+      body += chunk;
+    });
+    request.on("end", () => {
+      const captured: CapturedRequest = {
+        method: request.method ?? "GET",
+        url: request.url ?? "",
+        headers: request.headers,
+        body,
+      };
+      requests.push(captured);
+      const result = handler(captured);
+      response.writeHead(result.status, {
+        "content-type": result.contentType ?? "application/json",
+      });
+      response.end(
+        typeof result.body === "string"
+          ? result.body
+          : JSON.stringify(result.body === undefined ? {} : result.body),
+      );
+    });
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address() as AddressInfo;
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    requests,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error === undefined || error === null) {
+            resolve();
+          } else {
+            reject(error);
+          }
+        });
+      }),
+  };
+}
+
+function captureConsole() {
+  const logs: string[] = [];
+  const errors: string[] = [];
+  const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+    logs.push(args.map(String).join(" "));
+  });
+  const errorSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+    errors.push(args.map(String).join(" "));
+  });
+  return {
+    logs,
+    errors,
+    restore: () => {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    },
+  };
+}
+
+async function makeTempDir() {
+  return mkdtemp(join(tmpdir(), "ibeji-recorder-"));
+}
+
+function makePrompt() {
+  return { ask: vi.fn(async () => ""), close: vi.fn() };
+}
+
+const paystackKey = "sk_test_fake_recorder_key_123";
+
+describe("C15 recorder preflight key check", () => {
+  it("stops before recording on a 401 from Paystack's list call and saves nothing", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/transaction?")) {
+        return {
+          status: 401,
+          body: { status: false, message: "Invalid key", code: "invalid_key" },
+        };
+      }
+      return { status: 500, body: { status: false, message: "unexpected request" } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      expect(code).toBe(1);
+      expect(server.requests).toHaveLength(1);
+      const preflightUrl = new URL(server.requests[0]?.url ?? "", server.baseUrl);
+      expect(preflightUrl.pathname).toBe("/transaction");
+      expect(preflightUrl.searchParams.get("perPage")).toBe("50");
+      expect(preflightUrl.searchParams.get("page")).toBe("1");
+
+      const text = [...output.logs, ...output.errors].join("\n");
+      expect(text).toContain("rejected the test secret key");
+      expect(text).toContain("key was rejected");
+      expect(text).toContain("Invalid key");
+      expect(text).toContain("invalid_key");
+      expect(text).toContain("test mode is on");
+      expect(text).toContain("dashboard's copy button");
+      expect(text).toContain("right business or account");
+      expect(text).not.toContain(paystackKey);
+
+      await expect(readdir(join(cwd, "fixtures"))).rejects.toThrow();
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("uses Stripe's smallest documented list page size and stops on a 403", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/v1/payment_intents?")) {
+        return {
+          status: 403,
+          body: {
+            error: { type: "invalid_request_error", message: "The key lacks permission." },
+          },
+        };
+      }
+      return { status: 500, body: { error: { message: "unexpected request" } } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    const stripeKey = "sk_test_fake_recorder_key_456";
+    try {
+      const code = await runCli(
+        ["--service", "stripe"],
+        { STRIPE_TEST_SECRET_KEY: stripeKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      expect(code).toBe(1);
+      expect(server.requests).toHaveLength(1);
+      const preflightUrl = new URL(server.requests[0]?.url ?? "", server.baseUrl);
+      expect(preflightUrl.pathname).toBe("/v1/payment_intents");
+      expect(preflightUrl.searchParams.get("limit")).toBe("1");
+      expect(output.errors.join("\n")).toContain("The key lacks permission.");
+      expect(output.errors.join("\n")).not.toContain(stripeKey);
+      await expect(readdir(join(cwd, "fixtures"))).rejects.toThrow();
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder key trimming and hidden characters", () => {
+  it("trims outer whitespace and refuses hidden characters with only length and fingerprint", async () => {
+    expect(validateKey(paystack, "  sk_test_fake_trim_123  ")).toEqual({
+      ok: true,
+      code: "valid",
+      key: "sk_test_fake_trim_123",
+    });
+
+    const hidden = "sk_test_fake\u200Bhidden_123";
+    const rejected = validateKey(paystack, hidden);
+    expect(rejected.ok).toBe(false);
+    if (!rejected.ok) {
+      expect(rejected.code).toBe("wrong-format");
+      expect(rejected.message).toContain(`length ${hidden.length}`);
+      expect(rejected.message).toContain(fingerprintKey(hidden));
+      expect(rejected.message).not.toContain(hidden);
+    }
+
+    const fetchImpl = vi.fn(async () => {
+      throw new Error("a key with hidden characters must not be sent");
+    });
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: hidden },
+        {
+          fetchImpl: fetchImpl as unknown as typeof fetch,
+          prompt: makePrompt(),
+        },
+      );
+      expect(code).toBe(1);
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(output.errors.join("\n")).not.toContain(hidden);
+    } finally {
+      output.restore();
+    }
+  });
+});
+
+describe("C15 recorder mid-run key rejection", () => {
+  it("stops on a 401 from a call that should succeed and saves it only as skipped", async () => {
+    const server = await startServer((request) => {
+      if (request.method === "GET" && request.url.startsWith("/transaction?")) {
+        return { status: 200, body: { status: true, message: "ok", data: [] } };
+      }
+      if (request.method === "POST" && request.url === "/transaction/initialize") {
+        return {
+          status: 401,
+          body: { status: false, message: "Invalid key", code: "invalid_key" },
+        };
+      }
+      return { status: 500, body: { status: false, message: "unexpected request" } };
+    });
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const code = await runCli(
+        ["--service", "paystack"],
+        { PAYSTACK_TEST_SECRET_KEY: paystackKey },
+        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
+      );
+
+      expect(code).toBe(1);
+      expect(server.requests).toHaveLength(2);
+      expect(server.requests[1]?.url).toBe("/transaction/initialize");
+      expect(output.errors.join("\n")).toContain("key was rejected");
+      expect(output.errors.join("\n")).not.toContain(paystackKey);
+
+      const files = await readdir(join(cwd, "fixtures", "paystack"));
+      expect(files).toContain("transaction.initialize.skipped.json");
+      expect(files.some((file) => file.includes("invalid-request"))).toBe(false);
+
+      const skipped = JSON.parse(
+        await readFile(
+          join(cwd, "fixtures", "paystack", "transaction.initialize.skipped.json"),
+          "utf8",
+        ),
+      ) as { outcome: string; status: number; reason: string; requestBody: string };
+      expect(skipped.outcome).toBe("skipped");
+      expect(skipped.status).toBe(401);
+      expect(skipped.reason).toContain("key rejected");
+      expect(skipped.reason).toContain("Invalid key");
+      expect(skipped.requestBody).not.toContain(paystackKey);
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder invalid-request and invalid-key classification", () => {
+  it("saves a 400 to deliberately wrong input as invalid-request", async () => {
+    const server = await startServer(() => ({
+      status: 400,
+      body: { status: false, message: "Email Address is required", code: "missing_params" },
+    }));
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      const result = await ctx.recordInvalid("transaction.initialize", {
+        method: "POST",
+        path: "/transaction/initialize",
+        body: encodeJson({ amount: "10000", currency: "NGN" }),
+      });
+
+      expect(result.file.endsWith("transaction-initialize-invalid-request.json")).toBe(true);
+      expect(ctx.results.at(-1)?.outcome).toBe("invalid-request");
+      const saved = JSON.parse(await readFile(result.file, "utf8")) as {
+        outcome: string;
+        status: number;
+      };
+      expect(saved.outcome).toBe("invalid-request");
+      expect(saved.status).toBe(400);
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("saves a 2xx to deliberately wrong input as lenient-input with a note", async () => {
+    const server = await startServer(() => ({
+      status: 200,
+      body: { status: true, message: "accepted", data: {} },
+    }));
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      const result = await ctx.recordInvalid("transaction.initialize", {
+        method: "POST",
+        path: "/transaction/initialize",
+        body: encodeJson({ amount: "10000", currency: "NGN" }),
+      });
+
+      expect(result.file.endsWith("transaction-initialize-lenient-input.json")).toBe(true);
+      const entry = ctx.results.at(-1);
+      expect(entry?.outcome).toBe("lenient-input");
+      expect(entry?.note).toContain("accepted the deliberately wrong input");
+      const saved = JSON.parse(await readFile(result.file, "utf8")) as { outcome: string };
+      expect(saved.outcome).toBe("lenient-input");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("never saves a 401 to wrong input as invalid-request", async () => {
+    const server = await startServer(() => ({
+      status: 401,
+      body: { status: false, message: "Invalid key", code: "invalid_key" },
+    }));
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      await expect(
+        ctx.recordInvalid("transaction.initialize", {
+          method: "POST",
+          path: "/transaction/initialize",
+          body: encodeJson({ amount: "10000", currency: "NGN" }),
+        }),
+      ).rejects.toBeInstanceOf(KeyRejectedError);
+
+      const files = await readdir(join(cwd, "fixtures", "paystack"));
+      expect(files).toContain("transaction.initialize.skipped.json");
+      expect(files.some((file) => file.includes("invalid-request"))).toBe(false);
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("saves a response to a deliberately wrong key only as invalid-key", async () => {
+    const server = await startServer(() => ({
+      status: 200,
+      body: { status: true, message: "the wrong key was accepted", data: [] },
+    }));
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      const result = await ctx.recordInvalidKey("bank.list", {
+        method: "GET",
+        path: "/bank",
+        query: { country: "nigeria" },
+      });
+
+      expect(result.file.endsWith("bank-list-invalid-key.json")).toBe(true);
+      const entry = ctx.results.at(-1);
+      expect(entry?.outcome).toBe("invalid-key");
+      expect(entry?.note).toContain("accepted the deliberately wrong key");
+      const saved = JSON.parse(await readFile(result.file, "utf8")) as { outcome: string };
+      expect(saved.outcome).toBe("invalid-key");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder failed-step summary and skipped files", () => {
+  it("prints the service message and code and saves the full redacted request and response", async () => {
+    const server = await startServer(() => ({
+      status: 400,
+      body: { status: false, message: "Email Address is required", code: "missing_params" },
+    }));
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      const result = await ctx.record({
+        action: "transaction.initialize",
+        method: "POST",
+        path: "/transaction/initialize",
+        body: encodeJson({
+          amount: "10000",
+          email: "ada@real-customer.example",
+          currency: "NGN",
+        }),
+      });
+
+      const entry = ctx.results.at(-1);
+      expect(entry?.outcome).toBe("skipped");
+      expect(entry?.reason).toContain("Email Address is required");
+      expect(entry?.reason).toContain("missing_params");
+      expect(entry?.serviceMessage).toBe("Email Address is required");
+      expect(entry?.serviceCode).toBe("missing_params");
+      expect(result.file.endsWith("transaction.initialize.skipped.json")).toBe(true);
+
+      const saved = JSON.parse(await readFile(result.file, "utf8")) as {
+        outcome: string;
+        reason: string;
+        method: string;
+        path: string;
+        requestBody: string;
+        status: number;
+        responseBody: { message: string; code: string };
+      };
+      expect(saved.outcome).toBe("skipped");
+      expect(saved.reason).toContain("Email Address is required");
+      expect(saved.method).toBe("POST");
+      expect(saved.path).toBe("/transaction/initialize");
+      expect(saved.requestBody).toContain("user1@ibeji.test");
+      expect(saved.requestBody).not.toContain("ada@real-customer.example");
+      expect(saved.status).toBe(400);
+      expect(saved.responseBody.message).toBe("Email Address is required");
+      expect(saved.responseBody.code).toBe("missing_params");
+
+      printSummary(ctx.results as readonly RecorderResult[]);
+      const table = output.logs.join("\n");
+      expect(table).toContain("Service message");
+      expect(table).toContain("Email Address is required");
+      expect(table).toContain("missing_params");
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("writes a skipped file for a step skipped before any request", async () => {
+    const server = await startServer(() => ({ status: 500, body: {} }));
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      await ctx.skip("checkout", "transaction.initialize did not return data.authorization_url");
+
+      const file = join(cwd, "fixtures", "paystack", "checkout.skipped.json");
+      const saved = JSON.parse(await readFile(file, "utf8")) as {
+        outcome: string;
+        reason: string;
+        method: string | null;
+        status: number | null;
+      };
+      expect(saved.outcome).toBe("skipped");
+      expect(saved.reason).toContain("did not return data.authorization_url");
+      expect(saved.method).toBeNull();
+      expect(saved.status).toBeNull();
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("reads Stripe's nested error message and code into the summary", async () => {
+    const server = await startServer(() => ({
+      status: 400,
+      body: {
+        error: {
+          type: "invalid_request_error",
+          code: "parameter_missing",
+          message: "Missing required param: currency.",
+        },
+      },
+    }));
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    const stripeKey = "sk_test_fake_recorder_key_789";
+    try {
+      const ctx = createRecorderContext({
+        meta: stripe,
+        key: stripeKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      const result = await ctx.record({
+        action: "payment_intent.create",
+        method: "POST",
+        path: "/v1/payment_intents",
+        body: encodeForm({ amount: 2000 }),
+      });
+
+      const entry = ctx.results.at(-1);
+      expect(entry?.outcome).toBe("skipped");
+      expect(entry?.reason).toContain("Missing required param: currency.");
+      expect(entry?.reason).toContain("parameter_missing");
+      expect(entry?.serviceMessage).toBe("Missing required param: currency.");
+      expect(entry?.serviceCode).toBe("parameter_missing");
+      expect(result.file.endsWith("payment_intent.create.skipped.json")).toBe(true);
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder request printing", () => {
+  it("prints the request body with fake personal values and never the key", async () => {
+    const server = await startServer(() => ({
+      status: 200,
+      body: { status: true, message: "ok", data: {} },
+    }));
+    const cwd = await makeTempDir();
+    const output = captureConsole();
+    try {
+      const ctx = createRecorderContext({
+        meta: paystack,
+        key: paystackKey,
+        baseUrl: server.baseUrl,
+        cwd,
+        prompt: makePrompt(),
+      });
+      await ctx.record({
+        action: "transaction.initialize",
+        method: "POST",
+        path: "/transaction/initialize",
+        body: encodeJson({
+          amount: "10000",
+          email: "ada@real-customer.example",
+          customer: { name: "Ada Lovelace", account_number: "0123456789" },
+        }),
+      });
+
+      const printed = output.logs.join("\n");
+      expect(printed).toContain("Request: POST /transaction/initialize");
+      expect(printed).toContain("user1@ibeji.test");
+      expect(printed).toContain("Test Name 1");
+      expect(printed).toContain("0000000001");
+      expect(printed).not.toContain("ada@real-customer.example");
+      expect(printed).not.toContain("Ada Lovelace");
+      expect(printed).not.toContain("0123456789");
+      expect(printed).not.toContain(paystackKey);
+    } finally {
+      output.restore();
+      await server.close();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("C15 recorder request encoding", () => {
+  it("encodes Stripe arrays of objects with index brackets, not [object Object]", () => {
+    const encoded = encodeForm({
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: { name: "Ibeji recorder" },
+            unit_amount: 2000,
+          },
+          quantity: 1,
+        },
+      ],
+      payment_method_types: ["card"],
+    });
+    const params = new URLSearchParams(encoded);
+    expect(params.get("line_items[0][price_data][currency]")).toBe("usd");
+    expect(params.get("line_items[0][price_data][product_data][name]")).toBe("Ibeji recorder");
+    expect(params.get("line_items[0][price_data][unit_amount]")).toBe("2000");
+    expect(params.get("line_items[0][quantity]")).toBe("1");
+    expect(params.getAll("payment_method_types[]")).toEqual(["card"]);
+    expect(encoded).not.toContain("[object Object]");
+  });
+});

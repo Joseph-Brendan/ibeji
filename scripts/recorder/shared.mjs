@@ -111,23 +111,115 @@ export function validateKey(meta, key) {
     };
   }
 
-  if (meta.liveKeys.some((pattern) => pattern.test(key))) {
+  const trimmed = key.trim();
+
+  if (meta.liveKeys.some((pattern) => pattern.test(trimmed))) {
     return {
       ok: false,
       code: "live",
-      message: `${meta.envName} contains a live key (fingerprint ${fingerprintKey(key)}). What: the recorder refuses live keys. Why: live keys can move real money and must never be used with Ibeji. Fix: replace ${meta.envName} with the ${meta.displayName} test secret key.`,
+      message: `${meta.envName} contains a live key (length ${trimmed.length}, fingerprint ${fingerprintKey(trimmed)}). What: the recorder refuses live keys. Why: live keys can move real money and must never be used with Ibeji. Fix: replace ${meta.envName} with the ${meta.displayName} test secret key.`,
     };
   }
 
-  if (!meta.testKey.test(key)) {
+  if (!meta.testKey.test(trimmed)) {
     return {
       ok: false,
       code: "wrong-format",
-      message: `${meta.envName} does not match the ${meta.displayName} test secret-key format (fingerprint ${fingerprintKey(key)}). What: the recorder refuses this key. Why: it is not a test secret key in the format recorded in research. Fix: set ${meta.envName} to the ${meta.displayName} test secret key and run the recorder again.`,
+      message: `${meta.envName} does not match the ${meta.displayName} test secret-key format (length ${trimmed.length}, fingerprint ${fingerprintKey(trimmed)}). What: the recorder refuses this key. Why: it is not a test secret key in the format recorded in research, or it contains whitespace or hidden characters outside that format. Fix: copy the ${meta.displayName} test secret key again with the dashboard's copy button and run the recorder again.`,
     };
   }
 
-  return { ok: true, code: "valid" };
+  return { ok: true, code: "valid", key: trimmed };
+}
+
+/**
+ * A stop raised by the recorder itself. Its message already has what, why, and
+ * fix, and never includes a key.
+ */
+export class RecorderStopError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "RecorderStopError";
+  }
+}
+
+export class KeyRejectedError extends RecorderStopError {
+  constructor(message) {
+    super(message);
+    this.name = "KeyRejectedError";
+  }
+}
+
+/**
+ * Return the service's own error message and code from a response body. Paystack
+ * and Flutterwave put them at the top level; Stripe nests them under `error`.
+ */
+export function extractServiceError(body) {
+  if (typeof body === "string") {
+    const text = body.trim();
+    return {
+      message: text === "" ? undefined : text.slice(0, 500),
+      code: undefined,
+    };
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return { message: undefined, code: undefined };
+  }
+
+  const nested = body.error;
+  if (nested !== null && typeof nested === "object" && !Array.isArray(nested)) {
+    const message = nested.message;
+    const code = nested.code;
+    return {
+      message: typeof message === "string" ? message : undefined,
+      code: typeof code === "string" ? code : undefined,
+    };
+  }
+
+  const message = body.message;
+  const code = body.code;
+  return {
+    message:
+      typeof message === "string" ? message : typeof nested === "string" ? nested : undefined,
+    code: typeof code === "string" ? code : undefined,
+  };
+}
+
+function describeServiceError(status, body, redactor) {
+  const info = extractServiceError(body);
+  const message =
+    info.message === undefined
+      ? "(the response body had no error message)"
+      : redactor.redactText(info.message);
+  const code = info.code === undefined ? "" : ` Code: ${redactor.redactText(info.code)}.`;
+  return `HTTP ${status}. Service message: ${message}.${code}`;
+}
+
+export function keyRejectionMessage({ meta, status, body, redactor, action }) {
+  const detail = describeServiceError(status, body, redactor);
+  const where =
+    action === undefined
+      ? "before recording anything"
+      : `while recording ${action}; the run stopped and that request is saved as a skipped fixture for review`;
+  return (
+    `${meta.displayName} rejected the test secret key ${where}. ${detail} ` +
+    `What: the key was rejected, so the recorder stopped. ` +
+    `Why: an authenticated request with this key did not succeed. ` +
+    `Fix: check all of these and run the recorder again: ` +
+    `(1) test mode is on in the ${meta.displayName} dashboard; ` +
+    `(2) the test secret key was copied again with the dashboard's copy button; ` +
+    `(3) you are in the right business or account.`
+  );
+}
+
+export function preflightFailureMessage({ meta, status, body, redactor }) {
+  const detail = describeServiceError(status, body, redactor);
+  return (
+    `${meta.displayName} did not answer the recorder's key-check list request. ${detail} ` +
+    `What: the recorder stopped before recording anything and saved nothing. ` +
+    `Why: the authenticated list request did not return a 2xx response. ` +
+    `Fix: check ${meta.displayName}'s status and this computer's network, then run the recorder again.`
+  );
 }
 
 export function authorizationHeader(meta, key, invalid = false) {
@@ -152,6 +244,13 @@ function appendForm(params, value, prefix) {
     return;
   }
   if (Array.isArray(value)) {
+    const hasObjectItems = value.some((item) => item !== null && typeof item === "object");
+    if (hasObjectItems) {
+      value.forEach((item, index) => {
+        appendForm(params, item, `${prefix}[${index}]`);
+      });
+      return;
+    }
     for (const item of value) {
       params.append(`${prefix}[]`, String(item));
     }
@@ -178,8 +277,8 @@ export function responseData(result) {
   return body.data;
 }
 
-export function makeReference(prefix) {
-  return `${prefix}_${Date.now()}_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+export function makeReference(prefix, separator = "_") {
+  return `${prefix}${separator}${Date.now()}${separator}${randomUUID().replaceAll("-", "").slice(0, 12)}`;
 }
 
 export function createPrompt() {
@@ -509,6 +608,48 @@ export async function saveFixture({
   return file;
 }
 
+/**
+ * Save a failed or skipped step for review. These files always carry
+ * `outcome: "skipped"`; T3 must never use them as expected answers.
+ */
+export async function saveSkippedFixture({
+  cwd,
+  service,
+  action,
+  reason,
+  recordedAt,
+  method,
+  path,
+  query,
+  requestBody,
+  requestContentType,
+  status,
+  responseHeaders,
+  responseBody,
+}) {
+  const directory = join(cwd, "fixtures", service);
+  await mkdir(directory, { recursive: true });
+  const safeAction =
+    action.replaceAll(/[^a-z0-9._-]+/gi, "-").replace(/^[.-]+|[.-]+$/g, "") || "step";
+  const file = join(directory, `${safeAction}.skipped.json`);
+  const fixture = {
+    action,
+    outcome: "skipped",
+    reason,
+    recordedAt,
+    method: method ?? null,
+    path: path ?? null,
+    query: query ?? null,
+    requestBody: requestBody ?? null,
+    requestContentType: requestContentType ?? null,
+    status: status ?? null,
+    responseHeaders: responseHeaders ?? {},
+    responseBody: responseBody ?? null,
+  };
+  await writeFile(file, `${JSON.stringify(fixture, null, 2)}\n`, "utf8");
+  return file;
+}
+
 function serviceSucceeded(meta, status, body) {
   return meta.isSuccess(status, body);
 }
@@ -516,6 +657,7 @@ function serviceSucceeded(meta, status, body) {
 export function createRecorderContext({
   meta,
   key,
+  baseUrl = meta.baseUrl,
   cwd = process.cwd(),
   fetchImpl = globalThis.fetch,
   prompt = createPrompt(),
@@ -525,6 +667,73 @@ export function createRecorderContext({
   const activeRedactor = redactor ?? new Redactor({ keyPatterns: meta.keyPatterns });
   const results = [];
   const state = new Map();
+
+  function redactedRequestResponse(result) {
+    return {
+      path: activeRedactor.redactText(result.path),
+      query: activeRedactor.redact(result.query),
+      requestBody: redactRequestBody(
+        result.requestBody,
+        result.requestContentType ?? "",
+        activeRedactor,
+      ),
+      responseHeaders: redactResponseHeaders(result.responseHeaders, activeRedactor),
+      responseBody: activeRedactor.redact(result.responseBody),
+    };
+  }
+
+  function serviceError(result) {
+    const info = extractServiceError(result.responseBody);
+    return {
+      message: info.message === undefined ? undefined : activeRedactor.redactText(info.message),
+      code: info.code === undefined ? undefined : activeRedactor.redactText(info.code),
+    };
+  }
+
+  function failureReason(result) {
+    if (result.status === 0) {
+      return "no response";
+    }
+    const error = serviceError(result);
+    if (error.message === undefined && error.code === undefined) {
+      return `HTTP ${result.status}`;
+    }
+    const code = error.code === undefined ? "" : ` (${error.code})`;
+    return `HTTP ${result.status}: ${error.message ?? "service error"}${code}`;
+  }
+
+  function pushResult(action, result, outcome, reason, file, note) {
+    const error = serviceError(result);
+    results.push({
+      action,
+      outcome,
+      status: result.status,
+      reason,
+      file,
+      serviceMessage: error.message,
+      serviceCode: error.code,
+      note,
+    });
+  }
+
+  async function saveSkipped(result, action, reason) {
+    const redacted = redactedRequestResponse(result);
+    return saveSkippedFixture({
+      cwd,
+      service: meta.id,
+      action,
+      reason,
+      recordedAt: now().toISOString(),
+      method: result.method,
+      path: redacted.path,
+      query: redacted.query,
+      requestBody: redacted.requestBody,
+      requestContentType: result.requestContentType,
+      status: result.status,
+      responseHeaders: redacted.responseHeaders,
+      responseBody: redacted.responseBody,
+    });
+  }
 
   async function send({
     method,
@@ -537,7 +746,7 @@ export function createRecorderContext({
     invalidKey = false,
     headers: extraHeaders = {},
   }) {
-    const url = new URL(path, meta.baseUrl);
+    const url = new URL(path, baseUrl);
     if (query !== undefined && query !== null) {
       for (const [name, value] of Object.entries(query)) {
         if (Array.isArray(value)) {
@@ -557,6 +766,13 @@ export function createRecorderContext({
     if (body !== null) {
       headers["content-type"] = contentType;
     }
+
+    const printableBody = redactRequestBody(body, contentType, activeRedactor);
+    console.log(`Request: ${method} ${activeRedactor.redactText(path)}`);
+    if (query !== undefined && query !== null) {
+      console.log(`Query: ${JSON.stringify(activeRedactor.redact(query))}`);
+    }
+    console.log(`Body: ${printableBody === null ? "(none)" : printableBody}`);
 
     try {
       const response = await fetchImpl(url, {
@@ -597,6 +813,36 @@ export function createRecorderContext({
     }
   }
 
+  async function preflight() {
+    const request = meta.preflight;
+    const result = await send({
+      method: request.method,
+      path: request.path,
+      query: request.query,
+    });
+    if (result.status >= 200 && result.status < 300) {
+      return result;
+    }
+    if (result.status === 401 || result.status === 403) {
+      throw new KeyRejectedError(
+        keyRejectionMessage({
+          meta,
+          status: result.status,
+          body: result.responseBody,
+          redactor: activeRedactor,
+        }),
+      );
+    }
+    throw new RecorderStopError(
+      preflightFailureMessage({
+        meta,
+        status: result.status,
+        body: result.responseBody,
+        redactor: activeRedactor,
+      }),
+    );
+  }
+
   async function record({
     action,
     method,
@@ -609,14 +855,39 @@ export function createRecorderContext({
     headers,
   }) {
     const result = await send({ method, path, query, body, contentType, invalidKey, headers });
+
+    if (!invalidKey && (result.status === 401 || result.status === 403)) {
+      const reason = `key rejected: ${failureReason(result)}`;
+      const file = await saveSkipped(result, action, reason);
+      pushResult(action, result, "skipped", reason, file);
+      throw new KeyRejectedError(
+        keyRejectionMessage({
+          meta,
+          status: result.status,
+          body: result.responseBody,
+          redactor: activeRedactor,
+          action,
+        }),
+      );
+    }
+
     const success = serviceSucceeded(meta, result.status, result.responseBody);
-    const effectiveOutcome = outcome ?? (success ? "success" : "skipped");
-    const reason =
-      effectiveOutcome === "skipped"
-        ? result.status === 0
-          ? "no response"
-          : `HTTP ${result.status}`
-        : undefined;
+    const expectedSuccess =
+      outcome === undefined ||
+      outcome === "setup" ||
+      outcome === "idempotent-original" ||
+      outcome === "idempotent-replay";
+
+    if (result.status === 0 || (expectedSuccess && !success)) {
+      const reason = failureReason(result);
+      const file = await saveSkipped(result, action, reason);
+      pushResult(action, result, "skipped", reason, file);
+      return { ...result, ok: false, file };
+    }
+
+    const effectiveOutcome =
+      outcome ?? (invalidKey ? "invalid-key" : success ? "success" : "skipped");
+    const redacted = redactedRequestResponse(result);
     const stored = await saveFixture({
       cwd,
       service: meta.id,
@@ -624,47 +895,123 @@ export function createRecorderContext({
       outcome: effectiveOutcome,
       recordedAt: now().toISOString(),
       method: result.method,
-      path: activeRedactor.redactText(result.path),
-      query: activeRedactor.redact(result.query),
-      requestBody: redactRequestBody(
-        result.requestBody,
-        result.requestContentType ?? "",
-        activeRedactor,
-      ),
+      path: redacted.path,
+      query: redacted.query,
+      requestBody: redacted.requestBody,
       status: result.status,
-      responseHeaders: redactResponseHeaders(result.responseHeaders, activeRedactor),
-      responseBody: activeRedactor.redact(result.responseBody),
+      responseHeaders: redacted.responseHeaders,
+      responseBody: redacted.responseBody,
     });
-    results.push({
-      action,
-      outcome: effectiveOutcome,
-      status: result.status,
-      reason,
-      file: stored,
-    });
+    pushResult(action, result, effectiveOutcome, undefined, stored);
     return { ...result, ok: success, file: stored };
   }
 
   async function skip(action, reason) {
-    results.push({ action, outcome: "skipped", status: null, reason, file: null });
+    const file = await saveSkippedFixture({
+      cwd,
+      service: meta.id,
+      action,
+      reason,
+      recordedAt: now().toISOString(),
+      method: null,
+      path: null,
+      query: null,
+      requestBody: null,
+      requestContentType: null,
+      status: null,
+      responseHeaders: {},
+      responseBody: null,
+    });
+    results.push({ action, outcome: "skipped", status: null, reason, file });
   }
 
   async function recordInvalid(action, request) {
-    return record({
-      ...request,
+    const result = await send({ ...request, invalidKey: false });
+
+    if (result.status === 401 || result.status === 403) {
+      const reason = `key rejected: ${failureReason(result)}`;
+      const file = await saveSkipped(result, action, reason);
+      pushResult(action, result, "skipped", reason, file);
+      throw new KeyRejectedError(
+        keyRejectionMessage({
+          meta,
+          status: result.status,
+          body: result.responseBody,
+          redactor: activeRedactor,
+          action,
+        }),
+      );
+    }
+
+    if (
+      result.status === 0 ||
+      (result.status >= 300 && result.status < 400) ||
+      result.status >= 500
+    ) {
+      const reason =
+        result.status === 0
+          ? "no response"
+          : `service error while testing wrong input: ${failureReason(result)}`;
+      const file = await saveSkipped(result, action, reason);
+      pushResult(action, result, "skipped", reason, file);
+      return { ...result, ok: false, file };
+    }
+
+    const lenient = result.status >= 200 && result.status < 300;
+    const effectiveOutcome = lenient ? "lenient-input" : "invalid-request";
+    const note = lenient
+      ? `${meta.displayName} accepted the deliberately wrong input with HTTP ${result.status}; saved as lenient-input instead of invalid-request.`
+      : undefined;
+    const redacted = redactedRequestResponse(result);
+    const stored = await saveFixture({
+      cwd,
+      service: meta.id,
       action,
-      outcome: "invalid-request",
-      invalidKey: false,
+      outcome: effectiveOutcome,
+      recordedAt: now().toISOString(),
+      method: result.method,
+      path: redacted.path,
+      query: redacted.query,
+      requestBody: redacted.requestBody,
+      status: result.status,
+      responseHeaders: redacted.responseHeaders,
+      responseBody: redacted.responseBody,
     });
+    pushResult(action, result, effectiveOutcome, undefined, stored, note);
+    return { ...result, ok: false, file: stored };
   }
 
   async function recordInvalidKey(action, request) {
-    return record({
-      ...request,
+    const result = await send({ ...request, invalidKey: true });
+
+    if (result.status === 0) {
+      const reason = "no response";
+      const file = await saveSkipped(result, action, reason);
+      pushResult(action, result, "skipped", reason, file);
+      return { ...result, ok: false, file };
+    }
+
+    const accepted = result.status >= 200 && result.status < 300;
+    const note = accepted
+      ? `${meta.displayName} accepted the deliberately wrong key with HTTP ${result.status}; saved as invalid-key with this note.`
+      : undefined;
+    const redacted = redactedRequestResponse(result);
+    const stored = await saveFixture({
+      cwd,
+      service: meta.id,
       action,
       outcome: "invalid-key",
-      invalidKey: true,
+      recordedAt: now().toISOString(),
+      method: result.method,
+      path: redacted.path,
+      query: redacted.query,
+      requestBody: redacted.requestBody,
+      status: result.status,
+      responseHeaders: redacted.responseHeaders,
+      responseBody: redacted.responseBody,
     });
+    pushResult(action, result, "invalid-key", undefined, stored, note);
+    return { ...result, ok: !accepted, file: stored };
   }
 
   async function promptCheckout({ title, url, card, extra }) {
@@ -684,6 +1031,7 @@ export function createRecorderContext({
     keyFingerprint: fingerprintKey(key),
     state,
     results,
+    preflight,
     record,
     skip,
     recordInvalid,

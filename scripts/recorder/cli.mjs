@@ -3,6 +3,7 @@ import * as paystack from "./paystack.mjs";
 import {
   createPrompt,
   createRecorderContext,
+  RecorderStopError,
   Redactor,
   VALID_SERVICES,
   validateKey,
@@ -40,11 +41,17 @@ function statusLabel(status) {
   return status === null ? "-" : String(status);
 }
 
-function printSummary(results) {
+function summaryCell(value) {
+  return String(value ?? "")
+    .replaceAll("|", "\\|")
+    .replaceAll(/\s*\n\s*/g, " ");
+}
+
+export function printSummary(results) {
   console.log("");
   console.log("Recorder summary");
-  console.log("Action | Result | HTTP | File or reason");
-  console.log("---|---|---|---");
+  console.log("Action | Result | HTTP | Service message | Code | File or reason");
+  console.log("---|---|---|---|---|---");
   for (const result of results) {
     const resultLabel =
       result.outcome === "skipped"
@@ -53,15 +60,21 @@ function printSummary(results) {
           ? "recorded (invalid request)"
           : result.outcome === "invalid-key"
             ? "recorded (invalid key)"
-            : result.outcome === "idempotent-replay"
-              ? "recorded (idempotent replay)"
-              : result.outcome === "idempotency-mismatch"
-                ? "recorded (idempotency mismatch)"
-                : result.outcome === "setup"
-                  ? "recorded (setup)"
-                  : "recorded";
-    const detail = result.reason ?? result.file ?? "";
-    console.log(`${result.action} | ${resultLabel} | ${statusLabel(result.status)} | ${detail}`);
+            : result.outcome === "lenient-input"
+              ? "recorded (lenient input)"
+              : result.outcome === "idempotent-replay"
+                ? "recorded (idempotent replay)"
+                : result.outcome === "idempotency-mismatch"
+                  ? "recorded (idempotency mismatch)"
+                  : result.outcome === "setup"
+                    ? "recorded (setup)"
+                    : "recorded";
+    const detail = [result.note, result.reason, result.file]
+      .filter((value) => value !== undefined && value !== null && value !== "")
+      .join(" ");
+    console.log(
+      `${summaryCell(result.action)} | ${summaryCell(resultLabel)} | ${statusLabel(result.status)} | ${summaryCell(result.serviceMessage)} | ${summaryCell(result.serviceCode)} | ${summaryCell(detail)}`,
+    );
   }
 }
 
@@ -78,12 +91,12 @@ export async function runCli(args, env = process.env, deps = {}) {
     return 2;
   }
   const meta = serviceModule.meta;
-  const key = env[meta.envName];
-  const keyResult = validateKey(meta, key);
+  const keyResult = validateKey(meta, env[meta.envName]);
   if (!keyResult.ok) {
     console.error(keyResult.message);
     return 1;
   }
+  const key = keyResult.key;
 
   const prompt = deps.prompt ?? createPrompt();
   const keyPatterns = [
@@ -95,24 +108,36 @@ export async function runCli(args, env = process.env, deps = {}) {
   const ctx = createRecorderContext({
     meta,
     key,
+    baseUrl: deps.baseUrl,
     cwd: deps.cwd ?? process.cwd(),
     fetchImpl: deps.fetchImpl ?? globalThis.fetch,
     prompt,
     redactor,
   });
 
+  console.log(
+    `${meta.displayName} key accepted (length ${key.length}, fingerprint ${ctx.keyFingerprint}).`,
+  );
+
   try {
+    await ctx.preflight();
     await serviceModule.record(ctx);
   } catch (error) {
-    console.error(
-      `Recorder stopped: ${error instanceof Error ? error.message : String(error)}. ` +
-        "What: an unexpected recorder error occurred. Why: a step threw instead of returning a response. " +
-        "Fix: inspect the saved fixtures and the message above, then run the recorder again.",
-    );
+    if (error instanceof RecorderStopError) {
+      console.error(error.message);
+    } else {
+      console.error(
+        `Recorder stopped: ${error instanceof Error ? error.message : String(error)}. ` +
+          "What: an unexpected recorder error occurred. Why: a step threw instead of returning a response. " +
+          "Fix: inspect the saved fixtures and the message above, then run the recorder again.",
+      );
+    }
     return 1;
   } finally {
     ctx.close();
-    printSummary(ctx.results);
+    if (ctx.results.length > 0) {
+      printSummary(ctx.results);
+    }
   }
 
   return 0;

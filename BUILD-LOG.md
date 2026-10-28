@@ -582,3 +582,39 @@ The recorder prints the valid choices and exits with code 2 for any other argume
 - Joseph will run the recorder by hand with test credentials.
 - Copy any runtime bank data from fixtures into the relevant `src/twins/<twin>/data/` folder.
 - T3 will use only recorded, non-skipped fixtures.
+
+---
+
+## Phase 2, Step 2.7: Recorder stops on a rejected key and reports failures
+
+Date: 28 October 2026.
+
+Updated the hand-run recorder from two observed runs: a rejected key was being saved as `invalid-request`, and failed steps printed only `HTTP 400` without the service's message. No real key was used and no fixture was recorded in this task.
+
+### What was built
+
+- **Preflight key check.** Before any recording, the recorder sends one authenticated list request: Paystack `GET /transaction?perPage=50&page=1` (the documented default page size), Stripe `GET /v1/payment_intents?limit=1` (the documented minimum), and Flutterwave `GET /v3/transfers?page=1&page_size=10` (the documented default). A 401 or 403 prints the service's own message and code, says the key was rejected, lists test mode, the dashboard copy button, and the right business or account, then exits 1 without creating fixtures. Other preflight failures also stop before recording.
+- **Key handling.** Keys are trimmed before use. Test-key regexes now reject non-printable, whitespace, and non-ASCII characters, so hidden characters from pasting fail before any request. Refusal messages show only the key's length and SHA-256 fingerprint.
+- **Mid-run rejection.** A 401 or 403 on any call sent with the valid key stops the run. The failing call is saved as `<action>.skipped.json` for review, never as `invalid-request`; `invalid-key` probes remain the only deliberately wrong-key fixtures.
+- **Outcome rules.** `invalid-request` is saved only for a 4xx response to deliberately wrong input sent with a valid key. A 2xx response to that input becomes `lenient-input` with a note. A 401 or 403 never becomes `invalid-request`. A 5xx, redirect, or no response becomes `skipped`.
+- **Failure reporting.** Every failed or skipped step gets a `<action>.skipped.json` file with the redacted request, response, status, and reason. The summary table now has service message and code columns, and also shows notes such as a lenient input.
+- **Request visibility.** Each request prints its method, redacted query, and redacted body before it is sent, using the same fake personal values as the saved fixtures. A key is never printed.
+- **Request audit against research.** Fixed Paystack transaction references to use only the documented characters (`-`, `.`, `=`, alphanumeric) instead of underscores. Fixed the Stripe form encoder so arrays of objects use `line_items[0][field]` instead of `[object Object]`. Removed known-invalid fallback IDs from success paths for Paystack transfers and Stripe refunds; those steps are now skipped when the prerequisite record is missing. Flutterwave requests were checked against `research/flutterwave.md` at the same time.
+- **Research note.** `research/paystack.md` now records that `GET /bank` answered 200 with a deliberately wrong key in a recorded run, marked "Observed while recording, needs a fixture to confirm".
+
+### Decisions
+
+- The preflight failure stops the run for any non-2xx, not only 401/403. A 401/403 is reported as a rejected key; other statuses are reported as a failed key-check request. This avoids recording after an unclear authentication result.
+- A mid-run 401/403 saves the failing request as a skipped fixture because SPEC C15 point 6 requires every failed step to be reviewable. It is never used as an expected answer and is not an `invalid-request` fixture.
+- Key character rules use the same printable key character set as the redaction patterns after the documented prefix. The research files document key prefixes, not full bodies or lengths, so this is a refusal rule for pasted junk, not a claim about the services' key formats.
+
+### Tests
+
+- Added `test/unit/recorder-failures.test.ts`, using a fake HTTP server on `127.0.0.1` port 0 and temporary fixture folders. It covers preflight 401/403, no saved files on preflight rejection, Stripe's `limit=1`, key trimming and hidden characters, mid-run 401, `invalid-request` versus `lenient-input`, wrong-key-only `invalid-key`, summary message/code reporting, skipped files, redacted request printing, and indexed Stripe form encoding.
+- Updated the existing key test for the trimmed key returned by `validateKey`.
+
+### Later
+
+- Run the recorder by hand with real test credentials to confirm the bank-list wrong-key observation and create the fixtures.
+- T3 must ignore `skipped`, `invalid-request`, `invalid-key`, and `lenient-input` fixtures as expected answers.
+- No SPEC.md section was edited; the changes implement C15 and do not change its meaning.

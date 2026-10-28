@@ -84,7 +84,11 @@ describe("C15 recorder key checks", () => {
         errorSpy.mockRestore();
       }
 
-      expect(validateKey(service.meta, service.test)).toEqual({ ok: true, code: "valid" });
+      expect(validateKey(service.meta, service.test)).toEqual({
+        ok: true,
+        code: "valid",
+        key: service.test,
+      });
     }
   });
 

@@ -7,9 +7,14 @@ export const meta = {
   baseUrl: "https://api.flutterwave.com",
   requestFormat: "json",
   auth: "bearer",
-  testKey: /^FLWSECK_TEST-\S+$/,
-  liveKeys: [/^FLWSECK-(?!TEST-)\S+$/, /^FLWPUBK-\S+$/],
+  testKey: /^FLWSECK_TEST-[A-Za-z0-9._~+/=-]+$/,
+  liveKeys: [/^FLWSECK-(?!TEST-)[A-Za-z0-9._~+/=-]+$/, /^FLWPUBK-[A-Za-z0-9._~+/=-]+$/],
   keyPatterns: [/\bFLW(?:PUBK|SECK)(?:_TEST)?-[A-Za-z0-9._~+/=-]+\b/g],
+  preflight: {
+    method: "GET",
+    path: "/v3/transfers",
+    query: { page: "1", page_size: "10" },
+  },
   isSuccess(status, body) {
     return (
       status >= 200 &&

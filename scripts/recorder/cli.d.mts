@@ -1,4 +1,7 @@
+import type { RecorderResult } from "./shared.mjs";
+
 export type RunCliDeps = {
+  readonly baseUrl?: string;
   readonly cwd?: string;
   readonly fetchImpl?: typeof fetch;
   readonly prompt?: {
@@ -6,6 +9,8 @@ export type RunCliDeps = {
     readonly close: () => void;
   };
 };
+
+export function printSummary(results: readonly RecorderResult[]): void;
 
 export function parseArgs(
   args: readonly string[],
