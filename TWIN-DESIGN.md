@@ -1,8 +1,8 @@
 # Twin framework design
 
-Status: proposed in Phase 2. This is a design, not an implementation. No code has been written.
+Status: approved in SPEC.md v1.3, C21 decisions D31 to D41. This is a design, not an implementation. No code has been written.
 
-Scope: SPEC.md C2, C3, C4, C5, C7, C10, C12, C13, C17 T14, and B3 goal 7. The three research files are the only source of service facts: `research/paystack.md` (P), `research/flutterwave.md` (F), and `research/stripe.md` (S).
+Scope: SPEC.md C2, C3, C4, C5, C6, C7, C10, C12, C13, C17 T14, and B3 goal 7. The three research files are the only source of service facts: `research/paystack.md` (P), `research/flutterwave.md` (F), and `research/stripe.md` (S).
 
 ## 1. Comparison of the three services
 
@@ -21,7 +21,7 @@ Every cell cites the research section it comes from. `P` = `research/paystack.md
 | Idempotency | No general `Idempotency-Key`; transfer references are unique and retries use the same reference; duplicate recipient returns existing record; no documented refund idempotency (P §10). | No general v3 idempotency header; `tx_ref` and transfer reference are unique; duplicate behaviour **UNCONFIRMED**; refund has no documented idempotency (F §10). | `Idempotency-Key` for v1 POST; up to 255 characters; retained at least 24 hours; same key/parameters replays status and body, including 500; different parameters produce `idempotency_error`; concurrent use `409 idempotency_key_in_use` (S §18). |
 | Pagination | Mixed offset and cursor `meta` shapes. Offset: `total`, `skipped`, `perPage`, `page`, `pageCount`. Cursor: `next`, `previous`, `perPage`. List endpoints use page/perPage or cursor-style fields (P §0.10, §1.4, §3.3). | `meta.page_info` with `total`, `current_page`, `total_pages`; `page` and sometimes `page_size` (F §2.5, §5.3). | Cursor: `limit` 1–100 default 10, `starting_after`/`ending_before`, list envelope `object: "list"`, `data`, `has_more`, `url` (S §21). |
 | Checkout flow | `POST /transaction/initialize` returns `data.authorization_url`; redirect, then verify by reference. Local page outcomes: success, declined, abandoned. Only `charge.success` is documented for success; no failed/abandoned webhook (P §2, §6.2). | `POST /v3/payments` returns `data.link`; redirect, then verify server-side. Local outcomes: success, failed, cancelled; cancelled maps to a documented failed result, not a separate status; `charge.completed` for success/failure (F §3, §6.2). | `POST /v1/checkout/sessions` returns `url`; local outcomes: success, card declined, requires 3DS then approve/fail. Success can produce `checkout.session.completed` and `payment_intent.succeeded`; decline `payment_intent.payment_failed`; 3DS `requires_action` (S §6, §9, §15). |
-| Which C5 failures apply | Yes: `server-error`, `rate-limited`, `webhook-verification-fails`, `payment-declined`, `transfer-stuck-pending`, `transfer-reversed` (docs); `slow-response`, `timeout-after-commit`, `timeout-before-commit`, `flaky-network`, `webhook-delayed`, `webhook-duplicated`, `webhook-out-of-order`, `webhook-never-sent`, `bank-resolve-fails` (assumed). No: `authentication-required` (P §14.2). | Yes: `slow-response`, `timeout-after-commit`, `timeout-before-commit`, `server-error`, `rate-limited`, `webhook-duplicated`, `webhook-verification-fails`, `payment-declined`, `transfer-stuck-pending` (docs); `flaky-network`, `webhook-delayed`, `webhook-out-of-order`, `webhook-never-sent`, `bank-resolve-fails` (assumed). No: `authentication-required`; `transfer-reversed` is proposed removed because v3 has no reversal status/event (F §14.2, §15). | Yes: `timeout-after-commit`, `server-error`, `rate-limited`, `flaky-network`, `webhook-duplicated`, `webhook-out-of-order`, `webhook-verification-fails`, `payment-declined`, `authentication-required` (docs); `slow-response`, `timeout-before-commit`, `webhook-delayed`, `webhook-never-sent` (assumed). No: `transfer-stuck-pending`, `transfer-reversed`, `bank-resolve-fails` (S §26). |
+| Which C5 failures apply | Yes: `server-error`, `rate-limited`, `webhook-verification-fails`, `payment-declined`, `transfer-stuck-pending`, `transfer-reversed` (docs); `slow-response`, `timeout-after-commit`, `timeout-before-commit`, `flaky-network`, `webhook-delayed`, `webhook-duplicated`, `webhook-out-of-order`, `webhook-never-sent`, `bank-resolve-fails` (assumed). No: `authentication-required` (P §14.2). | Yes: `slow-response`, `timeout-after-commit`, `timeout-before-commit`, `server-error`, `rate-limited`, `webhook-duplicated`, `webhook-verification-fails`, `payment-declined`, `transfer-stuck-pending` (docs); `flaky-network`, `webhook-delayed`, `webhook-out-of-order`, `webhook-never-sent`, `bank-resolve-fails` (assumed). No: `authentication-required`; `transfer-reversed` is not supported because v3 has no reversal status/event (C21 D33; F §14.2, §15). | Yes: `timeout-after-commit`, `server-error`, `rate-limited`, `flaky-network`, `webhook-duplicated`, `webhook-out-of-order`, `webhook-verification-fails`, `payment-declined`, `authentication-required` (docs); `slow-response`, `timeout-before-commit`, `webhook-delayed`, `webhook-never-sent` (assumed). No: `transfer-stuck-pending`, `transfer-reversed`, `bank-resolve-fails` (S §26). |
 
 The comparison shows why the framework cannot assume one request parser, one error envelope, one pagination style, one money rule, one idempotency rule, one signer, or one checkout result. Those are per-twin.
 
@@ -37,6 +37,7 @@ export type TwinDefinition = {
   readonly actions: readonly ActionDefinition[];
   readonly state: TwinStateDefinition;
   readonly auth: AuthAdapter;
+  readonly idempotency: IdempotencyAdapter;
   readonly routes: RouteRegistrar;
   readonly responses: ResponseBuilder;
   readonly failures: FailureAdapter;
@@ -54,6 +55,7 @@ export type TwinDefinition = {
 - `actions` is both the action catalog and the source for action selectors. The core adds the `twin.` prefix for a full id.
 - `state` declares the twin's record schema and UI collections; the core stores the JSON state.
 - `auth` owns key extraction, live-key detection, and the service's 401 shape.
+- `idempotency` is either `none` or the service's replay adapter. The core calls it before the failure step and stores results only after the action is performed (D39).
 - `routes` registers the twin's HTTP methods and paths; the twin owns its parser.
 - `responses` builds success and service-specific error bodies.
 - `failures` declares and shapes the shared failure engine's results.
@@ -84,7 +86,7 @@ The two checkout ids are the request/page and the tester's choice. Both have the
 | Paystack | Refunds | `refund.create`, `refund.fetch`, `refund.list` |
 | Paystack | Transfers | `transfer_recipient.create`, `transfer.create`, `transfer.fetch`, `transfer.verify` |
 | Paystack | Banks | `bank.list`, `bank.resolve` |
-| Flutterwave | Payments | `payment.create`, `payment.verify`, `payment.list` |
+| Flutterwave | Payments | `payment.create`, `payment.verify`, `payment.verify_by_reference`, `payment.list` |
 | Flutterwave | Checkout | `checkout.open`, `checkout.submit` |
 | Flutterwave | Refunds | `refund.create`, `refund.fetch`, `refund.list` |
 | Flutterwave | Transfers | `transfer.create`, `transfer.fetch`, `transfer.list` |
@@ -95,7 +97,7 @@ The two checkout ids are the request/page and the tester's choice. Both have the
 | Stripe | Refunds | `refund.create`, `refund.retrieve`, `refund.list` |
 | Stripe | Events | `event.retrieve`, `event.list` |
 
-Flutterwave has no separate `payment.fetch` action because v3 documents no distinct fetch endpoint; `payment.verify` by id is the fetch (proposed C21 D32). Webhooks are not actions: the twin declares them through `WebhookEventDefinition` and emits them from the actions that cause them.
+Flutterwave has no separate `payment.fetch` action because v3 documents no distinct fetch endpoint; `payment.verify` by id is the fetch. Verify by id and verify by reference are separate actions, `payment.verify` and `payment.verify_by_reference`, because each route maps to exactly one action and T14 checks that (C21 D32). Webhooks are not actions: the twin declares them through `WebhookEventDefinition` and emits them from the actions that cause them.
 
 ### 2.1 Actions and routes
 
@@ -215,7 +217,7 @@ export type ResponseBuilder = {
 
 `TwinFailure` is service-neutral: a failure id, an HTTP status hint, a message, and structured details. The twin maps it to Paystack's `status/message/meta`, Flutterwave's `status/message/data`, or Stripe's `error` object. The core may set the status for a failure, but it never builds the body.
 
-The twin also owns validation errors, unknown-resource errors, and unsupported-resource shapes. For Stripe, the version-header rejection is also built by the Stripe response builder.
+The twin also owns validation errors, unknown-resource errors, and unsupported-resource shapes. For Stripe, the version gate accepts a missing header or a well-formed version and answers as `2026-09-30.endive`; it records a warning once per well-formed version and uses the Stripe response builder only to reject a malformed value (D37).
 
 ### 2.5 The shared failure step
 
@@ -237,7 +239,9 @@ export type FailureAdapter = {
 export type ActiveFailureEffects = {
   readonly declined?: boolean;
   readonly authenticationRequired?: { readonly then: "succeed" | "fail" };
-  readonly transferStuckPending?: boolean;
+  readonly transferStuckPending?: {
+    readonly thenFailPercent: number;
+  };
   readonly transferReversed?: boolean;
   readonly bankResolveFails?: { readonly mode: "error" | "timeout" };
 };
@@ -245,10 +249,10 @@ export type ActiveFailureEffects = {
 
 - The core resolves the action and asks the failure engine for a plan.
 - The core applies `flaky-network` before, `rate-limited`, `server-error`, `timeout-before-commit`, then calls the action handler only if the plan allows it.
-- The twin's `shapeResult` turns `payment-declined`, `authentication-required`, `transfer-stuck-pending`, `transfer-reversed`, and `bank-resolve-fails` into the service's statuses, bodies, and webhook events.
+- The twin's `shapeResult` turns `payment-declined`, `authentication-required`, `transfer-stuck-pending`, `transfer-reversed`, and `bank-resolve-fails` into the service's statuses, bodies, and webhook events. For `transfer-stuck-pending`, the core holds the transfer pending, then the twin resolves it as successful or failed according to `thenFailPercent`, using the service's own statuses and webhooks (D31).
 - The twin's `httpError` turns `server-error`, `rate-limited`, and other plan HTTP errors into its own error body. Timeouts produce no body.
 - The core applies `timeout-after-commit`, `flaky-network` after, and `slow-response` after the action.
-- A repeated request with an idempotency key never performs the action twice; the core checks the twin's declared idempotency mode before the failure step.
+- The core calls the twin's idempotency adapter before the failure step. A replay returns the stored result and skips the failure step; a request that did not perform its action stores nothing (D39).
 - The core refuses any failure not in `support` with the Ibeji control error `FAILURE_NOT_SUPPORTED_BY_TWIN`. The twin does not decide support at request time.
 
 ### 2.6 Webhook building, signing, and summaries
@@ -307,6 +311,7 @@ export type WebhookHeaders = Readonly<Record<string, string>>;
 - Paystack builds `{ "event": "...", "data": ... }`; it signs the raw body with HMAC-SHA512 in `x-paystack-signature`.
 - Flutterwave builds the normal `{ "event": "...", "data": ... }` for charges and transfers. Its refund webhook is a bare refund object with no event field, so `wireName` is `null` for that event. It marks the request with `verif-hash`.
 - Stripe builds a complete Event object with `id`, `object: "event"`, `api_version`, `created`, `data`, `livemode`, `pending_webhooks`, `request`, and `type`. It signs `t=...,v1=...` with HMAC-SHA256 and the `whsec_` credential.
+- For Stripe `charge.refunded`, `data.object` is a documented Charge built from the PaymentIntent's own data; its id matches `latest_charge`. There is no Charge API (D34).
 - `build` runs when the event is created, so the stored body is exact and a resend can reuse it. `sign` runs for every delivery attempt; Stripe's timestamp is new for each attempt.
 - `verify` is used by T14 to prove the twin accepts its own good webhook and rejects each declared tamper method. The runtime dispatcher does not need to verify its own outbound webhooks.
 - `verificationFailures` is per twin. All three can do `wrong-secret`, `corrupted`, and `missing`; Stripe can also do `stale-timestamp`. The C5 method setting is validated against this list.
@@ -386,21 +391,37 @@ The core owns the credentials file, stable issuance, rotation, permission bits, 
 
 ### 2.9 Money
 
+Inside Ibeji every amount is stored as a whole number in the currency's smallest unit (D38). There is no floating-point amount anywhere in the core or in twin state. Each twin converts at its edge, using its own service rules. Decimal amounts are parsed from the request text digit by digit and converted to smallest-unit integers; they are never parsed with `parseFloat`, `Number`, or floating-point arithmetic.
+
 ```ts
 export type MoneyRules = {
-  readonly unit: "minor" | "major";
   readonly zeroDecimal: readonly string[];
   readonly fractionDigits: (currency: string) => number;
-  readonly format: (amount: number, currency: string) => string;
-  readonly assertValid: (amount: number, currency: string) => void;
+  readonly parseServiceAmount: (
+    text: string,
+    currency: string
+  ) => MinorUnits;
+  readonly formatServiceAmount: (
+    amount: MinorUnits,
+    currency: string
+  ) => string;
+  readonly formatDisplay: (
+    amount: MinorUnits,
+    currency: string
+  ) => string;
+  readonly assertValid: (amount: MinorUnits, currency: string) => void;
 };
+
+export type MinorUnits = number;
 ```
 
-- Paystack: `unit: "minor"`; `amount` is the currency subunit, with the documented XOF exception that the API value is still multiplied by 100 even though XOF has no display subunit. `format` handles the display exception (P §12).
-- Flutterwave: `unit: "major"`; `amount` is whole currency units; no minor-unit conversion (F §12).
-- Stripe: `unit: "minor"`; `fractionDigits` is 0 for the zero-decimal list and 2 otherwise, with ISK/UGX special handling; `format` uses the smallest-unit rules (S §23).
+- Paystack: the API already sends whole numbers in the currency subunit. `parseServiceAmount` accepts the documented integer shape and returns it unchanged. The documented XOF exception remains: XOF has no display subunit, but Paystack requires the API amount multiplied by 100, so the twin's edge rules preserve that (P §12).
+- Flutterwave: v3 sends amounts in the main currency unit, not minor units. `parseServiceAmount` parses the text amount into Ibeji's smallest-unit integer and `formatServiceAmount` writes the main-unit text back to Flutterwave. The documented examples use whole currency amounts. **UNCONFIRMED:** `research/flutterwave.md` §12 does not document how many decimal places v3 allows for each currency, how it rounds excess decimals, or how decimal amounts behave in responses; the twin must not invent those rules. It rejects more decimal places than the currency has only once fixtures or a C21 decision confirm the currency rules.
+- Stripe: the API sends whole numbers in the smallest currency unit. `parseServiceAmount` accepts the integer and returns it unchanged. `fractionDigits` is 0 for the zero-decimal list and 2 otherwise, with ISK/UGX special handling; `formatServiceAmount` and `formatDisplay` use the smallest-unit rules (S §23).
 
-The core uses `format` for the Data page and event summaries. It uses `assertValid` before action handlers run. There is no shared assumption that all amounts are minor units.
+The core uses `formatDisplay` for the Data page and event summaries. It uses `assertValid` before action handlers run. The core never converts a service amount; the twin does that at its boundary. This means a Flutterwave decimal amount and a Stripe or Paystack integer amount can both live in Ibeji state as the same kind of minor-unit integer.
+
+`CheckoutPageModel.amountMinor` is a smallest-unit integer. The shared page calls the twin's `formatDisplay`; it never formats with a shared divisor.
 
 ### 2.10 Retry schedule
 
@@ -419,11 +440,11 @@ export type RetrySchedule = {
 | Flutterwave | 3 retries, 1800 seconds apart (documented when retries are enabled; the twin treats them as enabled) | F §9, `docs` |
 | Stripe | 3 retries at 3600, 7200, and 14400 seconds (the docs say 3 times over a few hours; exact delays are not published) | S §20, `assumed` |
 
-C7's fallback schedule (5 retries at 1, 5, 15, 30, 60 minutes) applies where a service has no documented schedule. Stripe has a count and a rough window but not exact delays; the proposed schedule above is recorded as assumed, not as a Stripe fact.
+C7's fallback schedule (5 retries at 1, 5, 15, 30, 60 minutes) applies where a service has no documented schedule. Stripe has a count and a rough window but not exact delays; the schedule above is approved by D35 and recorded as assumed, not as a Stripe fact.
 
 ### 2.11 Supported C5 failures
 
-Each twin's `failures.support` is the authority. The final proposed matrix is:
+Each twin's `failures.support` is the authority. The approved matrix is (D31, as changed by D33):
 
 | Failure | Paystack | Flutterwave | Stripe |
 |---|---|---|---|
@@ -441,10 +462,10 @@ Each twin's `failures.support` is the authority. The final proposed matrix is:
 | `payment-declined` | yes, docs | yes, docs | yes, docs |
 | `authentication-required` | no | no | yes, docs |
 | `transfer-stuck-pending` | yes, docs | yes, docs | no |
-| `transfer-reversed` | yes, docs | no; proposed C21 removal | no |
+| `transfer-reversed` | yes, docs | no (D33) | no |
 | `bank-resolve-fails` | yes, assumed | yes, assumed | no |
 
-`source: docs` means the research cites service documentation. `source: assumed` means the twin offers the failure because C5 requires a synthetic version, but the service documentation does not confirm the exact real-world behavior. The UI/CLI label assumed failures as required by C5. The `actions` list in each `FailureSupport` maps each failure to the actions it can shape.
+`source: docs` means the research cites service documentation. `source: assumed` means the twin offers the failure because C5 requires a synthetic version, but the service documentation does not confirm the exact real-world behavior. The UI/CLI label assumed failures as required by C5. The `actions` list in each `FailureSupport` maps each failure to the actions it can shape. `transfer-stuck-pending` carries the approved `thenFailPercent` setting: after the configured pending time, that percentage of transfers end failed and the rest end successful, using each service's statuses and webhooks (D31). C6's `stuck-payouts` uses 600 seconds and `thenFailPercent` 50.
 
 ### 2.12 Supporting types
 
@@ -506,7 +527,7 @@ export type CheckoutSubmitContext = CheckoutPageContext & {
 
 export type CheckoutPageModel = {
   readonly twinDisplayName: string;
-  readonly amount: number;
+  readonly amountMinor: MinorUnits;
   readonly currency: string;
   readonly customerEmail?: string;
   readonly reference: string;
@@ -556,6 +577,82 @@ export type CryptoRandom = {
 
 The core owns `Clock`, `SeededRandom`, `CryptoRandom`, and the storage types. The twin receives them but does not create a second clock or random source.
 
+### 2.13 Idempotency
+
+```ts
+export type IdempotencyAdapter =
+  | { readonly mode: "none" }
+  | {
+      readonly mode: "header";
+      readonly headerName: string;
+      readonly maxKeyLength: number;
+      readonly retentionSeconds: number;
+      readonly begin: (context: IdempotencyBeginContext) => IdempotencyDecision;
+      readonly complete: (
+        context: IdempotencyCompleteContext,
+        response: TwinResponse
+      ) => void;
+    };
+
+export type IdempotencyBeginContext = {
+  readonly request: TwinRequest;
+  readonly action: ActionDefinition;
+  readonly credentials: TwinCredentials;
+  readonly store: IdempotencyStore;
+  readonly clock: Clock;
+};
+
+export type IdempotencyCompleteContext = {
+  readonly key: string;
+  readonly request: TwinRequest;
+  readonly action: ActionDefinition;
+  readonly store: IdempotencyStore;
+  readonly clock: Clock;
+};
+
+export type IdempotencyDecision =
+  | { readonly kind: "proceed"; readonly key: string | null }
+  | { readonly kind: "replay"; readonly response: TwinResponse }
+  | { readonly kind: "error"; readonly response: TwinResponse };
+
+export type IdempotencyStore = {
+  readonly lookup: (
+    twinId: TwinId,
+    key: string
+  ) => StoredIdempotency | undefined;
+  readonly save: (twinId: TwinId, record: StoredIdempotency) => void;
+};
+
+export type StoredIdempotency = {
+  readonly key: string;
+  readonly method: HttpMethod;
+  readonly path: string;
+  readonly fingerprint: string;
+  readonly response: TwinResponse;
+  readonly storedAt: number;
+};
+```
+
+The core calls `begin` after the action is resolved and authenticated, but **before** the failure step. Its order is:
+
+1. If `mode` is `none`, skip all idempotency handling.
+2. Otherwise, `begin` reads the header, checks length, fingerprints the method/path/parameters, looks up the key, and returns `proceed`, `replay`, or `error`.
+3. A `replay` returns the stored response immediately; no failure fires and the action is not performed.
+4. A new key returns `proceed` with that key and goes to the normal failure step and the action; no header returns `proceed` with `null`.
+5. `complete` is called only when the action was performed, produced a response, and `proceed` carried a key. It stores the status, body, and replay headers. If steps 1 to 4 of C5 fired, the action never began, `complete` is not called, and a retry with the same key runs normally.
+6. `timeout-after-commit` and `flaky-network` after are applied only after `complete` has stored the result, so a retry with the same key returns the original success.
+7. A parameter mismatch or a concurrent same-key request returns the service-shaped error from `begin`.
+
+The adapters are:
+
+| Twin | Idempotency part |
+|---|---|
+| Paystack | `{ mode: "none" }`. Paystack documents no general idempotency header (P §10). The twin may model the documented transfer-reference and recipient behaviours inside those actions, but there is no general replay adapter. |
+| Flutterwave | `{ mode: "none" }`. Flutterwave v3 documents no general idempotency header; v4's `X-Idempotency-Key` is not a v3 fact (F §10). |
+| Stripe | Header adapter for `Idempotency-Key`: 255-character maximum, 24-hour retention, method/path/parameter fingerprint, saved status/body replay with `Idempotent-Replayed: true`, a service-shaped `idempotency_error` for a parameter mismatch, and `409 idempotency_key_in_use` for a concurrent same-key request. It applies only to POST; GET and DELETE carry no idempotency effect (S §18; D39). |
+
+Stripe's adapter owns the Stripe error bodies, including the exact ambiguous mismatch status the research leaves **UNCONFIRMED**. Paystack and Flutterwave cannot accidentally inherit it because their adapters are `none`.
+
 ## 3. How each service fits
 
 ### 3.1 Paystack
@@ -567,7 +664,7 @@ Paystack fits directly:
 - HMAC-SHA512 signer over the raw body with the secret key.
 - Transaction, checkout, refund, transfer-recipient, transfer, transfer-verify, bank-list, and bank-resolve actions.
 - Two pagination styles are handled by its response builder and list actions; the core never assumes one.
-- No idempotency header; the twin declares `idempotency: "none"` and only the documented transfer/reference behaviours are modeled where C4a exposes them.
+- No general idempotency header; the twin declares `idempotency: { mode: "none" }` (D39) and only the documented transfer/reference behaviours are modeled inside those actions.
 - Local checkout has no Paystack HTML API; the twin declares success/declined/abandoned outcomes and the shared renderer shows them. Only `charge.success` is emitted on success.
 - Transfer reversal and stuck-pending are documented, so those C5 failures are supported.
 - Bank resolve failure has no documented exact failure mode; the twin supports it as assumed.
@@ -576,15 +673,15 @@ No Paystack-specific code is needed in the core.
 
 ### 3.2 Flutterwave
 
-Flutterwave v3 fits after three explicit decisions:
+Flutterwave v3 fits with these approved decisions:
 
 - JSON parser, bearer secret auth, `status/message/data` envelope, and the separate bare-refund webhook shape.
 - `verif-hash` is a marker, not an HMAC signature. The `WebhookAdapter.sign` method is named generically "sign" but returns the `verif-hash` header for Flutterwave.
 - Checkout uses `POST /v3/payments` → `data.link`; local outcomes use the documented successful/failed states. The `cancelled` button is local and maps to the documented failed result, not an invented status.
-- C4b includes a separate "fetch one transaction", but the research found no distinct v3 endpoint. The design proposes C21: the verify-by-id action is the fetch, and no separate `payment.fetch` action is created. This is the only action-list change needed before Phase 3.
-- C5 includes `transfer-reversed` for Flutterwave, but v3 has no reversal status or reversal event. The design proposes removing Flutterwave from that C5 row rather than inventing a v3 reversal. `transfer-stuck-pending` remains, because v3 documents `PENDING` and test transfers stay pending.
+- C4b includes a separate "fetch one transaction", but the research found no distinct v3 endpoint. Verify-by-id is the fetch. Verify by id and verify by reference are separate actions, `payment.verify` and `payment.verify_by_reference`, because each route maps to exactly one action and T14 checks that (D32). No `payment.fetch` action exists.
+- C5 includes `transfer-reversed` for Flutterwave, but v3 has no reversal status or reversal event. D33 removes Flutterwave from that C5 row rather than inventing a v3 reversal. `transfer-stuck-pending` remains, because v3 documents `PENDING` and test transfers stay pending.
 - The v3 refund webhook is a bare object with no event name. `WebhookEventDefinition.wireName` is nullable; the internal event key is `refund`, and the summary says "Flutterwave refund".
-- v3 has no general idempotency header. The twin declares `idempotency: "none"`.
+- v3 has no general idempotency header. The twin declares `idempotency: { mode: "none" }` (D39).
 
 No Flutterwave-specific branch is needed in the core.
 
@@ -595,10 +692,10 @@ Stripe is the hardest fit and must be handled by the adapter, not by a JSON assu
 - The request parser is form-encoded: `metadata[key]`, `line_items[0][price]`, `name[]`, and `expand[]`. It lives in the Stripe twin.
 - Authentication accepts Basic Auth and the documented bearer form. The core does not assume `Authorization: Bearer` for every twin.
 - The error builder produces the `{error: {...}}` wrapper and Stripe's status/type/code shape.
-- The API-version policy is in the Stripe auth/version gate: missing or `2026-09-30.endive` is accepted; any other value is rejected with the Stripe error builder.
-- `Idempotency-Key` is modeled in the Stripe action pipeline. The Stripe twin owns the key/parameter comparison and replay response; it uses the core's state store and clock. Paystack and Flutterwave declare no idempotency, so the core never applies a replay rule to them.
+- The API-version policy is D37 in the Stripe version gate: a missing header answers as `2026-09-30.endive`; any well-formed version is accepted, answered in the `2026-09-30.endive` shape, and records a warning once per version; only a malformed value is rejected with the Stripe error builder.
+- `Idempotency-Key` is the Stripe adapter in §2.13: 255-character maximum, 24-hour retention, method/path/parameter fingerprint, saved status/body replay, mismatch error, and `409 idempotency_key_in_use` for concurrent use. The Stripe twin owns the adapter and its error bodies; the core calls it before the failure step and stores only after the action was performed (D39). Paystack and Flutterwave declare `none`, so the core never applies a replay rule to them.
 - Checkout Sessions, Events, and PaymentIntents are all normal actions. The local checkout has the extra approve/fail 3DS choice declared by the Stripe checkout adapter.
-- Stripe's `charge.refunded` event has a `charge` payload but Charge is not a C4c action. The twin can build a minimal local Charge snapshot for that event; the design proposes C21 to clarify this. It does not add a Charge API.
+- Stripe's `charge.refunded` event carries the documented Charge shape, built from the PaymentIntent's own data. The Charge id matches the PaymentIntent's `latest_charge`. There is no Charge API in v1 (D34).
 - Pagination is cursor-only and list envelopes are Stripe-specific, so the list actions and response builder are in the twin.
 - Stripe's test webhook retry schedule has no exact delays. The twin declares an assumed schedule.
 
@@ -613,6 +710,7 @@ The following may live in `src/core/`, `src/twins/framework/`, `src/control/`, `
 - HTTP server construction, `127.0.0.1` binding, Host checks, body limit, security headers, no CORS, route dispatch.
 - Session lifecycle, ports, state storage, reset scope, export, event log, clock, seeded randomness, scenarios.
 - The pure failure engine and its C5 order.
+- The optional idempotency store and the `begin`/`complete` orchestration. The adapter is twin-owned; `none` twins never store a result.
 - Webhook delivery records, attempts, statuses, address safety, retry scheduling, duplicate/delay/order/never-sent orchestration, resend handling.
 - The shared checkout page shell and renderer. It consumes a `CheckoutPageModel` and never knows service names or outcomes.
 - Credential storage, stable issuance, rotation, permission bits, and fingerprinting. It calls each `CredentialSpec.generate`.
@@ -629,6 +727,7 @@ Shared code must not contain service paths, field names, key prefixes, event nam
 - `definition.ts` — the `TwinDefinition` object and action catalog.
 - `actions/` — request parsers, action handlers, route registration, status transitions.
 - `auth.ts` — key extraction, live detection, issued-key comparison, and 401 shaping.
+- `idempotency.ts` — `{ mode: "none" }` or the service's header adapter, key/parameter comparison, replay, and error bodies.
 - `responses.ts` and `errors.ts` — success and error builders in the service's exact envelope, including 500/429/401 and all C5-shaped errors.
 - `state.ts` — the twin's Zod schema, initial state, record types, and UI collection metadata.
 - `money.ts` — unit conversion, currency list/special cases, formatting, validation.
@@ -648,7 +747,7 @@ The twin may have a private HTTP base path helper (for example Flutterwave `/v3`
 
 | Check | What T14 asserts for every twin |
 |---|---|
-| Definition contract | `id` is unique and non-empty; `displayName` is non-empty; `defaultPort` is a valid unused test port; every action id matches `<resource>.<verb>`; no duplicate ids; every action has a route; every route maps to a declared action. |
+| Definition contract | `id` is unique and non-empty; `displayName` is non-empty; `defaultPort` is a valid unused test port; every action id matches `<resource>.<verb>`; no duplicate ids; every action has a route; every route maps to a declared action; `idempotency` is either `none` or a complete header adapter. |
 | Lifecycle | The twin starts with port 0 and `hostname: '127.0.0.1'`, reports its bound port, stops cleanly, and leaves no server or timer. |
 | Host and HTTP safety | `127.0.0.1:<port>` and `localhost:<port>` are accepted; other Hosts get the correct forbidden-host result. No CORS headers. HTML has the CSP/referrer rules. Bodies over 1 MB are refused. No outbound request except the test's allowed local webhook receiver. |
 | Credentials | Every `CredentialSpec` generates a value containing `ibeji`, matching its test format; values are stable across a restart until rotation; rotation changes all of that twin's credentials; public values are displayable; secret values are never emitted in events, logs, exports, or summaries. |
@@ -656,13 +755,13 @@ The twin may have a private HTTP base path helper (for example Flutterwave `/v3`
 | Action/route parity | Every declared action is reachable at its declared method/path; unknown paths/methods return the service's not-found shape; query/path parsing matches that twin's service; action ids resolve through resource and full-id selectors. |
 | Events | Every request emits a request event and a response event with the twin scope, action id, status, and no secrets. Checkout and webhook actions likewise emit scoped events. |
 | Failure support | For every `FailureSupport`, the control API accepts the rule on a listed action; the shared failure step fires; the response/result is in the twin's shape; counters and action selectors work; the failure's source label is exposed. For every unsupported failure pair, the control API returns `FAILURE_NOT_SUPPORTED_BY_TWIN` and the twin is never called. |
-| Failure order | The shared C5 order is observed for each declared request/webhook failure: pre-network, rate, server, timeout-before, action, timeout-after, network-after, slow-response; webhook never-sent, verification, out-of-order, delay, duplicate. The twin only shapes outcomes; it does not reorder. |
+| Failure order | The shared C5 order is observed for each declared request/webhook failure: pre-network, rate, server, timeout-before, action, timeout-after, network-after, slow-response; webhook never-sent, verification, out-of-order, delay, duplicate. The twin only shapes outcomes; it does not reorder. A stuck transfer resolves after its configured time using the seeded random and `thenFailPercent`; the result uses the twin's statuses and webhooks. |
 | Checkout | The page is served on the twin port; it shows the Ibeji label, amount, currency, email/reference from the twin record, declared outcomes, and no service branding. The POST choice is checked for the twin's own Origin. Each outcome produces the declared state and webhook drafts. Payment-declined and authentication-required override the button and show the notice. |
 | Webhook build/sign | A declared event produces the exact documented body shape; `sign` returns the service's headers or marker; the twin's own `verify` accepts the untampered body and rejects tampering. |
 | Webhook verification failures | Every method the twin declares (`wrong-secret`, `corrupted`, `missing`, and Stripe's `stale-timestamp`) fails that twin's own `verify`; a good delivery still passes. Methods the twin does not declare are rejected by the control API. |
 | Webhook delivery behaviours | `webhook-never-sent` records `not-sent`; `webhook-delayed` delays the first attempt; duplicated copies have the same event id and body; out-of-order holds and releases newest first; retries follow the twin's schedule; resend uses the same body and current credentials. |
-| Money | `assertValid` accepts and rejects the documented unit shapes; `fractionDigits`, zero-decimal handling, and `format` produce the service's documented display; amounts in UI summaries are formatted by the twin, not a shared minor-unit assumption. |
-| Idempotency | If the twin declares an idempotency mode, the same key/parameters replay without a second action; a different parameter set is rejected in the service's shape; concurrent same-key behaves as declared. If the twin declares none, no undeclared replay dedupe occurs. |
+| Money | Every stored amount is a smallest-unit integer; `parseServiceAmount` converts service text at the edge without floating point; `formatServiceAmount`/`formatDisplay` produce the documented service and UI forms; `assertValid`, `fractionDigits`, and zero-decimal handling match the twin's research, with Flutterwave decimal limits remaining UNCONFIRMED. |
+| Idempotency | With a header adapter, the core calls `begin` before the failure step: the same key/parameters replay the stored response without rerunning either the failure step or the action; a different parameter set is rejected in the service's shape; concurrent same-key returns the declared conflict. `complete` stores only after the action was performed; a server-error or timeout-before retry with the same key runs normally, while timeout-after replays the original success. A `none` twin applies no replay dedupe. |
 | Event summaries | Every declared webhook event has a non-empty plain-English summary containing the service name, event meaning, and formatted amount/reference where applicable; no key, signature, or raw JSON is included. |
 | Registry extensibility | The conformance suite discovers all twins from `registry.ts` and runs without edits; a synthetic fourth definition with the same interface passes the contract/lifecycle checks without core changes. This protects B3 goal 7. |
 
@@ -688,59 +787,76 @@ The core webhook dispatcher works only through the `TwinDefinition` interface. I
 
 This is the C3 rule: the core orchestrates, the twin owns the service-specific body and signature.
 
-## 7. Proposed C21 decisions
+## 7. Approved C21 decisions
 
-The design depends on these decisions. None of them has been applied to SPEC.md.
+These decisions are approved in SPEC.md v1.3, C21 D31 to D41. The design matches them; there are no pending proposed decisions in this file.
 
-### 7.1 Existing open decisions from research
+### 7.1 Approved service versions
 
-- **Flutterwave API v3.0.0.** Already proposed in `research/flutterwave.md` §0.3. The design assumes v3, including `/v3` routes, bearer auth, `verif-hash`, whole-currency amounts, and no v3 idempotency.
-- **Stripe API version `2026-09-30.endive` and header policy.** Already proposed in `research/stripe.md` §17.3. The design assumes the Stripe twin has a version gate and rejects other values with its own error builder.
+- **D40 — Flutterwave API v3.0.0 is approved.** The twin uses `/v3` routes, bearer auth, `verif-hash`, whole-currency amounts at the service edge, and no v3 idempotency. Flutterwave v4 is not imitated in v1.
+- **D41 — Stripe API version `2026-09-30.endive` is approved.** The Stripe twin answers in that shape. D37 governs how the `Stripe-Version` header is handled.
 
-### 7.2 New C21 decisions
+### 7.2 Approved framework decisions
 
-**D31 — Final C5 support matrix.**
-
-Adopt the matrix in §2.11. In particular:
+**D31 — The C5 support matrix in §2.11 is approved, as changed by D33.**
 
 - Paystack supports every C5 failure except `authentication-required`.
 - Flutterwave supports every C5 failure except `authentication-required` and `transfer-reversed`.
 - Stripe supports every C5 failure except `transfer-stuck-pending`, `transfer-reversed`, and `bank-resolve-fails`.
-- Failures marked `assumed` are still offered and labelled "Assumed: not confirmed by the service's documentation."
+- Failures marked `assumed` are offered with the "Assumed" label.
+- `transfer-stuck-pending` includes `thenFailPercent`: after the configured pending time, that share of transfers ends failed and the rest ends successful, using the service's own statuses and webhooks.
 
-**D32 — Flutterwave C4b has no separate fetch action.**
+**D32 — Flutterwave has no separate fetch action.**
 
-Record that Flutterwave v3 has no distinct fetch-one-transaction endpoint. `payment.verify` by id is the fetch; C4b's "fetch" phrase does not create a separate `payment.fetch` action or an invented path. If a later Flutterwave version documents a distinct fetch endpoint, add it through C21.
+Verify by id is the fetch. Verify by id and verify by reference are separate actions, `payment.verify` and `payment.verify_by_reference`, because each route maps to exactly one action and T14 checks that. No `payment.fetch` action or invented path exists.
 
-**D33 — Remove `transfer-reversed` from Flutterwave v3.**
+**D33 — `transfer-reversed` applies to Paystack only.**
 
-The v3 research documents `NEW`, `PENDING`, `SUCCESSFUL`, and `FAILED` and no reversal status or reversal webhook. Flutterwave v4's `transfer.reversal` is not a v3 fact. The Flutterwave twin therefore does not advertise `transfer-reversed`; the C5 row becomes Paystack-only.
+Flutterwave v3 documents no reversal status or event. The Flutterwave twin does not advertise `transfer-reversed`; the C5 row is Paystack-only. Flutterwave v4's `transfer.reversal` is not a v3 fact.
 
-**D34 — Stripe `charge.refunded` uses a minimal Charge snapshot.**
+**D34 — Stripe's `charge.refunded` event carries a documented Charge object.**
 
-C4c has no Charge action, but Stripe's documented `charge.refunded` event has a `charge` object in `data.object`. The Stripe twin may build a minimal local Charge snapshot for that event only. It does not expose a Charge API, and the Charge object is not a new C4c action. If Joseph prefers, the alternative is to omit `charge.refunded` from the Stripe twin's emitted events; that would need a separate C21 entry.
+The Stripe twin builds the Charge from the PaymentIntent's own data, following the documented Charge shape in `research/stripe.md`, and the Charge id matches the PaymentIntent's `latest_charge`. This is event payload data only; there is no Charge API in v1.
 
-**D35 — Retry schedules for the local twins.**
+**D35 — Retry schedules are approved.**
 
-Use the schedules in §2.10:
+Paystack test mode uses 10 retries hourly (documented); Flutterwave v3 uses 3 retries at 30 minutes (documented, treated as enabled); Stripe sandbox uses 3 retries at 1, 2, and 4 hours (assumed, because Stripe documents three retries over a few hours but not exact delays). C7's fallback remains for a future twin with no schedule.
 
-- Paystack test mode: 10 retries hourly, documented.
-- Flutterwave v3: 3 retries at 30-minute intervals, documented when enabled.
-- Stripe sandbox: 3 retries at 1, 2, and 4 hours, assumed because Stripe documents three retries over a few hours but not exact delays.
+**D36 — Flutterwave's local "cancelled" outcome produces the documented failed result.**
 
-This clarifies C7 for the three twins. It does not change the C7 fallback for a future twin with no schedule.
+The local page labels the choice "Cancelled", but Flutterwave v3 has no separate cancelled status. The record and webhook use the documented failed result.
 
-**D36 — Flutterwave's local "cancelled" outcome maps to failed.**
+**D37 — Stripe version-header handling is approved.**
 
-C4b requires a local cancelled choice. Flutterwave v3 has no separate cancelled transaction status; its Standard guide maps cancellation to a failed result. The local page labels the choice "Cancelled", but the record and webhook use the documented failed result. This is a clarification of the local checkout page, not a new Flutterwave status.
+- No `Stripe-Version` header: the twin answers as `2026-09-30.endive`.
+- A well-formed version, meaning a date optionally followed by a dot and a name such as `2025-09-30.clover`: the twin accepts it, answers in the `2026-09-30.endive` shape, and records a warning event once per version: "Your app asked for Stripe API version X. The Stripe twin answers as 2026-09-30.endive, so some fields may differ."
+- A malformed value: the twin rejects it with Stripe's error envelope and `invalid_request_error`. `research/stripe.md` §17 records that Stripe's exact behavior for an arbitrary invalid version is **UNCONFIRMED**; the twin must not invent a new error code.
+- The warning contains no key material and is scoped to the Stripe twin.
+
+**D38 — Money is stored inside Ibeji in smallest-unit whole numbers.**
+
+The core and every twin state store amounts as `MinorUnits` integers. Each twin converts at its edge:
+
+- Paystack and Stripe already send whole numbers in the smallest unit; their edge parsers accept the integer.
+- Flutterwave v3 sends main-unit amounts. Its edge parser converts the request text to `MinorUnits` without floating-point arithmetic, and its formatter writes main-unit text back.
+- Decimal amounts are parsed from text digit by digit. `parseFloat`, `Number`, and floating-point arithmetic are never used for money.
+- The twin rejects more decimal places than the currency has, in the service's own error shape.
+- **UNCONFIRMED:** `research/flutterwave.md` §12 does not document the allowed decimal places, rounding, or decimal response behavior for Flutterwave v3 currencies. The Flutterwave twin must not invent those rules; it uses fixtures or a future C21 decision.
+
+**D39 — `TwinDefinition` includes idempotency.**
+
+The `idempotency` part is an adapter or `{ mode: "none" }`. The core calls `begin` after authentication/action resolution and **before** the failure step. A replay returns the stored response and skips both the failure step and the action. The core calls `complete` only when the action was performed and produced a response; results are stored only then. If `server-error`, `rate-limited`, or `timeout-before-commit` fires, nothing is stored and a retry with the same key runs normally. `timeout-after-commit` stores the result before the reply is lost, so a retry returns the original success.
+
+- Paystack: `{ mode: "none" }` (P §10).
+- Flutterwave: `{ mode: "none" }` (F §10).
+- Stripe: a header adapter for `Idempotency-Key` with 255-character maximum, 24-hour retention, method/path/parameter fingerprint, saved status/body replay, `Idempotent-Replayed: true`, a service-shaped mismatch error, and `409 idempotency_key_in_use` for concurrent same-key use (S §18).
 
 ## 8. Decision summary
 
-The design is accepted when:
+The approved design satisfies SPEC.md v1.3 and C21 D31 to D41:
 
 1. The comparison table and research citations are correct.
 2. `TwinDefinition` is the only contract the core uses.
-3. The three services fit through their own parsers, auth adapters, error builders, signers, checkout adapters, money rules, and failure maps.
+3. The three services fit through their own parsers, auth adapters, idempotency adapters, error builders, signers, checkout adapters, money rules, and failure maps.
 4. Shared code contains only the orchestration and UI pieces that all three use.
 5. T14 can run against every registry entry without a service switch.
-6. The C21 decisions are approved or revised before Phase 3.

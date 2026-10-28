@@ -513,6 +513,31 @@ These are proposed only; SPEC.md is unchanged.
 
 ### Later
 
-- Joseph must approve or revise the proposed C21 decisions before Phase 3.
+- The proposed C21 decisions were approved in Phase 2, Step 2.5 (D31 to D41); see below.
 - The framework type names and state-store boundaries will be hardened during implementation.
+- Write the conformance suite before the first twin implementation.
+
+---
+
+## Phase 2, Step 2.5: Twin design approved
+
+Date: 28 October 2026.
+
+Updated `TWIN-DESIGN.md` to match SPEC.md v1.3 and approved C21 decisions D31 to D41. No code was written.
+
+### What changed
+
+- Added `idempotency` to `TwinDefinition` (D39): a `none` adapter or a header adapter. The core calls `begin` before the failure step, calls `complete` only when the action was performed, and stores nothing when a pre-action failure fired. Paystack and Flutterwave are `none`; Stripe uses `Idempotency-Key` with 255 characters, 24-hour retention, method/path/parameter fingerprinting, saved-response replay, mismatch errors, and `409 idempotency_key_in_use`.
+- Split Flutterwave payments into `payment.verify` and `payment.verify_by_reference` (D32). Verify-by-id remains the fetch.
+- Replaced the Stripe version rule with D37: no header answers as `2026-09-30.endive`; well-formed versions are accepted with a warning once per version; only malformed values are rejected.
+- Updated the money design for D38: every stored amount is a smallest-unit integer, each twin converts at its edge, decimal amounts are parsed from text without floating point, and Flutterwave's missing decimal-place rules are marked **UNCONFIRMED**.
+- Updated the approved C5 matrix (D31, D33): `transfer-reversed` is Paystack-only; `transfer-stuck-pending` now carries `thenFailPercent` and resolves transfers as successful or failed after the pending time.
+- Updated the Stripe `charge.refunded` design (D34): the Charge is built from the PaymentIntent in the documented Charge shape, with the id matching `latest_charge`; there is no Charge API.
+- Marked the C21 section approved and updated it for D31 to D41, including D35 retry schedules, D36 Flutterwave cancellation, D40 Flutterwave v3, and D41 Stripe version.
+
+No SPEC.md edit was made by this task; the v1.3 changes and C21 entries were already present.
+
+### Later
+
+- Proceed to implementation using the approved design.
 - Write the conformance suite before the first twin implementation.
