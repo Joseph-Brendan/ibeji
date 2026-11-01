@@ -62,8 +62,8 @@ export function renderCheckoutPage(model: CheckoutPageModel, money: MoneyRules):
 <body>
 <main>
 <div class="card">
-<h1>Ibeji test checkout: ${escapeHtml(model.twinDisplayName)} twin</h1>
-<p><strong>No real money moves.</strong> This page is a local imitation for testing an app.</p>
+<h1>Ibeji test checkout: ${escapeHtml(model.twinDisplayName)} twin. No real money moves.</h1>
+<p>This page is a local imitation for testing an app. No real money moves.</p>
 <p class="amount">${escapeHtml(money.formatDisplay(model.amountMinor, model.currency))}</p>
 <p><span class="label">Currency</span><br>${escapeHtml(model.currency)}</p>
 ${email}

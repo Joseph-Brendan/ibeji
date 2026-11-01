@@ -1,5 +1,6 @@
 import { IbejiError } from "../core/errors.js";
 import type { TwinDefinition } from "./framework/types.js";
+import { paystackTwin } from "./paystack/definition.js";
 
 export type TwinRegistry = {
   readonly list: () => readonly TwinDefinition[];
@@ -40,11 +41,10 @@ function buildRegistry(definitions: readonly TwinDefinition[]): TwinRegistry {
 }
 
 /**
- * The one list of real twin definitions. Version 0.1.0 fills this in Phase 4
- * with Paystack and Flutterwave. Tests use createTwinRegistry with fake twins
- * so this list stays empty until a real twin is approved.
+ * The one list of real twin definitions. Stripe stays out until version 0.2.0
+ * (SPEC.md C21 D42). Tests use createTwinRegistry with fake definitions.
  */
-export const TWIN_DEFINITIONS: readonly TwinDefinition[] = Object.freeze([]);
+export const TWIN_DEFINITIONS: readonly TwinDefinition[] = Object.freeze([paystackTwin]);
 
 export const registry: TwinRegistry = buildRegistry(TWIN_DEFINITIONS);
 

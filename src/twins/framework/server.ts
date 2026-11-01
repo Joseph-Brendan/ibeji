@@ -74,6 +74,7 @@ export type RunningTwin = {
 type TwinVariables = {
   actionId: string | undefined;
   actionSummary: string | undefined;
+  request: TwinRequest | undefined;
 };
 
 type TwinContext = Context<{ Bindings: HttpBindings; Variables: TwinVariables }>;
@@ -430,22 +431,28 @@ export async function startTwin(
     const action = matchAction(actions, method, path);
     context.set("actionId", action?.id);
     context.set("actionSummary", action?.summary);
+    context.set("request", undefined);
+
+    await next();
+
+    const request = context.get("request");
+    const requestSummary =
+      action?.eventSummary !== undefined && request !== undefined
+        ? action.eventSummary(request)
+        : action === undefined
+          ? `${definition.displayName} twin received a request.`
+          : `${definition.displayName} twin: ${action.summary}.`;
 
     events.publish({
       type: "request",
       scope: definition.id,
-      summary:
-        action === undefined
-          ? `${definition.displayName} twin received a request.`
-          : `${definition.displayName} twin: ${action.summary}.`,
+      summary: requestSummary,
       details: {
         method,
         path,
         actionId: action?.id ?? null,
       },
     });
-
-    await next();
 
     if (context.res.headers.get("content-type")?.toLowerCase().includes("text/html") === true) {
       context.res.headers.set(
@@ -559,6 +566,7 @@ export async function startTwin(
       recordId: checkoutRecordId(request),
       failures: computed.effects,
       money: definition.money,
+      clock,
     };
 
     if (request.method === "GET") {
@@ -598,6 +606,12 @@ export async function startTwin(
       parsed.authentication,
     );
     emitDrafts(result.webhooks);
+    if (result.redirectUrl !== undefined) {
+      return new Response(null, {
+        status: 303,
+        headers: { location: result.redirectUrl },
+      });
+    }
     return new Response(renderCheckoutResult(result), {
       status: 200,
       headers: { "content-type": "text/html; charset=utf-8" },
@@ -609,6 +623,7 @@ export async function startTwin(
     action: ActionDefinition,
     request: TwinRequest,
   ): Promise<Response> => {
+    context.set("request", request);
     if (action.kind === "checkout") {
       return handleCheckout(context, request);
     }

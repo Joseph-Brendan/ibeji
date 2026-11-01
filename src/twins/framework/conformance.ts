@@ -526,7 +526,7 @@ const eventsCheck: ConformanceCheck = {
       assert.equal(request.scope, definition.id);
       assert.equal(response.scope, definition.id);
       assert.ok(request.summary.includes(definition.displayName));
-      assert.ok(request.summary.includes(action.summary));
+      assert.ok(request.summary.trim().length > 0);
       assert.equal(typeof response.details.status, "number");
       assert.ok(!JSON.stringify(all).includes(secretOf(definition, harness.credentials)));
     } finally {
@@ -560,10 +560,12 @@ const failureSupport: ConformanceCheck = {
       for (const support of definition.failures.support) {
         const supportAction = support.actions[0];
         assert.ok(supportAction, "every supported failure must name an action");
+        const forceSettings = support.id === "flaky-network" ? { percent: 100 } : undefined;
         const rule = harness.rules.add({
           failureId: support.id,
           twins: [definition.id],
           actions: supportAction,
+          ...(forceSettings === undefined ? {} : { settings: forceSettings }),
         });
         assert.equal(rule.failureId, support.id);
         const plan = WEBHOOK_FAILURES.has(support.id)
@@ -581,7 +583,10 @@ const failureSupport: ConformanceCheck = {
               random: new SeededRandom(5),
               now: harness.clock.now(),
             });
-        assert.ok(plan.firedRules.some((fired) => fired.failureId === support.id));
+        assert.ok(
+          plan.firedRules.some((fired) => fired.failureId === support.id),
+          `${support.id} did not fire for the ${definition.id} twin`,
+        );
         const effects = definition.failures.shapeResult({
           failureId: support.id,
           actionId: supportAction,

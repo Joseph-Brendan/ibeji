@@ -13,10 +13,11 @@ import { fakeTwinDefinition } from "../fixtures/fake-twin/definition.js";
 const recordSchema = z.object({ id: z.string(), value: z.number() });
 
 describe("T14 twin registry and framework state", () => {
-  it("T14 the production registry is the one empty list until real twins exist", () => {
-    expect(TWIN_DEFINITIONS).toEqual([]);
-    expect(listTwins()).toEqual([]);
-    expect(registry.list()).toEqual([]);
+  it("T14 the production registry holds Paystack and stays the one list", () => {
+    expect(TWIN_DEFINITIONS).toHaveLength(1);
+    expect(listTwins().map((twin) => twin.id)).toEqual(["paystack"]);
+    expect(registry.list().map((twin) => twin.id)).toEqual(["paystack"]);
+    expect(registry.has("paystack")).toBe(true);
     expect(registry.has("fake")).toBe(false);
     expect(() => registry.require("fake")).toThrow("is not a twin in the registry");
     expect(() => requireTwin("fake")).toThrow("is not a twin in the registry");

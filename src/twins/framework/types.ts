@@ -191,6 +191,7 @@ export type CheckoutPageContext = {
   readonly recordId: string;
   readonly failures: ActiveFailureEffects;
   readonly money: MoneyRules;
+  readonly clock: Clock;
 };
 
 export type CheckoutSubmitContext = CheckoutPageContext & {
@@ -210,6 +211,7 @@ export type CheckoutPageModel = {
 export type CheckoutResult = {
   readonly notice: string;
   readonly webhooks: readonly TwinWebhookDraft[];
+  readonly redirectUrl?: string;
 };
 
 export type CheckoutAdapter = {
@@ -300,6 +302,7 @@ export type ActionDefinition = {
   readonly path: string;
   readonly summary: string;
   readonly kind: "read" | "write" | "checkout";
+  readonly eventSummary?: (request: TwinRequest) => string;
   readonly handler: ActionHandler;
 };
 

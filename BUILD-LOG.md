@@ -1094,3 +1094,54 @@ Built the generic twin framework, the T3 contract helper, the T14 conformance su
 - Wire the framework into the control API and session loop.
 - Add UI checkout/Playwright coverage in Phase 6; the server-rendered page is ready for it.
 - Add a dispatcher registration test when the control layer owns one long-lived dispatcher.
+
+---
+
+## Phase 4, Step 4.2: Paystack twin transactions and checkout
+
+Date: 1 November 2026.
+
+Built the Paystack twin foundation, transactions, test checkout page, webhook signer, failure adapter, and registry entry. No refunds, transfers, or banks were built in this step.
+
+### What was built
+
+- **Definition.** `src/twins/paystack/definition.ts` with id `paystack`, display name `Paystack`, default port 4401, and actions `transaction.initialize`, `transaction.verify`, `transaction.fetch`, `transaction.list`, `checkout.open`, and `checkout.submit`.
+- **Registry.** `src/twins/registry.ts` now holds Paystack and remains the only list of real twins. Stripe stays out until 0.2.0.
+- **Authentication.** Bearer secret-key parsing, issued-key comparison, `pk_live_`/`sk_live_` live detection, and Paystack-shaped 401 responses. The framework still emits the live-key warning with a fingerprint only.
+- **Credentials.** `pk_test_ibeji_...` and `sk_test_ibeji_...`, generated from 12 random bytes, marked with `ibeji`, and validated by test-format regexes. There is no separate webhook credential: the secret key signs `x-paystack-signature`.
+- **Transactions.** Initialize, verify, fetch, and list use Paystack's JSON envelopes, field names, nesting, types, statuses, list meta, and the fixture-confirmed error bodies. Amounts stay integer minor units. Initialize returns `authorization_url` to this twin's `/checkout/<reference>` and an `access_code`.
+- **State.** A Zod transaction record stores the canonical transaction; the verify, fetch, and list response builders each produce their own exact key set, including the fixture differences in `helpdesk_link`, `receipt_number`, `transaction_date`, `plan_object`, `source.entry_point`, customer fields, authorization fields, and log history.
+- **Checkout.** The framework renders the page. The twin declares `success`, `declined`, and `abandoned`. Success sets the transaction to `success`, sends `charge.success`, and redirects to `callback_url` with a `reference` query parameter when one was given. Declined sets `failed` with Paystack's declined fields; abandoned sets `abandoned`; neither sends a webhook.
+- **Webhooks.** HMAC-SHA512 over the raw body with the Paystack secret key, hexadecimal, in `x-paystack-signature`; timing-safe verification; wrong-secret, corrupted, and missing-header tamper methods; `charge.success` body and summary; ten hourly test-mode retries.
+- **Failures.** A Paystack failure adapter with Paystack-shaped 429/5xx errors and support for slow response, both timeouts, server error, rate limit, flaky network, the five webhook failures, and payment-declined. Payment-declined applies to `checkout.submit`, where C5's checkout override lives.
+- **Event summaries.** The framework gained a generic optional `eventSummary(request)` on an action. Initialize publishes, for example, `Your app started a Paystack payment of ₦5,000 for ada@example.com`.
+
+### Decisions and research/fixture choices
+
+- **Fixture-confirmed errors are copied exactly.** Missing email is `Email Address is required` / `missing_params`; unknown verify reference is `Transaction reference not found.` / `transaction_not_found`; non-numeric fetch id is `Transaction ID should be numeric.` / `invalid_params`.
+- **The exact 401 body is UNCONFIRMED.** The twin uses the documented Paystack error envelope with `type: "api_error"` and `code: "unauthorized"`, with separate plain messages for missing, wrong, and live keys. It never echoes a key.
+- **The exact 5xx body is UNCONFIRMED.** The twin uses the documented envelope with `code: "server_error"`. It uses `code: "rate_limited"` for 429, as research section 14.1 records, rather than the bank-specific recorded 429 message.
+- **Duplicate transaction references are UNCONFIRMED.** The twin returns a Paystack-shaped 400 `duplicate_reference` instead of silently reusing the old transaction.
+- **Unknown numeric fetch ids are not fixture-confirmed.** The twin returns a Paystack-shaped 400 `transaction_not_found`.
+- **Fees are set to 0 on a successful transaction.** Paystack's fee formula is not in the research file; this is a placeholder value with the fixture's number type, not a claim about Paystack's fees.
+- **Checkout redirects add `?reference=`.** Research says Paystack redirects to `callback_url` with the transaction reference; the exact query spelling is not recorded, so the twin uses the conventional `reference` parameter.
+- **Payment-declined is limited to the checkout submit action.** `transaction.initialize` creates an authorization URL, it does not complete a payment; C5's override belongs on the checkout choice.
+- **Unknown checkout references show a placeholder local page.** The page is not a Paystack endpoint; this keeps the conformance suite able to exercise the checkout shell. Normal initialized transactions always show their real amount, email, and reference.
+- **T3 list tests seed the fixture's per-item status/log shapes.** The implementation uses the real statuses; the tests create the transaction counts and log-history lengths needed to compare every item with the recorded list fixtures.
+- **Framework extensions are generic.** `ActionDefinition.eventSummary`, `CheckoutPageContext.clock`, and `CheckoutResult.redirectUrl` contain no Paystack branch or path. The framework coverage remains 100%.
+- **No SPEC.md change.** No C21 entry is needed; this implements C4a's transaction and checkout scope, C7's Paystack credential/signing model, C10's checkout page, C12, C13, and C17 T3/T4/T5/T7/T14.
+
+### Tests
+
+- Added 40 tests: Paystack conformance, T3 for all 12 transaction fixtures, signer known-good HMAC, checkout outcomes/redirect/webhook, live-key/auth, event summaries, T4 failures, response/money/auth units, and registry updates.
+- Total suite: 410 tests.
+- Coverage: 100% of `src/core/` and `src/twins/framework/`; 99.09% of `src/` overall.
+- Paystack conformance passes all 17 shared checks.
+- `pnpm test` passed twice in a row; all existing C18 gates pass.
+
+### Later
+
+- Add Paystack refunds, transfer recipients, transfers, banks, and their webhook events.
+- Record or decide the full `charge.success`, `transfer.failed`, `transfer.reversed`, and refund event payloads; they remain UNCONFIRMED.
+- Resolve the official Paystack Node library base-URL limitation for T15.
+- Add the six C6 scenarios and the control API/session wiring.
