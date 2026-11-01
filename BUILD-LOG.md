@@ -1369,3 +1369,65 @@ These could not be recorded successfully and follow `research/flutterwave.md`. T
 - Add the conditional `meta[]` validation rules for transfer types that require them.
 - Revisit the exact transfer fee and `complete_message` text if a recorded successful transfer becomes available.
 - Add the scenario files and control API/CLI wiring when those layers are built.
+
+---
+
+## Phase 4, Step 4.7: Official library compatibility (T15)
+
+Date: 1 November 2026.
+
+Checked the two twins in the 0.1.0 registry only. Stripe is not checked until Phase 12 (C21 D42).
+
+### Paystack: no compatibility test
+
+The official Paystack Node library is `@paystack/paystack-sdk` 1.2.2. Its constructor takes only the API key, and its source hard-codes `BASE_PATH = "https://api.paystack.co"`. The research file records no supported base-URL override; the community libraries also hard-code the base or expose only undocumented mutation. Adding a monkey-patch would not be a compatibility test, so no Paystack library was added and no test was written.
+
+An app must call the Paystack twin directly with `fetch` or another HTTP client:
+
+- `POST http://127.0.0.1:4401/transaction/initialize` with JSON `{email, amount}` (amount in kobo), plus `reference` and `callback_url` as needed.
+- Redirect the customer to `data.authorization_url`, or use the twin checkout route directly.
+- `GET http://127.0.0.1:4401/transaction/verify/:reference` to confirm the result.
+- `POST http://127.0.0.1:4401/refund` with `{transaction: reference, amount?}` for a refund.
+
+The same choice applies to community Paystack libraries: they cannot be pointed at the twin without unsupported source patching.
+
+### Flutterwave: official library test
+
+Added `flutterwave-node-v3` 1.4.1 as a development dependency. It is the official v3 Node library and accepts the twin as its third constructor argument:
+
+```js
+const flw = new Flutterwave(publicKey, secretKey, "http://127.0.0.1:4402/");
+```
+
+The trailing slash is required because the library appends `v3/...` paths.
+
+The library has **no Standard hosted-payment method**: its `Charge` group calls `/v3/charges`, not `/v3/payments`. The compatibility test therefore creates the hosted payment with the twin API, completes it through the twin checkout route, then uses the library for the operations it does expose:
+
+- `flw.Transaction.verify_by_tx({ tx_ref })`
+- `flw.Transaction.verify({ id: transactionId })`
+- `flw.Transaction.refund({ id: String(transactionId), amount })`
+
+The test fetches the resulting refund from the twin and checks the amount and transaction id. This proves the library’s base URL, bearer authentication, JSON request/response handling, and refund path work against the twin. If Flutterwave later publishes a hosted-payment method in the v3 library, the create step can move into the library too.
+
+The package ships no TypeScript declarations. The test uses a small local interface derived from the installed README and source, not from memory. The library also initializes telemetry on construction, which contacts external Flutterwave/SigNoz hosts; the test stubs `https.request` for those telemetry calls so T7 stays local. This telemetry behaviour should be noted in the Connect your app guide.
+
+### Dependency and package check
+
+- `flutterwave-node-v3` is only in `devDependencies` (`1.4.1`). It is not in `dependencies`. The library brought 142 packages into the development tree; they are not runtime dependencies, and no install/build script ran.
+- `@paystack/paystack-sdk` is not installed at all; no Paystack library is in either dependency list.
+- `pnpm list --prod --depth 0` shows only `@hono/node-server`, `hono`, and `zod`.
+- `pnpm pack --dry-run` lists only `dist/cli/index.js`, `LICENSE`, `package.json`, `README.md`, and `scenarios/.gitkeep`; no compatibility library is in the package.
+- C1 already permits official service libraries as T15 development dependencies. No runtime dependency was added and no SPEC.md change was needed.
+
+### Tests
+
+- Added 2 compatibility tests: the Flutterwave library verification/refund flow against the twin, and a package check that `flutterwave-node-v3` is dev-only while the Paystack library is absent from runtime dependencies.
+- Total suite: 540 tests.
+- Coverage: the configured 100% line/branch thresholds for `src/core/` and `src/twins/framework/` pass; 97.7% of `src/` overall.
+- `pnpm test` passed twice in a row; all existing C18 gates pass.
+
+### Later
+
+- Add the Paystack direct-HTTP instructions and the Flutterwave hosted-create caveat to `docs/connect-your-app.md` and the T15 limit entry to `docs/limits.md` when those documents are written.
+- Re-check the Flutterwave hosted-create path if the official v3 library adds a Standard `/v3/payments` method.
+- Run the same T15 check for Stripe in Phase 12 (C21 D42).
