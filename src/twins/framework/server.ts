@@ -275,12 +275,28 @@ function effectsFromPlan(
         failureId: effect.kind,
         actionId,
         effects: {
-          transferStuckPending: { thenFailPercent: effect.thenFailPercent },
+          transferStuckPending: {
+            thenFailPercent: effect.thenFailPercent,
+            seconds: effect.seconds,
+            thenFailed: effect.thenFailed,
+            endsAt: effect.endsAt,
+          },
         },
       };
       break;
     case "transfer-reversed":
-      plan = { failureId: effect.kind, actionId, effects: { transferReversed: true } };
+      plan = {
+        failureId: effect.kind,
+        actionId,
+        effects: {
+          transferReversed: true,
+          transferReversal: {
+            afterSeconds: effect.afterSeconds,
+            reverseAt: effect.reverseAt,
+            reversed: effect.reversed,
+          },
+        },
+      };
       break;
     case "bank-resolve-fails":
       plan = {
@@ -438,7 +454,7 @@ export async function startTwin(
     const request = context.get("request");
     const requestSummary =
       action?.eventSummary !== undefined && request !== undefined
-        ? action.eventSummary(request)
+        ? action.eventSummary(request, state)
         : action === undefined
           ? `${definition.displayName} twin received a request.`
           : `${definition.displayName} twin: ${action.summary}.`;

@@ -78,19 +78,41 @@ function currencyFrom(data: JsonValue): string {
   return isRecord(data) && typeof data.currency === "string" ? data.currency : "NGN";
 }
 
+function recipientNameFrom(data: JsonValue): string | undefined {
+  if (!isRecord(data) || !isRecord(data.recipient)) {
+    return undefined;
+  }
+  return typeof data.recipient.name === "string" ? data.recipient.name : undefined;
+}
+
 function summarize(draft: TwinWebhookDraft): string {
   const amount = amountFrom(draft.data);
+  const formatted =
+    amount === undefined
+      ? undefined
+      : paystackMoney.formatDisplay(amount, currencyFrom(draft.data));
+
   if (draft.key.startsWith("refund.")) {
     const status = draft.key.slice("refund.".length);
-    if (amount === undefined) {
-      return `Paystack refund ${status} for ${draft.resourceId}`;
+    return formatted === undefined
+      ? `Paystack refund ${status} for ${draft.resourceId}`
+      : `Paystack refund ${status} for ${formatted}`;
+  }
+
+  if (draft.key.startsWith("transfer.")) {
+    const status = draft.key.slice("transfer.".length);
+    const recipientName = recipientNameFrom(draft.data);
+    if (formatted === undefined) {
+      return `Paystack transfer ${status} for ${draft.resourceId}`;
     }
-    return `Paystack refund ${status} for ${paystackMoney.formatDisplay(amount, currencyFrom(draft.data))}`;
+    return recipientName === undefined
+      ? `Paystack transfer ${status} for ${formatted}`
+      : `Paystack transfer ${status} for ${formatted} to ${recipientName}`;
   }
-  if (amount === undefined) {
-    return `Paystack charge succeeded for ${draft.resourceId}`;
-  }
-  return `Paystack charge succeeded for ${paystackMoney.formatDisplay(amount, currencyFrom(draft.data))}`;
+
+  return formatted === undefined
+    ? `Paystack charge succeeded for ${draft.resourceId}`
+    : `Paystack charge succeeded for ${formatted}`;
 }
 
 const EVENT_NAMES: Readonly<Record<string, string>> = {
@@ -100,6 +122,9 @@ const EVENT_NAMES: Readonly<Record<string, string>> = {
   "refund.needs-attention": "refund.needs-attention",
   "refund.failed": "refund.failed",
   "refund.processed": "refund.processed",
+  "transfer.success": "transfer.success",
+  "transfer.failed": "transfer.failed",
+  "transfer.reversed": "transfer.reversed",
 };
 
 export const paystackWebhooks: WebhookAdapter = {
@@ -139,6 +164,24 @@ export const paystackWebhooks: WebhookAdapter = {
       wireName: "refund.processed",
       objectType: "refund",
       actions: ["refund.create"],
+    },
+    {
+      key: "transfer.success",
+      wireName: "transfer.success",
+      objectType: "transfer",
+      actions: ["transfer.create"],
+    },
+    {
+      key: "transfer.failed",
+      wireName: "transfer.failed",
+      objectType: "transfer",
+      actions: ["transfer.create"],
+    },
+    {
+      key: "transfer.reversed",
+      wireName: "transfer.reversed",
+      objectType: "transfer",
+      actions: ["transfer.create"],
     },
   ],
   build: (draft) => ({

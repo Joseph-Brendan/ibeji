@@ -74,6 +74,46 @@ export const paystackRefundSchema = z.object({
 
 export type PaystackRefund = z.infer<typeof paystackRefundSchema>;
 
+export const paystackRecipientSchema = z.object({
+  id: z.string(),
+  recipientId: z.number().int(),
+  type: z.string(),
+  name: z.string(),
+  accountNumber: z.string().nullable(),
+  bankCode: z.string().nullable(),
+  bankName: z.string().nullable(),
+  accountName: z.string().nullable(),
+  authorizationCode: z.string().nullable(),
+  currency: z.string(),
+  description: z.string().nullable(),
+  email: z.string().nullable(),
+  metadata: z.json().nullable(),
+  recipientCode: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type PaystackRecipient = z.infer<typeof paystackRecipientSchema>;
+
+export const paystackTransferSchema = z.object({
+  id: z.string(),
+  transferId: z.number().int(),
+  reference: z.string(),
+  recipientCode: z.string(),
+  amount: z.number().int(),
+  currency: z.string(),
+  reason: z.string(),
+  source: z.string(),
+  status: z.enum(["pending", "success", "failed", "reversed"]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  transferredAt: z.string().nullable(),
+  requestId: z.number().int(),
+  transferCode: z.string(),
+});
+
+export type PaystackTransfer = z.infer<typeof paystackTransferSchema>;
+
 export const paystackCollections: readonly CollectionDefinition[] = [
   {
     id: "transactions",
@@ -93,6 +133,29 @@ export const paystackCollections: readonly CollectionDefinition[] = [
     columns: [
       { key: "refundId", label: "Refund ID", kind: "text" },
       { key: "transactionReference", label: "Transaction", kind: "text" },
+      { key: "status", label: "Status", kind: "text" },
+      { key: "amount", label: "Amount", kind: "money" },
+      { key: "currency", label: "Currency", kind: "text" },
+      { key: "createdAt", label: "Created", kind: "date" },
+    ],
+  },
+  {
+    id: "recipients",
+    label: "Transfer recipients",
+    columns: [
+      { key: "recipientCode", label: "Recipient code", kind: "text" },
+      { key: "name", label: "Name", kind: "text" },
+      { key: "accountNumber", label: "Account number", kind: "text" },
+      { key: "bankName", label: "Bank", kind: "text" },
+      { key: "currency", label: "Currency", kind: "text" },
+    ],
+  },
+  {
+    id: "transfers",
+    label: "Transfers",
+    columns: [
+      { key: "transferId", label: "Transfer ID", kind: "text" },
+      { key: "reference", label: "Reference", kind: "text" },
       { key: "status", label: "Status", kind: "text" },
       { key: "amount", label: "Amount", kind: "money" },
       { key: "currency", label: "Currency", kind: "text" },

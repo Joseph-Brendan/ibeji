@@ -1,17 +1,26 @@
 import type { TwinDefinition } from "../framework/types.js";
 import { paystackAuth } from "./auth.js";
+import { bankActions } from "./bank.js";
 import { paystackCheckout } from "./checkout.js";
 import { paystackCredentialSpecs } from "./credentials.js";
 import { paystackFailures } from "./failures.js";
 import { paystackMoney } from "./money.js";
+import { recipientActions } from "./recipients.js";
 import { refundActions } from "./refunds.js";
 import { paystackResponses } from "./responses.js";
 import { paystackRetrySchedule } from "./retry.js";
 import { paystackState } from "./state.js";
 import { transactionActions } from "./transactions.js";
+import { transferActions } from "./transfers.js";
 import { paystackWebhooks } from "./webhooks.js";
 
-const actions = [...transactionActions, ...refundActions];
+const actions = [
+  ...transactionActions,
+  ...refundActions,
+  ...bankActions,
+  ...recipientActions,
+  ...transferActions,
+];
 
 export const paystackTwin: TwinDefinition = {
   id: "paystack",

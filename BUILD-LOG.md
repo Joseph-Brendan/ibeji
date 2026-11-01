@@ -1189,3 +1189,62 @@ Added Paystack refund create, fetch, and list, partial refunds, refund limits, s
 - Decide whether `needs-attention` and `failed` need a test-card or failure-driven flow.
 - Replace the local status timings if Paystack documentation or a real story supplies exact refund transitions.
 - Add refund transfer/bank interactions only when those Paystack actions are built.
+
+---
+
+## Phase 4, Step 4.4: Paystack twin transfers and banks
+
+Date: 1 November 2026.
+
+Added bank listing, account resolution, transfer recipients, transfers, transfer status changes, transfer webhooks, and the three transfer-related failures.
+
+### What was built
+
+- **Bank data.** The 292-bank `bank-list-success` fixture data is stored in `src/twins/paystack/data/banks.json` and returned by `GET /bank`. `country=nigeria` or no country returns the recorded list; an unknown country returns the recorded lenient empty list.
+- **Account resolution.** `GET /bank/resolve` accepts any 10-digit numeric account number and a known bank code (including test code `001`). It returns a deterministic name from `src/twins/paystack/data/account-names.json`, a fixed list of fictional Nigerian names, plus the bank id. Malformed account numbers and unknown bank codes use Paystack-shaped errors.
+- **Recipients.** `POST /transferrecipient` creates the fixture-confirmed recipient object with `details`, duplicate-account reuse, test-format recipient codes, and the fixture-confirmed missing-account error.
+- **Transfers.** `POST /transfer`, `GET /transfer/:id_or_code`, and `GET /transfer/verify/:reference` implement the documented initiate and fetch/verify objects, reference rules, recipient lookup, and Paystack-shaped validation and not-found errors. The source must be `balance`, and the currency defaults to NGN as the transfer documentation says.
+- **Reference safety.** Research says a transfer reference is unique and a retry with the same reference avoids a second credit. An identical retry returns the existing transfer; reusing the same reference with different transfer details is rejected with `duplicate_reference`. This behaviour could not be recorded with the account-limit fixture and is marked in code.
+- **Life cycle.** A normal transfer starts `pending` and becomes `success` after one second, sending `transfer.success`. The local one-second phase exists so the injected clock can test status changes and webhooks; Paystack's test-transfer guide says real test transfers have no processing and succeed immediately.
+- **Webhooks.** `transfer.success`, `transfer.failed`, and `transfer.reversed` are built from the documented transfer object. The success payload includes the documented integration object and recipient object. Failed and reversed payload shapes remain UNCONFIRMED.
+- **Failures.** `transfer-stuck-pending` uses `seconds` and the engine's seeded `thenFailPercent` outcome to end success or failed; `transfer-reversed` uses `afterSeconds` to mark the transfer reversed; `bank-resolve-fails` returns the error or timeout Paystack shape.
+- **Event summaries.** `transfer.create` publishes, for example, `Your app sent ₦20,000 to Emeka Obi through Paystack`; recipient creation publishes a recipient summary.
+
+### Documentation-only Paystack actions
+
+These actions could not be recorded successfully. Their success shapes and life-cycle details follow `research/paystack.md` and are marked in code with `Source: documentation, not recorded`:
+
+- **`transfer.create`** — success response and status life cycle. The saved transfer-create fixtures are the recorder account's starter-business limit (`transfer_unavailable`), not a transfer result.
+- **`transfer.fetch`** — the recorded step is skipped. The fetch object follows the documented fetch/verify object.
+- **`transfer.verify`** — the recorded step is skipped. The verify object follows the documented fetch/verify object.
+
+`transfer_recipient.create` was recorded for an account-number recipient. Its `authorization_code` variant is also documentation-only and is marked in the code.
+
+`transfer_recipient.create` success was recorded. `bank.list` and `bank.resolve` success and invalid-request cases were recorded. The `transfer.failed` and `transfer.reversed` webhook payloads are also documentation-only because only exact event names and descriptions are documented.
+
+### Decisions and research/fixture choices
+
+- **The bank list is the recorded fixture.** Its 292 objects, including `Test Name N` bank names, are copied into the package data file.
+- **C4 authentication wins over the recorder's lenient bank-list auth.** `bank-list-invalid-key` recorded a 200 response with a wrong key, but C4 requires every twin to reject wrong keys. The twin returns 401; the T3 shape test uses a valid key and separately proves the wrong key is rejected.
+- **Malformed account input is the fixture-confirmed error.** The recorded invalid fixture used `0000000002`, which is a well-formed number under this task's "any well-formed account number" rule. T3 tests the same error body with a non-numeric account number; `0000000002` is resolved like any other well-formed number.
+- **Account names are fictional and fixed.** `account-names.json` contains twelve names such as Emeka Obi, Ifeoma Nwosu and Amina Bello. The choice is deterministic from the account and bank digits; this is not a Paystack account-name algorithm.
+- **Recipient duplicate reuse applies to account-number recipients.** Paystack's documented duplicate rule is about an account number. The documentation-only `authorization_code` variant has no account number, so it creates a record instead of reusing every other authorization-code recipient.
+- **Transfer timing is a local Ibeji simulation.** Normal success after one second, stuck-pending resolution after `seconds`, and reversal after `afterSeconds` are test timings, not documented Paystack timings.
+- **Transfer reference and identifier errors are Paystack-shaped but not fixture-confirmed.** Unknown, missing and malformed values use `validation_error` codes.
+- **The account-limit fixtures are not T3 expected transfer results.** They record the recorder account's starter-business limitation. The twin simulates a business that can transfer, so those two fixture bodies are not returned for a normal transfer.
+- **No SPEC.md change.** No C21 entry is needed; this implements C4a transfers and banks, C5's three transfer failures, and C17 T3/T4/T5/T7/T14.
+
+### Tests
+
+- Added 21 tests: T3 for the recorded bank, resolve and recipient fixtures; an exact comparison with the recorded bank data; fixed fictional-name resolution; duplicate recipients; the documentation-only `authorization_code` recipient; the normal transfer life cycle and `transfer.success`; the plain-English summary; unique-reference replay and mismatch rejection; invalid recipients/references/amounts/sources/identifiers; and T4 for stuck-pending success/failure/until-switched-off, reversal, and bank-resolve error/timeout.
+- Total suite: 444 tests.
+- Coverage: 100% of `src/core/` and `src/twins/framework/` (thresholds pass); 98.2% of `src/` overall.
+- Paystack still passes all 17 T14 conformance checks.
+- `pnpm test` passed twice in a row; all existing C18 gates pass.
+
+### Later
+
+- Copy `src/twins/paystack/data/*.json` into the built package when the server bundle is added.
+- Add a documented transfer-list action only if C4a adds it; it is not in v1.
+- Resolve the full `transfer.failed` and `transfer.reversed` webhook payloads when Paystack documentation or fixtures provide them.
+- Revisit transfer success timing if a recorded successful transfer fixture becomes available.

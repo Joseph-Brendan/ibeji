@@ -109,8 +109,16 @@ export type ActiveFailureEffects = {
   readonly authenticationRequired?: { readonly then: "succeed" | "fail" };
   readonly transferStuckPending?: {
     readonly thenFailPercent: number;
+    readonly seconds?: number | null;
+    readonly thenFailed?: boolean;
+    readonly endsAt?: number | undefined;
   };
   readonly transferReversed?: boolean;
+  readonly transferReversal?: {
+    readonly afterSeconds: number;
+    readonly reverseAt: number;
+    readonly reversed: boolean;
+  };
   readonly bankResolveFails?: { readonly mode: "error" | "timeout" };
 };
 
@@ -302,7 +310,7 @@ export type ActionDefinition = {
   readonly path: string;
   readonly summary: string;
   readonly kind: "read" | "write" | "checkout";
-  readonly eventSummary?: (request: TwinRequest) => string;
+  readonly eventSummary?: (request: TwinRequest, state: TwinStateStore) => string;
   readonly handler: ActionHandler;
 };
 

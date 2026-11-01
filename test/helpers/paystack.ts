@@ -175,6 +175,57 @@ export async function seedSuccessfulTransaction(
   }
 }
 
+export async function listBanks(harness: PaystackHarness, query = ""): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/bank${query}`, {
+    headers: authorizationHeader(),
+  });
+}
+
+export async function resolveAccount(harness: PaystackHarness, query: string): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/bank/resolve${query}`, {
+    headers: authorizationHeader(),
+  });
+}
+
+export async function createRecipient(
+  harness: PaystackHarness,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/transferrecipient`, {
+    method: "POST",
+    headers: authorizationHeader(),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createTransfer(
+  harness: PaystackHarness,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/transfer`, {
+    method: "POST",
+    headers: authorizationHeader(),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchTransfer(harness: PaystackHarness, idOrCode: string): Promise<Response> {
+  return fetch(
+    `http://127.0.0.1:${harness.running.port}/transfer/${encodeURIComponent(idOrCode)}`,
+    { headers: authorizationHeader() },
+  );
+}
+
+export async function verifyTransfer(
+  harness: PaystackHarness,
+  reference: string,
+): Promise<Response> {
+  return fetch(
+    `http://127.0.0.1:${harness.running.port}/transfer/verify/${encodeURIComponent(reference)}`,
+    { headers: authorizationHeader() },
+  );
+}
+
 export async function transactionRecord(harness: PaystackHarness, reference: string) {
   return harness.state.read("transactions", reference, paystackTransactionSchema);
 }

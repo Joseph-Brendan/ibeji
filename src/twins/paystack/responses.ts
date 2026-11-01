@@ -83,6 +83,20 @@ function messageFor(action: ActionDefinition): string {
       return "Refund retrieved";
     case "refund.list":
       return "Refunds retrieved";
+    case "bank.list":
+      return "Banks retrieved";
+    case "bank.resolve":
+      return "Account number resolved";
+    case "transfer_recipient.create":
+      return "Transfer recipient created successfully";
+    // The transfer action success messages are documentation-only.
+    // Source: documentation, not recorded.
+    case "transfer.create":
+      return "Transfer has been queued";
+    case "transfer.fetch":
+      return "Transfer retrieved";
+    case "transfer.verify":
+      return "Transfer verified";
     default:
       return "Request successful";
   }
@@ -315,4 +329,109 @@ export const refundNotFoundResponse = (): TwinResponse =>
     nextStep: "Check the refund ID and try again.",
     type: "validation_error",
     code: "refund_not_found",
+  });
+
+export const invalidAccountNumberResponse = (): TwinResponse =>
+  paystackError(400, "Account number should be numeric", {
+    nextStep: "You need to pass a valid account number in your API Request",
+    type: "validation_error",
+    code: "invalid_account_number",
+  });
+
+export const invalidBankCodeResponse = (): TwinResponse =>
+  paystackError(400, "Bank code is invalid", {
+    nextStep: "Use a bank code from the bank list.",
+    type: "validation_error",
+    code: "invalid_bank_code",
+  });
+
+export const bankResolveFailedResponse = (): TwinResponse =>
+  paystackError(400, "Account lookup failed", {
+    nextStep: "Try again later.",
+    type: "api_error",
+    code: "bank_resolve_failed",
+  });
+
+export const bankResolveTimeoutResponse = (): TwinResponse =>
+  paystackError(504, "Account lookup timed out", {
+    nextStep: "Try again later.",
+    type: "api_error",
+    code: "bank_resolve_timeout",
+  });
+
+export const recipientMissingAccountResponse = (): TwinResponse =>
+  paystackError(400, "Either authorization_code or account_number must be passed.", {
+    nextStep: "Provide all required params ",
+    type: "validation_error",
+    code: "missing_params",
+  });
+
+export const recipientFieldsRequiredResponse = (): TwinResponse =>
+  paystackError(400, "Type and name are required", {
+    nextStep: "Provide all required params ",
+    type: "validation_error",
+    code: "missing_params",
+  });
+
+export const invalidTransferAccountResponse = (): TwinResponse =>
+  paystackError(400, "Account number should be numeric", {
+    nextStep: "Pass a 10-digit account number.",
+    type: "validation_error",
+    code: "invalid_account_number",
+  });
+
+export const recipientNotFoundResponse = (): TwinResponse =>
+  paystackError(400, "Transfer recipient not found", {
+    nextStep: "Create the recipient first, or use its recipient_code.",
+    type: "validation_error",
+    code: "recipient_not_found",
+  });
+
+export const missingTransferFieldsResponse = (): TwinResponse =>
+  paystackError(400, "Provide source, amount, recipient and reference", {
+    nextStep: "Provide all required params ",
+    type: "validation_error",
+    code: "missing_params",
+  });
+
+export const invalidTransferAmountResponse = (): TwinResponse =>
+  paystackError(400, "Transfer amount should be a positive integer", {
+    nextStep: "Pass a whole amount in the currency's smallest unit.",
+    type: "validation_error",
+    code: "invalid_params",
+  });
+
+export const invalidTransferSourceResponse = (): TwinResponse =>
+  paystackError(400, "Transfer source should be balance", {
+    nextStep: "Use balance as the transfer source.",
+    type: "validation_error",
+    code: "invalid_params",
+  });
+
+export const duplicateTransferReferenceResponse = (): TwinResponse =>
+  paystackError(400, "Transfer reference already exists", {
+    nextStep: "Use a unique transfer reference.",
+    type: "validation_error",
+    code: "duplicate_reference",
+  });
+
+export const invalidTransferReferenceResponse = (): TwinResponse =>
+  paystackError(400, "Transfer reference is invalid", {
+    nextStep: "Use 16 to 50 lowercase letters, digits, hyphens or underscores.",
+    type: "validation_error",
+    code: "invalid_params",
+  });
+
+export const invalidTransferIdentifierResponse = (): TwinResponse =>
+  paystackError(400, "Transfer ID or code is invalid", {
+    nextStep: "Use a numeric transfer ID or a TRF_ code.",
+    type: "validation_error",
+    code: "invalid_params",
+  });
+
+export const transferNotFoundResponse = (): TwinResponse =>
+  paystackError(404, "Transfer not found", {
+    nextStep: "Check the transfer ID, code or reference and try again.",
+    type: "validation_error",
+    code: "transfer_not_found",
   });
