@@ -35,6 +35,22 @@ function refundDraft(status: "processing" | "completed"): TwinWebhookDraft {
   };
 }
 
+function transferDraft(status: "SUCCESSFUL" | "FAILED"): TwinWebhookDraft {
+  return {
+    key: "transfer.completed",
+    actionId: "transfer.create",
+    resourceId: "26251",
+    occurredAt: 1_000,
+    data: {
+      id: 26_251,
+      fullname: "Chinedu Okafor",
+      amount: 5_500,
+      currency: "NGN",
+      status,
+    } as unknown as JsonValue,
+  };
+}
+
 describe("T5 Flutterwave webhook verification", () => {
   const adapter = flutterwaveTwin.webhooks;
 
@@ -110,6 +126,18 @@ describe("T5 Flutterwave webhook verification", () => {
     expect(refundBody.event).toBeUndefined();
     expect(refundBody.id).toBe(110_122);
     expect(refundBody.status).toBe("completed");
+
+    const transfer = adapter.build(transferDraft("SUCCESSFUL"), {});
+    const transferBody = JSON.parse(transfer.body) as {
+      event: string;
+      "event.type": string;
+      data: { status: string; fullname: string; full_name?: string };
+    };
+    expect(transferBody.event).toBe("transfer.completed");
+    expect(transferBody["event.type"]).toBe("Transfer");
+    expect(transferBody.data.status).toBe("SUCCESSFUL");
+    expect(transferBody.data.fullname).toBe("Chinedu Okafor");
+    expect(transferBody.data.full_name).toBeUndefined();
   });
 
   it("T5 writes plain-English Flutterwave summaries and uses the documented retry schedule", () => {
@@ -125,10 +153,74 @@ describe("T5 Flutterwave webhook verification", () => {
       "Flutterwave refund processing for NGN 100.00",
     );
 
+    const transfer = transferDraft("SUCCESSFUL");
+    const transferRaw = adapter.build(transfer, {});
+    expect(adapter.summarize(transfer, transferRaw)).toBe(
+      "Flutterwave transfer successful for NGN 5,500.00 to Chinedu Okafor",
+    );
+
     expect(flutterwaveRetrySchedule).toEqual({
       source: "docs",
       delaysSeconds: [1_800, 1_800, 1_800],
     });
+  });
+
+  it("T5 summarizes string amounts and missing names without throwing", () => {
+    const stringAmount: TwinWebhookDraft = {
+      key: "charge.completed",
+      actionId: "checkout.submit",
+      resourceId: "tx-ref-2",
+      occurredAt: 1_000,
+      data: { status: "successful", amount: "7500", currency: "NGN" },
+    };
+    expect(adapter.summarize(stringAmount, adapter.build(stringAmount, {}))).toBe(
+      "Flutterwave payment successful for NGN 7,500.00",
+    );
+
+    const noName: TwinWebhookDraft = {
+      key: "transfer.completed",
+      actionId: "transfer.create",
+      resourceId: "26251",
+      occurredAt: 1_000,
+      data: { status: "SUCCESSFUL", amount: 5_500, currency: "NGN", fullname: "" },
+    };
+    expect(adapter.summarize(noName, adapter.build(noName, {}))).toBe(
+      "Flutterwave transfer successful for NGN 5,500.00",
+    );
+
+    const noData: TwinWebhookDraft = {
+      key: "charge.completed",
+      actionId: "checkout.submit",
+      resourceId: "tx-ref-3",
+      occurredAt: 1_000,
+      data: null,
+    };
+    expect(adapter.summarize(noData, adapter.build(noData, {}))).toBe(
+      "Flutterwave payment event for tx-ref-3",
+    );
+
+    const badAmount: TwinWebhookDraft = {
+      key: "charge.completed",
+      actionId: "checkout.submit",
+      resourceId: "tx-ref-4",
+      occurredAt: 1_000,
+      data: { status: "failed", amount: "not-a-number", currency: "NGN" },
+    };
+    expect(adapter.summarize(badAmount, adapter.build(badAmount, {}))).toBe(
+      "Flutterwave payment failed for tx-ref-4",
+    );
+  });
+
+  it("T5 rejects verification when no webhook secret was issued", () => {
+    const raw = adapter.build(chargeDraft("successful"), {});
+    expect(
+      adapter.verify(
+        raw,
+        { "verif-hash": "ibeji_test" },
+        { ...FLUTTERWAVE_TEST_CREDENTIALS, webhook: "" },
+        new Date(0),
+      ),
+    ).toBe(false);
   });
 
   it("T5 has Flutterwave-specific auth and checkout definitions", () => {

@@ -102,7 +102,11 @@ function liveKeyFor(definition: TwinDefinition, credentials: TwinCredentials): s
 }
 
 function concretePath(action: ActionDefinition): string {
-  return action.path.replace(/:[A-Za-z0-9_]+/gu, "ref-1");
+  // A country path parameter needs a real country-shaped sample; all other
+  // path parameters use the shared non-404 probe value.
+  return action.path.replace(/:[A-Za-z0-9_]+/gu, (parameter) =>
+    parameter === ":country" ? "NG" : "ref-1",
+  );
 }
 
 function nonCheckoutAction(definition: TwinDefinition): ActionDefinition {

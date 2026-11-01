@@ -64,6 +64,30 @@ export const flutterwaveRefundSchema = z.object({
 
 export type FlutterwaveRefund = z.infer<typeof flutterwaveRefundSchema>;
 
+export const flutterwaveTransferSchema = z.object({
+  id: z.string(),
+  transferId: z.number().int(),
+  accountNumber: z.string(),
+  bankCode: z.string(),
+  bankName: z.string(),
+  fullName: z.string(),
+  amount: z.number().int(),
+  currency: z.string(),
+  debitCurrency: z.string(),
+  fee: z.number().int(),
+  status: z.enum(["PENDING", "SUCCESSFUL", "FAILED"]),
+  reference: z.string(),
+  meta: z.json().nullable(),
+  narration: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  completeMessage: z.string(),
+  requiresApproval: z.number().int(),
+  isApproved: z.number().int(),
+});
+
+export type FlutterwaveTransfer = z.infer<typeof flutterwaveTransferSchema>;
+
 export const flutterwaveCollections: readonly CollectionDefinition[] = [
   {
     id: "payments",
@@ -83,6 +107,18 @@ export const flutterwaveCollections: readonly CollectionDefinition[] = [
     columns: [
       { key: "refundId", label: "Refund ID", kind: "text" },
       { key: "txRef", label: "Transaction", kind: "text" },
+      { key: "status", label: "Status", kind: "text" },
+      { key: "amount", label: "Amount", kind: "money" },
+      { key: "currency", label: "Currency", kind: "text" },
+      { key: "createdAt", label: "Created", kind: "date" },
+    ],
+  },
+  {
+    id: "transfers",
+    label: "Transfers",
+    columns: [
+      { key: "transferId", label: "Transfer ID", kind: "text" },
+      { key: "reference", label: "Reference", kind: "text" },
       { key: "status", label: "Status", kind: "text" },
       { key: "amount", label: "Amount", kind: "money" },
       { key: "currency", label: "Currency", kind: "text" },

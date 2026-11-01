@@ -47,6 +47,16 @@ function messageFor(action: ActionDefinition): string {
       return "Refund fetched";
     case "refund.list":
       return "Refunds fetched";
+    case "bank.list":
+      return "Banks fetched successfully";
+    case "bank.resolve":
+      return "Account details fetched";
+    case "transfer.create":
+      return "Transfer Queued Successfully";
+    case "transfer.fetch":
+      return "Transfer fetched";
+    case "transfer.list":
+      return "Transfers fetched";
     default:
       return "Request successful";
   }
@@ -108,6 +118,38 @@ export const refundExceedsRemainingResponse = (): TwinResponse =>
 
 export const refundFullyRefundedResponse = (): TwinResponse =>
   flutterwaveError(400, "Transaction has been fully refunded");
+
+export const bankNotFoundResponse = (): TwinResponse =>
+  flutterwaveError(404, "No banks found for country code");
+
+export const invalidAccountResponse = (): TwinResponse => flutterwaveError(400, "invalid account");
+
+export const bankResolveFailedResponse = (): TwinResponse =>
+  flutterwaveError(400, "Account lookup failed");
+
+export const bankResolveTimeoutResponse = (): TwinResponse =>
+  flutterwaveError(503, "An error occurred. Please contact support");
+
+export const transferAmountRequiredResponse = (): TwinResponse =>
+  flutterwaveError(400, "amount is required");
+
+export const transferFieldRequiredResponse = (field: string): TwinResponse =>
+  flutterwaveError(400, `${field} is required`);
+
+export const invalidTransferAmountResponse = (): TwinResponse =>
+  flutterwaveError(400, "Amount should be a valid amount with at most 2 decimal places");
+
+export const duplicateTransferReferenceResponse = (): TwinResponse =>
+  flutterwaveError(400, "reference has already been used");
+
+export const transferNotFoundResponse = (): TwinResponse =>
+  flutterwaveError(404, "Transfer not found");
+
+export const invalidTransferIdResponse = (): TwinResponse =>
+  flutterwaveError(400, "Transfer ID should be numeric");
+
+export const invalidTransferPageResponse = (): TwinResponse =>
+  flutterwaveError(400, "page parameter must be a positive integer");
 
 export const serverErrorResponse = (status: number): TwinResponse => {
   if (status === 500) {

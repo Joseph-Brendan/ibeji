@@ -1308,3 +1308,64 @@ Added the Flutterwave v3 twin foundation, hosted payments, the local checkout pa
 - Implement the documented per-refund `callbackurl` webhook override when the framework can route a single delivery to a different URL.
 - Add the scenario files and control API/CLI wiring when those layers are built.
 - Copy any Flutterwave data files into the built package when the server bundle is added.
+
+---
+
+## Phase 4, Step 4.6: Flutterwave twin transfers and banks
+
+Date: 1 November 2026.
+
+Added Flutterwave bank listing, account resolution, transfers, transfer status changes, `transfer.completed` webhooks, and the two transfer-related failures that v3 supports.
+
+### What was built
+
+- **Bank data.** The recorded NG bank list is stored in `src/twins/flutterwave/data/banks.json` (598 objects). `GET /v3/banks/:country` returns it for `NG` with `Banks fetched successfully`; another country returns the recorded 404 `No banks found for country code`.
+- **Account resolution.** `POST /v3/accounts/resolve` accepts a 10-digit numeric account number and a known bank code. It returns `Account details fetched` with a deterministic name from the fixed fictional list in `src/twins/flutterwave/data/account-names.json`. Malformed input, missing fields and unknown bank codes return the recorded `invalid account` error.
+- **Transfers.** `POST /v3/transfers`, `GET /v3/transfers/:id` and `GET /v3/transfers` create, fetch and list transfers. The create response uses the documented `NEW` status, message and object shape; later fetches/list items use the documented `PENDING`/`SUCCESSFUL`/`FAILED` statuses. The list endpoint uses `meta.page_info`, validates `page` with the recorded 400, and filters by reference, status and dates.
+- **Status changes.** The documented test-transfer reference suffixes are implemented: `_PMCK` succeeds after 10 minutes, `_PMCK_ST_F` fails after 10 minutes, and `_PMCKDU_n` / `_PMCK_ST_FDU_n` use `n` minutes. A transfer with no suffix stays `PENDING`, which is the documented default for test transfers.
+- **Webhook.** A final transfer emits `transfer.completed` with `event.type: "Transfer"` and the documented webhook data, including `fullname` rather than the API object’s `full_name`.
+- **Failures.** `transfer-stuck-pending` leaves a transfer pending, or ends it successful/failed after `seconds` according to `thenFailPercent`; an empty `seconds` leaves it pending. `bank-resolve-fails` returns Flutterwave’s error or 503 timeout shape. `transfer-reversed` is not declared and is refused with `FAILURE_NOT_SUPPORTED_BY_TWIN`.
+- **Event summaries.** `transfer.create` publishes, for example, `Your app sent NGN 5,500.00 to Chinedu Okafor through Flutterwave`; `transfer.completed` summaries use the recipient name and formatted amount.
+
+### Documentation-only Flutterwave actions
+
+These could not be recorded successfully and follow `research/flutterwave.md`. Their success/behaviour code is marked with `Source: documentation, not recorded`:
+
+- **`transfer.create`** — success response, `NEW` status, message, fee, `complete_message`, generated reference and status life cycle. The recorded `transfer-create.account-limit` fixture is the recorder account’s IP-whitelisting limit, not a transfer result.
+- **`transfer.fetch`** — the success object and non-numeric ID validation. The recorded non-numeric response is an HTML 200 page; the twin deliberately does not copy it. A missing numeric transfer returns the documented JSON 404.
+- **`transfer.list`** — non-empty transfer items. The recorded list fixture is empty; the item follows the documented `§1.6` transfer object.
+- **`transfer.completed`** — the full documented webhook payload, including `event.type: "Transfer"` and `fullname`.
+- **Test-transfer timing** — the `_PMCK`, `_PMCK_ST_F` and `DU_n` schedules come from the testing guide, not from a fixture.
+- **Duplicate transfer references** — the v3 docs call the reference unique but do not state the duplicate behaviour; the twin rejects a reused reference in Flutterwave’s error shape.
+- **Per-transfer fields not exercised** — `callback_url` and the conditional `meta[]` requirements are accepted/ignored for now; the framework currently has one webhook URL per twin.
+
+`bank.list` success and invalid-country cases were recorded, as were `bank.resolve` success and invalid-request cases. The invalid-key fixture is reproduced exactly by the Flutterwave auth adapter.
+
+### Decisions and fixture choices
+
+- **The bank list is the recorded fixture.** All 598 objects are copied from `bank-list-success`; an exact-value test checks the whole response.
+- **Account names are fictional and fixed.** The name is chosen deterministically from the account and bank digits. This is not a Flutterwave account-name algorithm.
+- **The recorded invalid account is well-formed.** `0000000002` with bank `044` has 10 digits, so under this task’s well-formed rule it resolves. The T3 invalid-request test uses non-numeric input and compares the fixture’s error shape; this difference is recorded here.
+- **Unknown bank codes use the same recorded `invalid account` error.** The docs do not provide a separate unknown-bank error.
+- **The transfer fee and failure `complete_message` are local placeholders.** The fee formula and a complete failure story are not documented; the response keeps a numeric fee and a plain failure message without claiming they are Flutterwave facts.
+- **The create response and later reads differ on purpose.** The documented create sample says `NEW`; the testing guide says test transfers remain `PENDING`. The twin responds `NEW` at create, stores `PENDING`, and emits `transfer.completed` only at the final status.
+- **`transfer-stuck-pending` overrides the test suffix schedule.** With `seconds` set, the shared failure decides the final status after that delay; with `seconds: null`, the transfer stays pending. This is the C5 behaviour, in Flutterwave’s statuses.
+- **`transfer-reversed` remains refused.** v3 has no reversal status or event (C21 D33); the conformance test explicitly asserts `FAILURE_NOT_SUPPORTED_BY_TWIN`.
+- **`bank-resolve-fails` is assumed.** The service docs give the global error shape but no exact account-lookup failure mode. Error mode returns 400 and timeout mode returns the documented 503 timeout shape.
+- **Non-numeric transfer IDs are a 400 validation error.** The real endpoint’s recorded HTML 200 is not copied; numeric missing IDs use the documented 404.
+- **Conformance path probe.** The shared action-route parity check now uses `NG` for a `:country` path parameter so a valid country reaches `bank.list`; this is a generic path-parameter sample, not a service branch or weakened check.
+- **No SPEC.md change.** No C21 entry is needed. This implements C4b transfers and banks, the applicable C5 failures, D33, and C17 T3/T4/T5/T7/T14.
+
+### Tests
+
+- Added 34 tests: T3 for the bank-list success/exact data/invalid country/invalid key, resolve success/invalid, transfer list success/invalid, transfer fetch lenient input and transfer create account limit; well-formed/malformed/unknown-bank resolution; transfer create/fetch/list, documented status schedules, `transfer.completed`, filters, generated references and event summaries; T4 stuck-pending success/failure/until-switched-off, bank-resolve error/timeout and `transfer-reversed` refusal; Flutterwave response-builder shapes; and the transfer webhook build and summary.
+- Total suite: 538 tests.
+- Coverage: the configured 100% line/branch thresholds for `src/core/` and `src/twins/framework/` pass; 97.7% of `src/` overall.
+- `pnpm test` passed twice in a row; all existing C18 gates pass.
+
+### Later
+
+- Implement the documented per-transfer `callback_url` and per-refund `callbackurl` routing when the framework can select a webhook URL per delivery.
+- Add the conditional `meta[]` validation rules for transfer types that require them.
+- Revisit the exact transfer fee and `complete_message` text if a recorded successful transfer becomes available.
+- Add the scenario files and control API/CLI wiring when those layers are built.

@@ -3,10 +3,15 @@ import { EventLog } from "../../src/core/events.js";
 import { RuleStore } from "../../src/core/failures/rules.js";
 import type { WebhookDispatcher } from "../../src/core/webhooks/dispatcher.js";
 import { flutterwaveTwin } from "../../src/twins/flutterwave/definition.js";
-import type { FlutterwavePayment, FlutterwaveRefund } from "../../src/twins/flutterwave/state.js";
+import type {
+  FlutterwavePayment,
+  FlutterwaveRefund,
+  FlutterwaveTransfer,
+} from "../../src/twins/flutterwave/state.js";
 import {
   flutterwavePaymentSchema,
   flutterwaveRefundSchema,
+  flutterwaveTransferSchema,
 } from "../../src/twins/flutterwave/state.js";
 import { type RunningTwin, startTwin } from "../../src/twins/framework/server.js";
 import { FrameworkStateStore } from "../../src/twins/framework/state.js";
@@ -165,6 +170,50 @@ export async function listRefunds(harness: FlutterwaveHarness, query = ""): Prom
   });
 }
 
+export async function listBanks(harness: FlutterwaveHarness, country = "NG"): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/v3/banks/${encodeURIComponent(country)}`, {
+    headers: authorizationHeader(),
+  });
+}
+
+export async function resolveAccount(
+  harness: FlutterwaveHarness,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/v3/accounts/resolve`, {
+    method: "POST",
+    headers: authorizationHeader(),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createTransfer(
+  harness: FlutterwaveHarness,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/v3/transfers`, {
+    method: "POST",
+    headers: authorizationHeader(),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchTransfer(
+  harness: FlutterwaveHarness,
+  id: string | number,
+): Promise<Response> {
+  return fetch(
+    `http://127.0.0.1:${harness.running.port}/v3/transfers/${encodeURIComponent(String(id))}`,
+    { headers: authorizationHeader() },
+  );
+}
+
+export async function listTransfers(harness: FlutterwaveHarness, query = ""): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/v3/transfers${query}`, {
+    headers: authorizationHeader(),
+  });
+}
+
 export function paymentRecord(
   harness: FlutterwaveHarness,
   txRef: string,
@@ -177,6 +226,13 @@ export function refundRecord(
   id: string | number,
 ): FlutterwaveRefund | undefined {
   return harness.state.read("refunds", String(id), flutterwaveRefundSchema);
+}
+
+export function transferRecord(
+  harness: FlutterwaveHarness,
+  id: string | number,
+): FlutterwaveTransfer | undefined {
+  return harness.state.read("transfers", String(id), flutterwaveTransferSchema);
 }
 
 export async function seedPayment(

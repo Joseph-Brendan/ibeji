@@ -92,6 +92,14 @@ function summaryAmount(data: JsonValue): string | undefined {
   }
 }
 
+function fullNameFrom(data: JsonValue): string | undefined {
+  if (!isRecord(data)) {
+    return undefined;
+  }
+  const name = data.fullname ?? data.full_name;
+  return typeof name === "string" && name.trim().length > 0 ? name : undefined;
+}
+
 function summarize(draft: TwinWebhookDraft): string {
   const data = draft.data;
   const status = isRecord(data) && typeof data.status === "string" ? data.status : "event";
@@ -103,6 +111,16 @@ function summarize(draft: TwinWebhookDraft): string {
       : `Flutterwave refund ${status} for ${formatted}`;
   }
 
+  if (draft.key === "transfer.completed") {
+    const name = fullNameFrom(data);
+    if (formatted === undefined) {
+      return `Flutterwave transfer ${status.toLowerCase()} for ${draft.resourceId}`;
+    }
+    return name === undefined
+      ? `Flutterwave transfer ${status.toLowerCase()} for ${formatted}`
+      : `Flutterwave transfer ${status.toLowerCase()} for ${formatted} to ${name}`;
+  }
+
   return formatted === undefined
     ? `Flutterwave payment ${status} for ${draft.resourceId}`
     : `Flutterwave payment ${status} for ${formatted}`;
@@ -112,6 +130,17 @@ function build(draft: TwinWebhookDraft): RawWebhook {
   if (draft.key === "refund") {
     return {
       body: JSON.stringify(draft.data),
+      contentType: "application/json",
+    };
+  }
+
+  if (draft.key === "transfer.completed") {
+    return {
+      body: JSON.stringify({
+        event: "transfer.completed",
+        "event.type": "Transfer",
+        data: draft.data,
+      }),
       contentType: "application/json",
     };
   }
@@ -140,6 +169,12 @@ export const flutterwaveWebhooks: WebhookAdapter = {
       wireName: null,
       objectType: "refund",
       actions: ["refund.create"],
+    },
+    {
+      key: "transfer.completed",
+      wireName: "transfer.completed",
+      objectType: "transfer",
+      actions: ["transfer.create"],
     },
   ],
   build,

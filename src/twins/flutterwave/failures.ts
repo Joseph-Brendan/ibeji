@@ -8,9 +8,16 @@ const PAYMENT_ACTIONS = [
   "payment.list",
 ] as const;
 const REFUND_ACTIONS = ["refund.create", "refund.fetch", "refund.list"] as const;
-const WRITE_ACTIONS = ["payment.create", "refund.create"] as const;
-const ALL_ACTIONS = [...PAYMENT_ACTIONS, ...REFUND_ACTIONS] as const;
-const WEBHOOK_ACTIONS = ["checkout.submit", "refund.create"] as const;
+const TRANSFER_ACTIONS = ["transfer.create", "transfer.fetch", "transfer.list"] as const;
+const BANK_ACTIONS = ["bank.list", "bank.resolve"] as const;
+const WRITE_ACTIONS = ["payment.create", "refund.create", "transfer.create"] as const;
+const ALL_ACTIONS = [
+  ...PAYMENT_ACTIONS,
+  ...REFUND_ACTIONS,
+  ...TRANSFER_ACTIONS,
+  ...BANK_ACTIONS,
+] as const;
+const WEBHOOK_ACTIONS = ["checkout.submit", "refund.create", "transfer.create"] as const;
 
 export const flutterwaveFailureSupport: readonly FailureSupport[] = [
   {
@@ -72,6 +79,16 @@ export const flutterwaveFailureSupport: readonly FailureSupport[] = [
     id: "payment-declined",
     source: "docs",
     actions: ["checkout.submit"],
+  },
+  {
+    id: "transfer-stuck-pending",
+    source: "docs",
+    actions: ["transfer.create"],
+  },
+  {
+    id: "bank-resolve-fails",
+    source: "assumed",
+    actions: ["bank.resolve"],
   },
 ];
 

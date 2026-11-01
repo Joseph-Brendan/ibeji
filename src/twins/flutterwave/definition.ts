@@ -1,5 +1,6 @@
 import type { TwinDefinition } from "../framework/types.js";
 import { flutterwaveAuth } from "./auth.js";
+import { bankActions } from "./bank.js";
 import { checkoutActions, flutterwaveCheckout } from "./checkout.js";
 import { flutterwaveCredentialSpecs } from "./credentials.js";
 import { flutterwaveFailures } from "./failures.js";
@@ -9,9 +10,16 @@ import { refundActions } from "./refunds.js";
 import { flutterwaveResponses } from "./responses.js";
 import { flutterwaveRetrySchedule } from "./retry.js";
 import { flutterwaveState } from "./state.js";
+import { transferActions } from "./transfers.js";
 import { flutterwaveWebhooks } from "./webhooks.js";
 
-const actions = [...paymentActions, ...refundActions, ...checkoutActions];
+const actions = [
+  ...paymentActions,
+  ...refundActions,
+  ...transferActions,
+  ...bankActions,
+  ...checkoutActions,
+];
 
 export const flutterwaveTwin: TwinDefinition = {
   id: "flutterwave",
