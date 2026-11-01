@@ -1431,3 +1431,123 @@ The package ships no TypeScript declarations. The test uses a small local interf
 - Add the Paystack direct-HTTP instructions and the Flutterwave hosted-create caveat to `docs/connect-your-app.md` and the T15 limit entry to `docs/limits.md` when those documents are written.
 - Re-check the Flutterwave hosted-create path if the official v3 library adds a Standard `/v3/payments` method.
 - Run the same T15 check for Stripe in Phase 12 (C21 D42).
+
+---
+
+## Phase 4, Step 4.8: Twins completeness check
+
+Date: 1 November 2026.
+
+Reviewed the Paystack and Flutterwave twins against C4, C4a, C4b, C5, C7 and C17 before building controls on top of them. All C4 actions for both twins are implemented. The completeness review found and fixed three consistency problems:
+
+- The shared conformance suite’s “wrong key” probe used the Paystack-style literal `sk_test_...`; it now uses a generic wrong key. The suite still proves each twin returns its own 401 shape.
+- The core webhook dispatcher named the Flutterwave `verif-hash` header explicitly when hiding sensitive response headers. It now uses the generic rule “hide names containing `hash`”, with a dispatcher test.
+- Paystack webhook summaries said `transfer success` and `refund needs-attention`; they now say `transfer succeeded` and `refund needs attention`. A unit test checks the natural wording.
+
+### Paystack action coverage
+
+| C4 action | Implemented | Contract status | Test that proves it |
+|---|---|---|---|
+| `transaction.initialize` | Yes | Fixture T3: success, declined, unpaid, invalid | `test/contract/paystack-transactions.test.ts`: four `T3 transaction-initialize-*` tests |
+| `transaction.verify` | Yes | Fixture T3: success, failed, abandoned, invalid | `test/contract/paystack-transactions.test.ts`: four `T3 transaction-verify-*` tests |
+| `transaction.fetch` | Yes | Fixture T3: success, invalid | `test/contract/paystack-transactions.test.ts`: two `T3 transaction-fetch-*` tests |
+| `transaction.list` | Yes | Fixture T3: success, lenient input | `test/contract/paystack-transactions.test.ts`: two `T3 transaction-list-*` tests |
+| `checkout.open`, `checkout.submit` | Yes | Local Ibeji checkout; no service fixture | `test/integration/paystack.test.ts`: “C4 pays, declines, and abandons…” and “T4 payment-declined…” |
+| `refund.create` | Yes | Fixture T3: success, invalid request | `test/contract/paystack-refunds.test.ts`: two `T3 refund-create-*` tests; limits and Kola in `paystack-refunds.test.ts` |
+| `refund.fetch` | Yes | Fixture T3: success, invalid request | `test/contract/paystack-refunds.test.ts`: two `T3 refund-fetch-*` tests |
+| `refund.list` | Yes | Fixture T3: success, lenient input | `test/contract/paystack-refunds.test.ts`: two `T3 refund-list-*` tests |
+| `transfer_recipient.create` | Yes | Fixture T3: success, invalid request; `authorization_code` variant documentation-only | `test/contract/paystack-banks-transfers.test.ts`: two `T3 transfer-recipient-*` tests; `paystack-transfers.test.ts`: authorization-code test |
+| `transfer.create` | Yes | Documentation-only success; recorded account-limit fixture is not a transfer result | `test/contract/paystack-banks-transfers.test.ts`: account-limit test; `paystack-transfers.test.ts`: normal life cycle and reference-retry tests |
+| `transfer.fetch` | Yes | Documentation-only success; recorded fixture is skipped | `test/integration/paystack-transfers.test.ts`: normal life cycle, invalid identifiers |
+| `transfer.verify` | Yes | Documentation-only success; recorded fixture is skipped | `test/integration/paystack-transfers.test.ts`: normal life cycle, invalid identifiers |
+| `bank.list` | Yes | Fixture T3: success, lenient, invalid key; exact recorded data | `test/contract/paystack-banks-transfers.test.ts`: three `T3 bank-list-*` tests and exact-data test |
+| `bank.resolve` | Yes | Fixture T3: success, invalid request | `test/contract/paystack-banks-transfers.test.ts`: two `T3 bank-resolve-*` tests; fixed-name test |
+| Webhooks: `charge.success`, `refund.*`, `transfer.success`, `transfer.failed`, `transfer.reversed` | Yes | Documentation/local; refund and transfer payload gaps remain documented | `test/integration/paystack.test.ts`: T5 charge tests; `paystack-refunds.test.ts`: status webhooks; `paystack-transfers.test.ts`: `transfer.success`; `twin-webhook-failures.test.ts`; `test/unit/paystack-webhooks.test.ts` |
+
+### Flutterwave action coverage
+
+| C4 action | Implemented | Contract status | Test that proves it |
+|---|---|---|---|
+| `payment.create` | Yes | Fixture T3: success, failed checkout, unpaid, invalid request | `test/contract/flutterwave-payments-refunds.test.ts`: four `T3 payment-create-*` tests |
+| `payment.verify` (the v3 fetch, D32) | Yes | Fixture T3: success, invalid request | `test/contract/flutterwave-payments-refunds.test.ts`: two `T3 payment-verify-*` tests |
+| `payment.verify_by_reference` | Yes | Fixture T3: success, failed, invalid request, unpaid | `test/contract/flutterwave-payments-refunds.test.ts`: four `T3 payment-verify-by-reference-*` tests |
+| `payment.list` | Yes | Fixture T3: success, lenient input | `test/contract/flutterwave-payments-refunds.test.ts`: two `T3 payment-list-*` tests |
+| `checkout.open`, `checkout.submit` | Yes | Local Ibeji checkout; no service fixture | `test/integration/flutterwave.test.ts`: page, success/failed/cancelled and T4 decline tests |
+| `refund.create` | Yes | Fixture T3: success, invalid request | `test/contract/flutterwave-payments-refunds.test.ts`: two `T3 refund-create-*` tests; limits and Kola in `flutterwave-refunds.test.ts` |
+| `refund.fetch` | Yes | Fixture T3: success, invalid request | `test/contract/flutterwave-payments-refunds.test.ts`: two `T3 refund-fetch-*` tests |
+| `refund.list` | Yes | Fixture T3: success, lenient input | `test/contract/flutterwave-payments-refunds.test.ts`: two `T3 refund-list-*` tests |
+| `transfer.create` | Yes | Documentation-only success; recorded fixture is the recorder IP-whitelisting limit | `test/contract/flutterwave-transfers-banks.test.ts`: account-limit test; `flutterwave-transfers.test.ts`: create/lifecycle tests |
+| `transfer.fetch` | Yes | Documentation-only success; recorded HTML lenient response is not copied | `test/contract/flutterwave-transfers-banks.test.ts`: lenient-input test; `flutterwave-transfers.test.ts`: lifecycle/fetch tests |
+| `transfer.list` | Yes | Fixture T3: success, invalid page; non-empty items documentation-only | `test/contract/flutterwave-transfers-banks.test.ts`: two `T3 transfer-list-*` tests; `flutterwave-transfers.test.ts`: filters/pagination |
+| `bank.list` | Yes | Fixture T3: success, invalid country, invalid key; exact recorded data | `test/contract/flutterwave-transfers-banks.test.ts`: four bank-list tests |
+| `bank.resolve` | Yes | Fixture T3: success, invalid request; malformed/unknown handling in integration | `test/contract/flutterwave-transfers-banks.test.ts`: two `T3 bank-resolve-*` tests; `flutterwave-transfers.test.ts`: well-formed/malformed/unknown tests |
+| Webhooks: `charge.completed`, bare refund object, `transfer.completed` | Yes | Documentation/local; refund event name remains UNCONFIRMED | `test/integration/flutterwave.test.ts`, `flutterwave-refunds.test.ts`, `flutterwave-transfers.test.ts`; `twin-webhook-failures.test.ts`; `test/unit/flutterwave-webhooks.test.ts` |
+
+### Failure-by-twin coverage
+
+The source labels are the approved C5/D31 matrix. “Both” in the test column means the parameterized webhook test runs both twins.
+
+| C5 failure | Paystack source | Paystack twin-level test | Flutterwave source | Flutterwave twin-level test |
+|---|---|---|---|---|
+| `slow-response` | Assumed | `paystack.test.ts`: T4 slow-response | Docs | `flutterwave.test.ts`: T4 slow-response |
+| `timeout-after-commit` | Assumed | `paystack.test.ts`: T4 timeout-after-commit; `paystack-refunds.test.ts`: Kola | Docs | `flutterwave.test.ts`: T4 timeout-after-commit; `flutterwave-refunds.test.ts`: Kola |
+| `timeout-before-commit` | Assumed | `paystack.test.ts`: T4 timeout-before-commit | Docs | `flutterwave.test.ts`: T4 timeout-before-commit |
+| `server-error` | Docs | `paystack.test.ts`: T4 server-error and rate-limited | Docs | `flutterwave.test.ts`: T4 server-error |
+| `rate-limited` | Docs | `paystack.test.ts`: T4 server-error and rate-limited | Docs | `flutterwave.test.ts`: T4 rate-limited |
+| `flaky-network` | Assumed | `paystack.test.ts`: T4 flaky-network before/after | Assumed | `flutterwave.test.ts`: T4 flaky-network before/after |
+| `webhook-delayed` | Assumed | `twin-webhook-failures.test.ts`: T4 webhook-delayed (both) | Assumed | `twin-webhook-failures.test.ts`: T4 webhook-delayed (both) |
+| `webhook-duplicated` | Assumed | `twin-webhook-failures.test.ts`: T4 webhook-duplicated (both) | Docs | `twin-webhook-failures.test.ts`: T4 webhook-duplicated (both) |
+| `webhook-out-of-order` | Assumed | `twin-webhook-failures.test.ts`: T4 webhook-out-of-order (both) | Assumed | `twin-webhook-failures.test.ts`: T4 webhook-out-of-order (both) |
+| `webhook-never-sent` | Assumed | `twin-webhook-failures.test.ts`: T4 webhook-never-sent (both) | Assumed | `twin-webhook-failures.test.ts`: T4 webhook-never-sent (both) |
+| `webhook-verification-fails` | Docs | `twin-webhook-failures.test.ts`: T4 verification-fails (both); `paystack-webhooks.test.ts` | Docs | `twin-webhook-failures.test.ts`: T4 verification-fails (both); `flutterwave-webhooks.test.ts` |
+| `payment-declined` | Docs | `paystack.test.ts`: T4 payment-declined | Docs | `flutterwave.test.ts`: T4 payment-declined |
+| `authentication-required` | N/A (Stripe only) | Conformance refusal in `paystack-conformance.test.ts` | N/A (Stripe only) | Conformance refusal in `flutterwave-conformance.test.ts` |
+| `transfer-stuck-pending` | Docs | `paystack-transfers.test.ts`: three T4 stuck-pending tests | Docs | `flutterwave-transfers.test.ts`: three T4 stuck-pending tests |
+| `transfer-reversed` | Docs | `paystack-transfers.test.ts`: T4 transfer-reversed | N/A (D33) | `flutterwave-transfers.test.ts` and `flutterwave-conformance.test.ts`: explicit refusal |
+| `bank-resolve-fails` | Assumed | `paystack-transfers.test.ts`: T4 bank-resolve error/timeout | Assumed | `flutterwave-transfers.test.ts`: T4 bank-resolve error/timeout |
+
+### Twin-specific code search
+
+Search scope was `src/`, excluding the two twin folders, plus a separate search of `src/core`, `src/twins/framework`, `src/cli`, `src/control`, `src/mcp` and `src/shared`.
+
+Terms searched for Paystack: `paystack`, `Paystack`, `PAYSTACK`, `sk_test_`, `pk_test_`, `sk_live_`, `pk_live_`, `charge.success`, `authorization_url`, `x-paystack-signature`, `transfer_recipient`, `transaction.initialize`, `access_code`, `refund.pending`, `refund.processing`, `transfer.success`, `transfer.failed`, `transfer.reversed`.
+
+Terms searched for Flutterwave: `flutterwave`, `Flutterwave`, `FLUTTERWAVE`, `FLWSECK`, `FLWPUBK`, `verif-hash`, `charge.completed`, `tx_ref`, `flw_ref`, `amount_refunded`, `transfer.completed`, `verify_by_reference`, `v3/payments`, `payment.create`, `payment.verify`, `payment.list`.
+
+Results:
+
+- Every term returned zero matches in `src/core`, `src/twins/framework`, `src/cli`, `src/control`, `src/mcp` and `src/shared`.
+- The only matches in `src/` outside the twin folders were the approved registry entries in `src/twins/registry.ts`: the two imports and the two definitions.
+- `src/twins/paystack/data/banks.json` contains the bank name/slug `flutterwave-mfb-ng` from the recorded Paystack bank fixture. It is data inside the Paystack twin folder, not executable twin code.
+- Tests, research, fixtures and BUILD-LOG intentionally contain service facts; the production-source search is clean.
+
+### Event summaries
+
+Every custom request summary names its service: Paystack payment/refund/recipient/transfer summaries, Flutterwave payment/refund/transfer summaries, and the default framework summaries (“Paystack twin: …”, “Flutterwave twin: …”).
+
+Webhook summaries also name the service:
+- Paystack: charge succeeded; refund pending/processing/processed/needs attention/failed; transfer succeeded/failed/was reversed. The transfer and needs-attention wording was fixed in this review.
+- Flutterwave: payment successful/failed; refund status; transfer successful/failed. All read naturally.
+- Checkout result notices name the service (“Paystack payment succeeded…”, “Flutterwave payment failed…”).
+
+The T14 event-summaries conformance check verifies every declared webhook event produces a non-empty summary containing the twin display name. The Paystack webhook-summary unit test pins the natural phrases.
+
+### Conformance, no-network and registry
+
+- `test/conformance/paystack-conformance.test.ts` and `test/conformance/flutterwave-conformance.test.ts` both pass.
+- `test/integration/t7-network.test.ts` runs with the suite-wide T7 network patch; both twins’ tests and the two conformance tests run under it.
+- `test/unit/framework-registry-state.test.ts` asserts the production registry is exactly `["paystack", "flutterwave"]`.
+
+### Missing tests added
+
+- Paystack and Flutterwave `flaky-network` before/after tests.
+- Flutterwave `rate-limited` test.
+- Parameterized T4 webhook tests for delayed, duplicated, out-of-order, never-sent and verification-fails across both twins.
+- Paystack webhook-summary wording test.
+
+### Tests and gates
+
+- Added 9 tests: two flaky-network tests, one Flutterwave rate-limited test, five shared webhook-failure tests, and one Paystack webhook-summary test. The two service-specific framework/core cases were fixed with a dispatcher test update.
+- Total suite: 549 tests.
+- Coverage: the configured 100% line/branch thresholds for `src/core/` and `src/twins/framework/` pass; 97.7% of `src/` overall.
+- `pnpm test` passed twice in a row; all existing C18 gates pass.

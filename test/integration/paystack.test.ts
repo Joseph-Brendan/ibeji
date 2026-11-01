@@ -356,6 +356,42 @@ describe("T4 Paystack failures", () => {
     });
   });
 
+  it("T4 flaky-network drops before and after the action", async () => {
+    await withHarness(async (harness) => {
+      const before = harness.rules.add({
+        failureId: "flaky-network",
+        twins: ["paystack"],
+        actions: "transaction.initialize",
+        settings: { percent: 100, when: "before" },
+      });
+      await expect(
+        initialize(harness, {
+          amount: "10000",
+          email: "customer.one@example.com",
+          reference: "flaky-before",
+        }),
+      ).rejects.toThrow();
+      expect((await verify(harness, "flaky-before")).status).toBe(400);
+      harness.rules.remove(before.id);
+
+      const after = harness.rules.add({
+        failureId: "flaky-network",
+        twins: ["paystack"],
+        actions: "transaction.initialize",
+        settings: { percent: 100, when: "after" },
+      });
+      await expect(
+        initialize(harness, {
+          amount: "10000",
+          email: "customer.one@example.com",
+          reference: "flaky-after",
+        }),
+      ).rejects.toThrow();
+      expect((await verify(harness, "flaky-after")).status).toBe(200);
+      harness.rules.remove(after.id);
+    });
+  });
+
   it("T4 timeout-before-commit performs no action", async () => {
     await withHarness(async (harness) => {
       harness.rules.add({

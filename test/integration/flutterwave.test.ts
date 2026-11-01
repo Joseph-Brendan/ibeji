@@ -409,6 +409,61 @@ describe("T4 Flutterwave request failures", () => {
     });
   });
 
+  it("T4 rate-limited uses Flutterwave's error shape", async () => {
+    await withHarness(async (harness) => {
+      harness.rules.add({
+        failureId: "rate-limited",
+        twins: ["flutterwave"],
+        actions: "payment.create",
+      });
+      const response = await createPayment(harness, {});
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({
+        status: "error",
+        message: "Too many requests",
+        data: null,
+      });
+    });
+  });
+
+  it("T4 flaky-network drops before and after the action", async () => {
+    await withHarness(async (harness) => {
+      const before = harness.rules.add({
+        failureId: "flaky-network",
+        twins: ["flutterwave"],
+        actions: "payment.create",
+        settings: { percent: 100, when: "before" },
+      });
+      await expect(
+        createPayment(harness, {
+          amount: "7500",
+          tx_ref: "flaky-before",
+          redirect_url: "https://example.com/ibeji/flutterwave",
+          customer: { email: "customer.one@example.com" },
+        }),
+      ).rejects.toThrow();
+      expect(paymentRecord(harness, "flaky-before")).toBeUndefined();
+      harness.rules.remove(before.id);
+
+      const after = harness.rules.add({
+        failureId: "flaky-network",
+        twins: ["flutterwave"],
+        actions: "payment.create",
+        settings: { percent: 100, when: "after" },
+      });
+      await expect(
+        createPayment(harness, {
+          amount: "7500",
+          tx_ref: "flaky-after",
+          redirect_url: "https://example.com/ibeji/flutterwave",
+          customer: { email: "customer.one@example.com" },
+        }),
+      ).rejects.toThrow();
+      expect(paymentRecord(harness, "flaky-after")?.status).toBe("unpaid");
+      harness.rules.remove(after.id);
+    });
+  });
+
   it("T4 payment-declined overrides the success button", async () => {
     await withHarness(async (harness) => {
       await seedPayment(harness, "declined-override", { amount: "7500" });

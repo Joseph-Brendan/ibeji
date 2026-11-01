@@ -443,7 +443,7 @@ const authentication: ConformanceCheck = {
 
       const wrong = await fetch(`http://127.0.0.1:${harness.running.port}${path}`, {
         method: action.method,
-        headers: { authorization: "Bearer sk_test_ibeji_wrong000000000" },
+        headers: { authorization: "Bearer ibeji_wrong_key" },
       });
       assert.equal(wrong.status, 401);
 

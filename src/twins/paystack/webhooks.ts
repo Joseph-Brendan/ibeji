@@ -85,6 +85,19 @@ function recipientNameFrom(data: JsonValue): string | undefined {
   return typeof data.recipient.name === "string" ? data.recipient.name : undefined;
 }
 
+function statusLabel(status: string): string {
+  switch (status) {
+    case "success":
+      return "succeeded";
+    case "reversed":
+      return "was reversed";
+    case "needs-attention":
+      return "needs attention";
+    default:
+      return status.replaceAll("-", " ");
+  }
+}
+
 function summarize(draft: TwinWebhookDraft): string {
   const amount = amountFrom(draft.data);
   const formatted =
@@ -93,14 +106,14 @@ function summarize(draft: TwinWebhookDraft): string {
       : paystackMoney.formatDisplay(amount, currencyFrom(draft.data));
 
   if (draft.key.startsWith("refund.")) {
-    const status = draft.key.slice("refund.".length);
+    const status = statusLabel(draft.key.slice("refund.".length));
     return formatted === undefined
       ? `Paystack refund ${status} for ${draft.resourceId}`
       : `Paystack refund ${status} for ${formatted}`;
   }
 
   if (draft.key.startsWith("transfer.")) {
-    const status = draft.key.slice("transfer.".length);
+    const status = statusLabel(draft.key.slice("transfer.".length));
     const recipientName = recipientNameFrom(draft.data);
     if (formatted === undefined) {
       return `Paystack transfer ${status} for ${draft.resourceId}`;

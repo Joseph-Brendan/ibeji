@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RawWebhook } from "../../src/core/webhooks/types.js";
+import type { JsonValue, TwinWebhookDraft } from "../../src/twins/framework/types.js";
 import { paystackRetrySchedule } from "../../src/twins/paystack/retry.js";
 import { PAYSTACK_SIGNATURE_HEADER, paystackWebhooks } from "../../src/twins/paystack/webhooks.js";
 
@@ -53,5 +54,40 @@ describe("T5 Paystack webhook signing", () => {
       event: "charge.success",
       data: { id: 1, amount: 10000, currency: "NGN" },
     });
+  });
+
+  it("C4/T5 writes natural webhook summaries that name Paystack", () => {
+    const draft = (key: string, data: JsonValue): TwinWebhookDraft => ({
+      key,
+      actionId: "checkout.submit",
+      resourceId: "ref-1",
+      occurredAt: 1,
+      data,
+    });
+    const raw = { body: "{}", contentType: "application/json" as const };
+
+    expect(
+      paystackWebhooks.summarize(
+        draft("charge.success", { id: 1, amount: 500_000, currency: "NGN" }),
+        raw,
+      ),
+    ).toBe("Paystack charge succeeded for ₦5,000.00");
+    expect(
+      paystackWebhooks.summarize(
+        draft("refund.needs-attention", { id: 1, amount: 500_000, currency: "NGN" }),
+        raw,
+      ),
+    ).toBe("Paystack refund needs attention for ₦5,000.00");
+    expect(
+      paystackWebhooks.summarize(
+        draft("transfer.success", {
+          id: 1,
+          amount: 2_000_000,
+          currency: "NGN",
+          recipient: { name: "Emeka Obi" },
+        }),
+        raw,
+      ),
+    ).toBe("Paystack transfer succeeded for ₦20,000.00 to Emeka Obi");
   });
 });

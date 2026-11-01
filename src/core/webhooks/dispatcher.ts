@@ -615,7 +615,7 @@ function isSensitiveResponseHeader(name: string): boolean {
   return (
     lower.includes("authorization") ||
     lower.includes("signature") ||
-    lower === "verif-hash" ||
+    lower.includes("hash") ||
     lower === "proxy-authorization"
   );
 }

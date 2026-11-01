@@ -404,13 +404,14 @@ describe("T5 webhook dispatcher statuses and attempts", () => {
     expect(after?.attempts[1]?.attempt).toBe(2);
   });
 
-  it("T5 response: keeps 4 KB and removes authorization and signature headers", async () => {
+  it("T5 response: keeps 4 KB and removes authorization, signature and hash headers", async () => {
     const clock = new FakeClock(1_000);
     const server = await startServer({
       status: 200,
       headers: {
         Authorization: "Bearer response-secret",
         "x-fake-signature": "response-signature",
+        "x-secret-hash": "response-hash",
         "X-Keep": "kept",
       },
       body: "x".repeat(5_000),
@@ -429,6 +430,7 @@ describe("T5 webhook dispatcher statuses and attempts", () => {
     expect(attempt?.responseHeaders).toMatchObject({ "x-keep": "kept" });
     expect(attempt?.responseHeaders).not.toHaveProperty("authorization");
     expect(attempt?.responseHeaders).not.toHaveProperty("x-fake-signature");
+    expect(attempt?.responseHeaders).not.toHaveProperty("x-secret-hash");
     expect(attempt?.responseBody).not.toContain("response-secret");
   });
 });
