@@ -5,7 +5,7 @@ import { type Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 
 import { type Clock, realClock } from "../../core/clock.js";
-import { type ErrorCode, IbejiError, isIbejiError } from "../../core/errors.js";
+import { IbejiError, isIbejiError } from "../../core/errors.js";
 import { EventLog } from "../../core/events.js";
 import {
   type ActiveRule,
@@ -19,6 +19,14 @@ import { SeededRandom } from "../../core/random.js";
 import { fingerprint } from "../../core/redact.js";
 import type { WebhookDispatcher, WebhookTwin } from "../../core/webhooks/dispatcher.js";
 import { renderCheckoutPage, renderCheckoutResult } from "./html.js";
+import {
+  applyHtmlSecurityHeaders,
+  errorResponseFrom,
+  ibejiErrorResponse,
+  isAllowedHost,
+  isAllowedOrigin,
+  MAX_BODY_BYTES,
+} from "./http-security.js";
 import { FrameworkStateStore, MemoryIdempotencyStore } from "./state.js";
 import type {
   ActionContext,
@@ -41,7 +49,7 @@ import type {
   TwinWebhookDraft,
 } from "./types.js";
 
-export const MAX_BODY_BYTES = 1_048_576;
+export { MAX_BODY_BYTES } from "./http-security.js";
 
 export type WebhookTwinRegistry = Record<string, WebhookTwin>;
 
@@ -157,56 +165,6 @@ function pathMatches(pattern: string, path: string): boolean {
     return false;
   }
   return patternParts.every((part, index) => part.startsWith(":") || part === pathParts[index]);
-}
-
-function normaliseHost(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\.(?=:|$)/gu, "");
-}
-
-function isAllowedHost(value: string | undefined, port: number): boolean {
-  if (value === undefined) {
-    return false;
-  }
-  const host = normaliseHost(value);
-  return host === `127.0.0.1:${port}` || host === `localhost:${port}`;
-}
-
-function ibejiErrorResponse(code: ErrorCode): Response {
-  const error = new IbejiError(code);
-  return new Response(
-    JSON.stringify({
-      error: {
-        code: error.code,
-        what: error.what,
-        why: error.why,
-        fix: error.fix,
-      },
-    }),
-    {
-      status: error.status as number,
-      headers: { "content-type": "application/json; charset=utf-8" },
-    },
-  );
-}
-
-function errorResponseFrom(error: IbejiError): Response {
-  return new Response(
-    JSON.stringify({
-      error: {
-        code: error.code,
-        what: error.what,
-        why: error.why,
-        fix: error.fix,
-      },
-    }),
-    {
-      status: error.status ?? 500,
-      headers: { "content-type": "application/json; charset=utf-8" },
-    },
-  );
 }
 
 function twinResponseOf(response: TwinResponse): Response {
@@ -382,14 +340,6 @@ function authenticationChoiceOf(value: string): {
   };
 }
 
-function isAllowedOrigin(origin: string | undefined, port: number): boolean {
-  if (origin === undefined) {
-    return false;
-  }
-  const value = origin.toLowerCase();
-  return value === `http://127.0.0.1:${port}` || value === `http://localhost:${port}`;
-}
-
 function delay(clock: Clock, milliseconds: number): Promise<void> {
   if (milliseconds <= 0) {
     return Promise.resolve();
@@ -471,12 +421,7 @@ export async function startTwin(
     });
 
     if (context.res.headers.get("content-type")?.toLowerCase().includes("text/html") === true) {
-      context.res.headers.set(
-        "Content-Security-Policy",
-        "default-src 'self'; frame-ancestors 'none'",
-      );
-      context.res.headers.set("Referrer-Policy", "no-referrer");
-      context.res.headers.set("X-Content-Type-Options", "nosniff");
+      applyHtmlSecurityHeaders(context.res.headers);
     }
 
     const actionId = context.get("actionId");

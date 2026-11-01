@@ -33,6 +33,7 @@ describe("T1 events", () => {
     const events = new EventLog(new FakeClock());
     const received: number[] = [];
     const unsubscribe = events.subscribe((event) => received.push(event.id));
+    expect(events.subscriberCount).toBe(1);
 
     events.publish({ type: "request", scope: "alpha", summary: "One." });
     events.publish({ type: "response", scope: "alpha", summary: "Two." });
@@ -40,6 +41,7 @@ describe("T1 events", () => {
     events.publish({ type: "request", scope: "alpha", summary: "Three." });
 
     expect(received).toEqual([1, 2]);
+    expect(events.subscriberCount).toBe(0);
   });
 
   it("T1: a scope filter delivers only events for that scope", () => {

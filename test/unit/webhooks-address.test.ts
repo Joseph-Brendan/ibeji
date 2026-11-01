@@ -296,6 +296,16 @@ describe("C13 webhook address rules", () => {
     );
   });
 
+  it("C13: a DNS failure is refused as an address error", async () => {
+    await expectNotAllowed(
+      () =>
+        resolveAllowedWebhookUrl("http://broken.example.com/webhook", loopbackOnly, async () => {
+          throw Object.assign(new Error("no such host"), { code: "ENOTFOUND" });
+        }),
+      "host name that resolves",
+    );
+  });
+
   it("C13: invalid addresses and malformed URLs are refused", async () => {
     expect(isWebhookAddressAllowed("not-an-ip", 4, loopbackOnly)).toBe(false);
     await expectNotAllowed(

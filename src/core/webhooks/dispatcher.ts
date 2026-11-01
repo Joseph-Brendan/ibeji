@@ -46,7 +46,7 @@ export type WebhookDeliveryStatus =
   | "not-sent"
   | "abandoned";
 
-export const WEBHOOK_DELIVERY_STATUSES: readonly WebhookDeliveryStatus[] = [
+export const WEBHOOK_DELIVERY_STATUSES = [
   "queued",
   "scheduled",
   "sending",
@@ -55,7 +55,7 @@ export const WEBHOOK_DELIVERY_STATUSES: readonly WebhookDeliveryStatus[] = [
   "unreachable",
   "not-sent",
   "abandoned",
-];
+] as const satisfies readonly WebhookDeliveryStatus[];
 
 export type WebhookAttemptOutcome = "delivered" | "failed" | "unreachable";
 

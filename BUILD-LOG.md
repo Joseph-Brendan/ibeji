@@ -1551,3 +1551,55 @@ The T14 event-summaries conformance check verifies every declared webhook event 
 - Total suite: 549 tests.
 - Coverage: the configured 100% line/branch thresholds for `src/core/` and `src/twins/framework/` pass; 97.7% of `src/` overall.
 - `pnpm test` passed twice in a row; all existing C18 gates pass.
+
+---
+
+## Phase 5: control API and session security
+
+Date: 1 November 2026.
+
+Built the control API, dashboard sign-in, SSE live updates, credentials store, session file, export, port checking and `startSession`. No new dependency was needed: the control API uses the installed Hono, `@hono/node-server` and Zod, plus Node's `crypto`, `fs/promises`, `net` and `path` modules.
+
+### What was built
+
+- **Shared HTTP security.** The Host check, origin check, 1 MB body limit, C8 HTML headers and C12 error responses moved from the twin server into `src/twins/framework/http-security.ts`. The twin server and the control server use the same code. `MAX_BODY_BYTES` remains re-exported from the twin server for existing callers.
+- **Control API.** `src/control/app.ts` implements every C8 route under `/_ibeji/api/v1`, with Zod validation for every body and query. It uses only the registry, twin definitions and core services; no service name or service-specific field appears in `src/control`.
+- **Sign-in.** `src/control/secrets.ts` creates a 32-byte session token, single-use launch codes that expire after two minutes, and separate 32-byte UI tokens. Every token and launch code is compared with `crypto.timingSafeEqual`; launch codes are compared by iterating the stored codes, not by a direct map lookup. Used codes stay in memory only so they can be redacted from later errors.
+- **SSE.** `src/control/sse.ts` sends events with their id, applies a scope filter, catches up from `Last-Event-ID`, sends a heartbeat every 15 seconds on the injected clock, and removes subscribers on disconnect or cancellation.
+- **Credentials.** `src/control/credentials.ts` stores `~/.ibeji/credentials.json`, creates credentials for every registered twin on first start, keeps them across sessions, regenerates any value that is not an Ibeji test credential, and rotates one or all twins.
+- **Session file.** `src/control/session-file.ts` reads and writes `~/.ibeji/session.json` through a temporary file and rename, with mode 600 and a mode 700 `.ibeji` folder on macOS and Linux. A live process with a matching `/health` instance refuses a second start with `SESSION_ALREADY_RUNNING`; a dead, mismatched or invalid file is removed and noted as stale.
+- **Export.** `src/control/export.ts` and `src/control/redact.ts` build the C9 export, replace credentials and live keys with fingerprints, remove authorization/signature headers, and never include the session token, UI tokens or launch codes.
+- **Ports.** `src/control/session.ts` checks every requested fixed port before any server starts, refuses duplicates, never falls back to another port, and stops every server it started if a later start fails.
+- **Session lifecycle.** `startSession` loads or creates credentials, starts the chosen twins from the registry, starts the control server, writes the session file, starts a 250 ms webhook dispatch loop, and returns the control and twin addresses, credentials, seed, token, first launch code and first launch link. SIGINT, SIGTERM and process exit remove the session file; the signal handlers are added and removed with the session.
+
+### Decisions
+
+- **`home` means the user's home folder.** The session and credentials live in `<home>/.ibeji/`, matching C7 and C9. Tests pass a temporary folder; they never touch the real home folder.
+- **Session file shape.** It holds `instanceId`, `processId`, `ports: { control, twins }`, `token`, `startTime` (ISO) and `version`. The token is the only secret in it.
+- **Sign-in request bodies.** `POST /auth/exchange` accepts `{ "code": "..." }` and also accepts the alias `{ "launchCode": "..." }`; exactly one is required. The first form is the documented one.
+- **Response wrappers.** List routes return `{ twins }`, `{ failures }`, `{ rules }`, `{ scenarios }`, `{ deliveries }` or `{ events }`. Mutations return `{ ok: true, ... }` with the created or removed item where useful. These shapes give the UI, CLI and MCP server one stable contract.
+- **Twin metadata.** `GET /twins` returns action metadata, supported failures with their source, the zero-decimal list, the default fraction digits and a fraction map for known currencies. Label colour tokens are assigned in registry order as `twin-label-1`, `twin-label-2`, and so on; they are Ibeji palette tokens, never service colours.
+- **Event order and pagination.** `GET /events` returns events oldest first, defaulting to the newest 500. The limit is capped at 500. SSE always sends events oldest first.
+- **Reset routes.** Reset uses the dispatcher's existing `resetTwin`, which marks only queued and scheduled deliveries abandoned. Rules, scenarios, webhook URLs, credentials and the event log are untouched.
+- **Webhook URL body.** `PUT /twins/:twin/webhook-url` takes `{ "url": "..." }`; an empty string removes the URL. Every set URL is resolved and checked against the C13 policy before it is stored.
+- **Placeholder page.** `/` serves the Phase 6 placeholder. A launch code in `?launch=` is consumed by the server, the cookie is set, and the browser is redirected to `/` so the code leaves the address bar. The real UI can use `POST /auth/exchange` directly in Phase 6.
+- **Session loop.** The dispatcher loop runs every 250 ms on the injected clock. It marks queued and scheduled deliveries abandoned on stop and logs only the failure code, never a payload.
+- **Windows.** `chmod` is skipped there because NTFS does not use POSIX mode bits. `%USERPROFILE%\.ibeji` inherits the per-user access control of the user's profile, so other standard users do not get access. The mode 600/700 values are still passed on every write; the protection on Windows is the profile ACL, not the mode value.
+- **No SPEC.md change.** The route bodies and response wrappers are implementation details the spec leaves open. No C21 entry is needed.
+
+### Tests
+
+- Added 89 tests across 10 new test files, one new test helper, and existing test files: the shared HTTP helpers, secrets and launch codes, credentials, session-file helpers and health matching, export redaction, SSE unit and integration tests, control security, route coverage, partial sessions, port failures, session restart, signal/exit cleanup, and a DNS-failure webhook case.
+- Total suite: 638 tests across 56 files.
+- Every route in the C8 table is exercised with a bearer token; each twin-specific route runs for Paystack and Flutterwave where it applies.
+- Coverage: the configured 100% line/branch thresholds for `src/core/` and `src/twins/framework/` pass; overall coverage is above the C17 90% floor.
+- `pnpm test` passes twice in a row; all existing C18 gates pass.
+
+### Later
+
+- Decide how a separate `ibeji open` process asks the running session for a fresh launch code. The in-process `createLaunchCode` and `createLaunchLink` functions are ready and the first link is returned by `startSession`, but the C8 route table has no route for this request; this task deliberately does not add an unspecified API route.
+- Wire `startSession` into the real CLI (`start`, `open`, `status`, and the rest), the MCP server and the UI.
+- Load and validate the C6 scenario files from `scenarios/` in Step 5.2; `startSession` currently accepts an already-validated scenario list.
+- Reuse the control Zod schemas in the CLI and MCP server when those layers are built.
+- Add webhook attempt events for the Live activity page if the UI needs them; the Webhooks page already reads deliveries and attempts.
+- Run the Windows file-permission check on a real Windows CI job; this machine only proves the macOS modes.

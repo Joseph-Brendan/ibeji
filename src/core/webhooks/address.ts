@@ -183,7 +183,18 @@ export async function resolveAllowedWebhookUrl(
 ): Promise<ResolvedWebhookUrl> {
   const url = parseWebhookUrl(rawUrl);
   const hostname = dnsHostname(url);
-  const addresses = await resolver(hostname);
+
+  let addresses: readonly DnsAddress[];
+  try {
+    addresses = await resolver(hostname);
+  } catch (error) {
+    throw notAllowed(
+      "The webhook URL is not allowed.",
+      `${hostname} could not be resolved.`,
+      "Use a host name that resolves to at least one address.",
+      error,
+    );
+  }
 
   if (addresses.length === 0) {
     throw notAllowed(

@@ -3,20 +3,23 @@ import { type Clock, realClock } from "./clock.js";
 export const MAX_EVENTS = 5000;
 export const IBEJI_SCOPE = "ibeji";
 
-export type EventType =
-  | "request"
-  | "response"
-  | "webhook-sent"
-  | "webhook-delivered"
-  | "webhook-failed"
-  | "failure-fired"
-  | "rule-added"
-  | "rule-removed"
-  | "scenario-started"
-  | "scenario-step"
-  | "scenario-finished"
-  | "warning"
-  | "state-reset";
+export const EVENT_TYPES = [
+  "request",
+  "response",
+  "webhook-sent",
+  "webhook-delivered",
+  "webhook-failed",
+  "failure-fired",
+  "rule-added",
+  "rule-removed",
+  "scenario-started",
+  "scenario-step",
+  "scenario-finished",
+  "warning",
+  "state-reset",
+] as const;
+
+export type EventType = (typeof EVENT_TYPES)[number];
 
 export type EventDetails = Readonly<Record<string, unknown>>;
 
@@ -97,5 +100,9 @@ export class EventLog {
 
   get size(): number {
     return this.events.length;
+  }
+
+  get subscriberCount(): number {
+    return this.subscribers.size;
   }
 }
