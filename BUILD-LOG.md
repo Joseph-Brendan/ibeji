@@ -1248,3 +1248,63 @@ These actions could not be recorded successfully. Their success shapes and life-
 - Add a documented transfer-list action only if C4a adds it; it is not in v1.
 - Resolve the full `transfer.failed` and `transfer.reversed` webhook payloads when Paystack documentation or fixtures provide them.
 - Revisit transfer success timing if a recorded successful transfer fixture becomes available.
+
+---
+
+## Phase 4, Step 4.5: Flutterwave twin payments, checkout and refunds
+
+Date: 1 November 2026.
+
+Added the Flutterwave v3 twin foundation, hosted payments, the local checkout page, refunds, webhooks, and the payment/refund parts of the failure library. No Flutterwave transfers or banks were added in this step.
+
+### What was built
+
+- **Definition and registry.** `flutterwaveTwin` uses id `flutterwave`, display name `Flutterwave`, default port `4402`, `/v3` paths, `idempotency: { mode: "none" }`, and the shared framework. `src/twins/registry.ts` now lists Paystack and Flutterwave.
+- **Authentication.** Bearer secret auth, live-key detection for the undocumented full live format via the documented `FLWPUBK-` and `FLWSECK-` prefixes, Flutterwave 401 bodies, and the core's live-key warning event with only a fingerprint.
+- **Credentials.** Public `FLWPUBK_TEST-ibeji-...`, secret `FLWSECK_TEST-ibeji-...`, and a separate webhook hash `ibeji_...`. The webhook hash is the `verif-hash` value; the encryption key is not issued because C4b uses the hosted flow.
+- **Payments.** `POST /v3/payments`, `GET /v3/transactions/:id/verify`, `GET /v3/transactions/verify_by_reference`, and `GET /v3/transactions`. Verify by ID is the fetch (C21 D32); no `payment.fetch` or invented `/v3/transactions/:id` exists.
+- **Checkout.** Create returns `data.link` to the twin's own `/checkout/:tx_ref` page. The shared renderer shows the Ibeji test-checkout label, amount, currency, email, reference and the success/failed/cancelled buttons. Successful and failed choices set the Flutterwave status and emit `charge.completed`; cancelled maps to the documented failed result (C21 D36). The redirect carries `status`, `tx_ref`, and `transaction_id`.
+- **Refunds.** `POST /v3/transactions/:id/refund`, `GET /v3/refunds/:id` (a bare refund object), and `GET /v3/refunds`. Partial and full refunds, the NGN 100 / KES 10 minimums, remaining-amount limits, the duplicate-partial-processing error, a two-minute processing window, and a completion webhook.
+- **Webhooks.** `charge.completed` for successful and failed payments, failed payments include the documented `event.type`, and the refund webhook is the documented bare object with no event name. `verif-hash` is a shared-secret comparison. The retry schedule is three retries 30 minutes apart.
+- **Failures and summaries.** Slow response, timeout-before/after-commit, server error, rate limit, flaky network, webhook failures, and payment-declined are declared. Plain-English request and webhook summaries name Flutterwave.
+
+### Where Flutterwave differs from Paystack, and how the code handles it
+
+- **API version and paths.** Flutterwave v3 uses `/v3/payments` and `/v3/transactions...`; Paystack uses `/transaction...`. The Flutterwave paths live only in `src/twins/flutterwave/`.
+- **Success envelope.** Flutterwave uses `{status: "success", message, data}`; Paystack uses `{status: true, message, data}`. `flutterwave/responses.ts` owns the Flutterwave envelope.
+- **Error envelope.** Flutterwave uses `{status: "error", message, data}`, validation errors may use `errors: [{field, message}]` and omit `data`, and 500 uses `{error_id, message, code: "app_error"}`. Paystack's `status: false`/`meta`/`type`/`code` shape is never used.
+- **Authentication errors.** Missing key is `Authorization required`; a wrong or live key is `Invalid authorization key`, both in the Flutterwave envelope. Paystack uses its own unauthorized shape.
+- **Credentials and webhook verification.** Flutterwave has a separate webhook hash in `verif-hash`, compared as a shared secret. Paystack signs the body with HMAC-SHA512 in `x-paystack-signature`.
+- **Money.** Flutterwave v3 request and response amounts are main currency units, not kobo/cents. The twin parses decimal request text with digit arithmetic (BigInt) into Ibeji's smallest-unit integer, formats service amounts back to main-unit text, and displays `NGN 7,500.00`. Paystack treats the wire amount as the smallest unit.
+- **Money decimal limit.** The v3 research has no per-currency decimal table. The twin uses two decimal places for every currency and rejects more in a Flutterwave error body. This is recorded here; it is not a Paystack rule.
+- **Payment objects.** Flutterwave uses `tx_ref`, `flw_ref`, `created_at`, `amount_settled`, `card`, and a nested customer; the list item uses string IDs and flattened customer fields. Paystack's transaction fields and list shape are not reused.
+- **Hosted payment response.** Flutterwave returns `data.link`; Paystack returns `data.authorization_url`. The Flutterwave link points at this twin's `/checkout/:tx_ref`.
+- **Unpaid hosted payment.** Flutterwave has no transaction until checkout starts, so verify by ID or reference returns the recorded 400 `No transaction was found for this id`. Paystack creates a pending transaction at initialize time.
+- **Checkout outcomes.** Flutterwave has success, failed, and cancelled; cancelled is recorded as failed (D36), and both successful and failed checkouts send `charge.completed`. Paystack has success, declined, and abandoned, and only success sends a charge webhook.
+- **Refund routes and shapes.** Flutterwave uses `/v3/transactions/:id/refund` and `/v3/refunds`; the create object uses `comments`, object `meta`, and `tx_id`, while fetch/list use `comment`, string `meta`, and `transaction_id`. Fetch is a bare object. Paystack's refund routes, envelope, and field names are not reused.
+- **Refund limits and errors.** Flutterwave's documented NGN 100 / KES 10 minimum and its duplicate-partial-processing message are implemented. The recorded duplicate-processing error is returned exactly.
+- **Charge webhook object.** `charge.completed` uses the documented webhook data, which omits the verify object's `meta`, `amount_settled`, and card token; failed events add the documented `event.type`. Paystack's charge webhook reuses its verify data.
+- **Refund webhook.** Flutterwave's refund webhook is a bare object with no event name; the adapter declares `wireName: null` and builds the body directly. Paystack sends named `refund.*` events inside its event/data envelope.
+- **Refund status timing.** The recorded create response showed `completed`, while the recorded second-refund error showed a refund still processing. Ibeji starts refunds at `processing` and moves to `completed` after two minutes so both behaviours and the status-change requirement can be tested. This timing is a local Ibeji choice, not a Flutterwave timing.
+- **Retry schedule.** Flutterwave retries three times at 30-minute intervals (treated as enabled); Paystack retries ten times hourly in test mode.
+- **Failure support.** Flutterwave does not support `transfer-reversed` (D33). `transfer-stuck-pending` and `bank-resolve-fails` are deferred until the transfer and bank actions exist, because T14 requires every declared failure action to exist.
+- **T14 tampered body.** Flutterwave's `verif-hash` does not cover the body. To satisfy the shared conformance tampered-body check, `webhooks.verify` also requires canonical JSON; this is an Ibeji guard, not a Flutterwave signature.
+- **Create validation and idempotency.** The recorded invalid-payment fixture requires `redirect_url`, so the twin requires it even though the OpenAPI schema marks it optional. A repeated `tx_ref` is rejected with a Flutterwave error; the research marks duplicate-reference behaviour UNCONFIRMED.
+- **List item shape.** The recorded payment-list fixtures are empty. The non-empty item follows the documented list-item fields, not the verify object shape.
+- **Phone field spelling.** The research records both `phone_number` and `phonenumber`; the twin accepts either.
+- **No SPEC.md change.** No C21 entry is needed. This implements C4b payments, checkout and refunds, the applicable C5 failures, C10, C20, C21 D32/D36/D40, and C17 T3/T4/T5/T7/T14.
+
+### Tests
+
+- Added 60 tests: T3 for all 12 payment fixtures and all 6 refund fixtures; T14 conformance; T5 `verif-hash`, build, tamper and retry checks; checkout success/failed/cancelled and redirects; T4 slow response, both timeouts, server error, payment-declined, and Kola refunds; authentication and live-key handling; money units, decimal rejection, and two fast-check round-trip properties.
+- Total suite: 504 tests.
+- Coverage: the configured 100% line/branch thresholds for `src/core/` and `src/twins/framework/` pass; 97.1% of `src/` overall.
+- `pnpm test` passed twice in a row; all existing C18 gates pass.
+
+### Later
+
+- Add Flutterwave transfers (`transfer.create`, `transfer.fetch`, `transfer.list`) and banks (`bank.list`, `bank.resolve`) in the next step, then add `transfer-stuck-pending` and `bank-resolve-fails` support.
+- Resolve the exact v3 decimal rules and refund status timing when Flutterwave documentation or fixtures provide them.
+- Implement the documented per-refund `callbackurl` webhook override when the framework can route a single delivery to a different URL.
+- Add the scenario files and control API/CLI wiring when those layers are built.
+- Copy any Flutterwave data files into the built package when the server bundle is added.
