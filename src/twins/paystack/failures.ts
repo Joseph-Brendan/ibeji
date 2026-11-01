@@ -9,62 +9,65 @@ const TRANSACTION_ACTIONS = [
 ] as const;
 
 const CHECKOUT_ACTIONS = ["checkout.submit"] as const;
+const REFUND_ACTIONS = ["refund.create", "refund.fetch", "refund.list"] as const;
+const REFUND_WRITE_ACTIONS = ["refund.create"] as const;
+const WEBHOOK_ACTIONS = ["checkout.submit", "refund.create"] as const;
 
 export const paystackFailureSupport: readonly FailureSupport[] = [
   {
     id: "slow-response",
     source: "assumed",
-    actions: TRANSACTION_ACTIONS,
+    actions: [...TRANSACTION_ACTIONS, ...REFUND_ACTIONS],
   },
   {
     id: "timeout-after-commit",
     source: "assumed",
-    actions: TRANSACTION_ACTIONS,
+    actions: [...TRANSACTION_ACTIONS, ...REFUND_WRITE_ACTIONS],
   },
   {
     id: "timeout-before-commit",
     source: "assumed",
-    actions: TRANSACTION_ACTIONS,
+    actions: [...TRANSACTION_ACTIONS, ...REFUND_WRITE_ACTIONS],
   },
   {
     id: "server-error",
     source: "docs",
-    actions: TRANSACTION_ACTIONS,
+    actions: [...TRANSACTION_ACTIONS, ...REFUND_ACTIONS],
   },
   {
     id: "rate-limited",
     source: "docs",
-    actions: TRANSACTION_ACTIONS,
+    actions: [...TRANSACTION_ACTIONS, ...REFUND_ACTIONS],
   },
   {
     id: "flaky-network",
     source: "assumed",
-    actions: TRANSACTION_ACTIONS,
+    actions: [...TRANSACTION_ACTIONS, ...REFUND_ACTIONS],
   },
   {
     id: "webhook-delayed",
     source: "assumed",
-    actions: CHECKOUT_ACTIONS,
+    actions: WEBHOOK_ACTIONS,
   },
   {
     id: "webhook-duplicated",
     source: "assumed",
-    actions: CHECKOUT_ACTIONS,
+    actions: WEBHOOK_ACTIONS,
   },
   {
     id: "webhook-out-of-order",
     source: "assumed",
-    actions: CHECKOUT_ACTIONS,
+    actions: WEBHOOK_ACTIONS,
   },
   {
     id: "webhook-never-sent",
     source: "assumed",
-    actions: CHECKOUT_ACTIONS,
+    actions: WEBHOOK_ACTIONS,
   },
   {
     id: "webhook-verification-fails",
     source: "docs",
-    actions: CHECKOUT_ACTIONS,
+    actions: WEBHOOK_ACTIONS,
   },
   {
     id: "payment-declined",

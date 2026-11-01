@@ -1145,3 +1145,47 @@ Built the Paystack twin foundation, transactions, test checkout page, webhook si
 - Record or decide the full `charge.success`, `transfer.failed`, `transfer.reversed`, and refund event payloads; they remain UNCONFIRMED.
 - Resolve the official Paystack Node library base-URL limitation for T15.
 - Add the six C6 scenarios and the control API/session wiring.
+
+---
+
+## Phase 4, Step 4.3: Paystack twin refunds
+
+Date: 1 November 2026.
+
+Added Paystack refund create, fetch, and list, partial refunds, refund limits, status changes over time, refund webhooks, and the Kola timeout case. No transfer or bank actions were added.
+
+### What was built
+
+- **Actions.** `refund.create` (`POST /refund`), `refund.fetch` (`GET /refund/:id`), and `refund.list` (`GET /refund`). The definition and registry pick them up through the existing action list.
+- **Create shape.** The fixture-confirmed create response, including the nested transaction object with stringified metadata, `expected_at`, `channel`, `deducted_amount: 0`, `fully_deducted: false`, `reason: "PENDING"`, and `customer: null`.
+- **Fetch and list shape.** The fixture-confirmed fetch/list object with integer transaction id, dispute/settlement nulls, `createdAt`, `transaction_reference`, full customer object, `refund_type`, `transaction_amount`, `refund_channel`, `session_id`, and `retriable`. List meta adds `totalRetriable` and `partialAmountLeft`.
+- **Partial refunds and limits.** Amount may be omitted (remaining refundable) or supplied. A refund cannot exceed the amount paid, cannot exceed the remaining refundable amount, and cannot be created against a transaction that did not succeed. A fully refunded transaction rejects another refund.
+- **Status transitions.** New refunds start `pending`; after 60 seconds they become `processing`; after 120 seconds they become `processed` and get `refunded_at`. Timers use the injected clock.
+- **Webhooks.** `refund.pending` is emitted at creation; `refund.processing` and `refund.processed` are emitted by the status timers. The pending payload follows the documented `refund.pending` example, with the amount as a string. The other payload shapes reuse that data shape because the research file marks them UNCONFIRMED.
+- **Event summary.** `refund.create` publishes a plain-English summary, for example `Your app refunded ₦1,500 through Paystack for transaction refund-summary`.
+- **Failures.** Refund actions support the shared request failures, and `refund.create` supports `timeout-after-commit`, so the Kola case can create exactly one refund and then lose the reply.
+
+### Decisions and research/fixture choices
+
+- **Status timings are an Ibeji design, not a Paystack fact.** Research records the five refund status names but no transition timings. The twin uses 60 seconds to `processing` and 120 seconds to `processed`; this is documented here and nowhere claimed as Paystack behaviour.
+- **The create and fetch error bodies that fixtures confirm are copied exactly.** The invalid transaction response and the 401 invalid-refund-ID response match the fixtures.
+- **Refund limit and failed-transaction errors are not fixture-confirmed.** The twin uses the Paystack error envelope with `validation_error` and descriptive codes: `transaction_not_successful`, `amount_exceeds_transaction_amount`, `refund_amount_exceeds_remaining`, and `transaction_fully_refunded`.
+- **Omitted amount means the remaining refundable amount.** Research says the amount defaults to the original transaction amount and cannot exceed it; using the remaining amount avoids creating a refund that would exceed the total after a prior partial refund.
+- **`refund.processing` and `refund.processed` payloads are UNCONFIRMED.** They use the documented `refund.pending` data shape with the status changed. `refund.failed` and `refund.needs-attention` are declared as event definitions but are not produced by the normal test flow.
+- **The Kola test sends one refund request.** Paystack documents no general idempotency key, so the twin does not invent one; the test proves one request that times out leaves exactly one refund.
+- **No SPEC.md change.** No C21 entry is needed; this implements C4a refunds, C5 failure ordering for `refund.create`, and C17 T3/T4/T5/T7/T14.
+
+### Tests
+
+- Added 13 tests: T3 for all six refund fixtures, partial and cumulative refund limits, failed-transaction refunds, Kola timeout, status/webhook transitions with the fake clock, numeric transaction IDs and list filters, and the refund event summary.
+- Total suite: 423 tests.
+- Coverage: 100% of `src/core/` and `src/twins/framework/`; 98.71% of `src/` overall.
+- Paystack still passes all 17 T14 conformance checks.
+- `pnpm test` passed twice in a row; all existing C18 gates pass.
+
+### Later
+
+- Add the `kola-case` scenario file when the scenario catalog is built in Step 5.2.
+- Decide whether `needs-attention` and `failed` need a test-card or failure-driven flow.
+- Replace the local status timings if Paystack documentation or a real story supplies exact refund transitions.
+- Add refund transfer/bank interactions only when those Paystack actions are built.

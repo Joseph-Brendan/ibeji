@@ -130,6 +130,51 @@ export async function checkoutPage(harness: PaystackHarness, reference: string):
   );
 }
 
+export async function createRefund(
+  harness: PaystackHarness,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/refund`, {
+    method: "POST",
+    headers: authorizationHeader(),
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchRefund(harness: PaystackHarness, id: string): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/refund/${encodeURIComponent(id)}`, {
+    headers: authorizationHeader(),
+  });
+}
+
+export async function listRefunds(harness: PaystackHarness, query = ""): Promise<Response> {
+  return fetch(`http://127.0.0.1:${harness.running.port}/refund${query}`, {
+    headers: authorizationHeader(),
+  });
+}
+
+export async function seedSuccessfulTransaction(
+  harness: PaystackHarness,
+  reference: string,
+  amount = 10_000,
+  email = "customer.one@example.com",
+): Promise<void> {
+  const initialized = await initialize(harness, {
+    amount: String(amount),
+    email,
+    currency: "NGN",
+    reference,
+    metadata: JSON.stringify({ recorder: "ibeji" }),
+  });
+  if (initialized.status !== 200) {
+    throw new Error(`initialize failed with ${initialized.status}`);
+  }
+  const paid = await checkout(harness, reference, "success");
+  if (paid.status !== 200) {
+    throw new Error(`checkout failed with ${paid.status}`);
+  }
+}
+
 export async function transactionRecord(harness: PaystackHarness, reference: string) {
   return harness.state.read("transactions", reference, paystackTransactionSchema);
 }

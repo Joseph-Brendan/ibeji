@@ -64,18 +64,43 @@ function amountFrom(data: JsonValue): number | undefined {
     return undefined;
   }
   const amount = data.amount;
-  return typeof amount === "number" && Number.isSafeInteger(amount) ? amount : undefined;
+  if (typeof amount === "number" && Number.isSafeInteger(amount)) {
+    return amount;
+  }
+  if (typeof amount === "string" && /^\d+$/u.test(amount)) {
+    const parsed = Number(amount);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function currencyFrom(data: JsonValue): string {
+  return isRecord(data) && typeof data.currency === "string" ? data.currency : "NGN";
 }
 
 function summarize(draft: TwinWebhookDraft): string {
   const amount = amountFrom(draft.data);
+  if (draft.key.startsWith("refund.")) {
+    const status = draft.key.slice("refund.".length);
+    if (amount === undefined) {
+      return `Paystack refund ${status} for ${draft.resourceId}`;
+    }
+    return `Paystack refund ${status} for ${paystackMoney.formatDisplay(amount, currencyFrom(draft.data))}`;
+  }
   if (amount === undefined) {
     return `Paystack charge succeeded for ${draft.resourceId}`;
   }
-  const currency =
-    isRecord(draft.data) && typeof draft.data.currency === "string" ? draft.data.currency : "NGN";
-  return `Paystack charge succeeded for ${paystackMoney.formatDisplay(amount, currency)}`;
+  return `Paystack charge succeeded for ${paystackMoney.formatDisplay(amount, currencyFrom(draft.data))}`;
 }
+
+const EVENT_NAMES: Readonly<Record<string, string>> = {
+  "charge.success": "charge.success",
+  "refund.pending": "refund.pending",
+  "refund.processing": "refund.processing",
+  "refund.needs-attention": "refund.needs-attention",
+  "refund.failed": "refund.failed",
+  "refund.processed": "refund.processed",
+};
 
 export const paystackWebhooks: WebhookAdapter = {
   events: [
@@ -85,10 +110,40 @@ export const paystackWebhooks: WebhookAdapter = {
       objectType: "transaction",
       actions: ["transaction.initialize", "checkout.submit"],
     },
+    {
+      key: "refund.pending",
+      wireName: "refund.pending",
+      objectType: "refund",
+      actions: ["refund.create"],
+    },
+    {
+      key: "refund.processing",
+      wireName: "refund.processing",
+      objectType: "refund",
+      actions: ["refund.create"],
+    },
+    {
+      key: "refund.needs-attention",
+      wireName: "refund.needs-attention",
+      objectType: "refund",
+      actions: ["refund.create"],
+    },
+    {
+      key: "refund.failed",
+      wireName: "refund.failed",
+      objectType: "refund",
+      actions: ["refund.create"],
+    },
+    {
+      key: "refund.processed",
+      wireName: "refund.processed",
+      objectType: "refund",
+      actions: ["refund.create"],
+    },
   ],
   build: (draft) => ({
     body: JSON.stringify({
-      event: "charge.success",
+      event: EVENT_NAMES[draft.key] ?? draft.key,
       data: draft.data,
     }),
     contentType: "application/json",

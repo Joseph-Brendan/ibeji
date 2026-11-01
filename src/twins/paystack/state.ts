@@ -50,6 +50,30 @@ export const paystackTransactionSchema = z.object({
 
 export type PaystackTransaction = z.infer<typeof paystackTransactionSchema>;
 
+export const paystackRefundSchema = z.object({
+  id: z.string(),
+  refundId: z.number().int(),
+  transactionId: z.number().int(),
+  transactionReference: z.string(),
+  transactionAmount: z.number().int(),
+  transactionPaidAt: z.string(),
+  transactionMetadata: z.string().nullable(),
+  currency: z.string(),
+  email: z.string(),
+  customerId: z.number().int(),
+  customerCode: z.string(),
+  amount: z.number().int(),
+  status: z.enum(["pending", "processing", "needs-attention", "failed", "processed"]),
+  createdAt: z.string(),
+  expectedAt: z.string(),
+  refundedAt: z.string().nullable(),
+  customerNote: z.string(),
+  merchantNote: z.string(),
+  reason: z.string(),
+});
+
+export type PaystackRefund = z.infer<typeof paystackRefundSchema>;
+
 export const paystackCollections: readonly CollectionDefinition[] = [
   {
     id: "transactions",
@@ -60,6 +84,18 @@ export const paystackCollections: readonly CollectionDefinition[] = [
       { key: "amount", label: "Amount", kind: "money" },
       { key: "currency", label: "Currency", kind: "text" },
       { key: "email", label: "Customer email", kind: "text" },
+      { key: "createdAt", label: "Created", kind: "date" },
+    ],
+  },
+  {
+    id: "refunds",
+    label: "Refunds",
+    columns: [
+      { key: "refundId", label: "Refund ID", kind: "text" },
+      { key: "transactionReference", label: "Transaction", kind: "text" },
+      { key: "status", label: "Status", kind: "text" },
+      { key: "amount", label: "Amount", kind: "money" },
+      { key: "currency", label: "Currency", kind: "text" },
       { key: "createdAt", label: "Created", kind: "date" },
     ],
   },

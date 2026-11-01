@@ -77,6 +77,12 @@ function messageFor(action: ActionDefinition): string {
       return "Transaction retrieved";
     case "transaction.list":
       return "Transactions retrieved";
+    case "refund.create":
+      return "Refund has been queued for processing";
+    case "refund.fetch":
+      return "Refund retrieved";
+    case "refund.list":
+      return "Refunds retrieved";
     default:
       return "Request successful";
   }
@@ -254,3 +260,59 @@ export function validationErrorResponse(message: string, code: string): TwinResp
     code,
   });
 }
+
+export const refundTransactionNotFoundResponse = (): TwinResponse =>
+  paystackError(400, "Transaction not found", {
+    nextStep: "Ensure the transaction reference or ID is correct",
+    type: "validation_error",
+    code: "transaction_not_found",
+  });
+
+export const refundTransactionRequiredResponse = (): TwinResponse =>
+  paystackError(400, "Transaction is required", {
+    nextStep: "Provide the transaction reference or ID.",
+    type: "validation_error",
+    code: "missing_params",
+  });
+
+export const refundTransactionNotSuccessfulResponse = (): TwinResponse =>
+  paystackError(400, "Transaction has not been successful", {
+    nextStep: "Only successful transactions can be refunded.",
+    type: "validation_error",
+    code: "transaction_not_successful",
+  });
+
+export const refundAmountExceedsPaidResponse = (): TwinResponse =>
+  paystackError(400, "Refund amount cannot exceed the transaction amount", {
+    nextStep: "Use an amount no larger than the amount paid.",
+    type: "validation_error",
+    code: "amount_exceeds_transaction_amount",
+  });
+
+export const refundAmountExceedsRemainingResponse = (): TwinResponse =>
+  paystackError(400, "Refund amount exceeds the remaining refundable amount", {
+    nextStep: "Use the remaining amount or less.",
+    type: "validation_error",
+    code: "refund_amount_exceeds_remaining",
+  });
+
+export const refundFullyRefundedResponse = (): TwinResponse =>
+  paystackError(400, "Transaction has already been fully refunded", {
+    nextStep: "Create a new payment before refunding again.",
+    type: "validation_error",
+    code: "transaction_fully_refunded",
+  });
+
+export const invalidRefundIdResponse = (): TwinResponse =>
+  paystackError(401, "Please provide a valid refund ID. ID should be a valid integer", {
+    nextStep: "Provide all required params ",
+    type: "validation_error",
+    code: "missing_params",
+  });
+
+export const refundNotFoundResponse = (): TwinResponse =>
+  paystackError(404, "Refund not found", {
+    nextStep: "Check the refund ID and try again.",
+    type: "validation_error",
+    code: "refund_not_found",
+  });
