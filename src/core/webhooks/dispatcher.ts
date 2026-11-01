@@ -132,7 +132,7 @@ type HttpResult = {
  */
 export class WebhookDispatcher {
   private readonly clock: Clock;
-  private readonly twins: WebhookTwinSource;
+  private readonly twins: Record<string, WebhookTwin>;
   private readonly random: RandomSource;
   private readonly addressPolicy: AddressPolicy;
   private readonly dnsResolver: DnsResolver;
@@ -145,10 +145,20 @@ export class WebhookDispatcher {
 
   constructor(options: WebhookDispatcherOptions) {
     this.clock = options.clock;
-    this.twins = options.twins;
+    this.twins = { ...options.twins };
     this.random = options.random;
     this.addressPolicy = options.addressPolicy ?? DEFAULT_ADDRESS_POLICY;
     this.dnsResolver = options.dnsResolver ?? defaultDnsResolver;
+  }
+
+  /** Register a running twin's signer and schedule with this dispatcher. */
+  registerTwin(twinId: string, twin: WebhookTwin): void {
+    this.twins[twinId] = twin;
+  }
+
+  /** Remove a stopped twin so no new delivery can be addressed to it. */
+  unregisterTwin(twinId: string): void {
+    delete this.twins[twinId];
   }
 
   enqueue(input: EnqueueWebhookInput): readonly WebhookDelivery[] {

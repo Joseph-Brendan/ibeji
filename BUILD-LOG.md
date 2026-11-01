@@ -1045,3 +1045,52 @@ Built the generic webhook dispatcher and address policy in `src/core/webhooks/`.
 
 - Wire the dispatcher to the session loop and event log in the control layer.
 - Confirm the assumed-schedule rule when the Stripe twin is built in Phase 4.
+
+---
+
+## Phase 4, Step 4.1: twin framework and conformance suite
+
+Date: 1 November 2026.
+
+Built the generic twin framework, the T3 contract helper, the T14 conformance suite, and the whole-suite T7 network guard. No real twin was built: `src/twins/registry.ts` is the only list and is empty.
+
+### What was built
+
+- **Dependencies.** Added `hono@4.13.14` and `@hono/node-server@2.1.5` as runtime dependencies. Read their installed READMEs and type definitions before use. Hono has no dependencies or install script; the Node adapter has only a peer dependency on Hono. No native code, binding, or install script is present. Their installed size is about 3 MB.
+- **Definition types.** `src/twins/framework/types.ts` contains the `TwinDefinition` and all adapter and supporting types from TWIN-DESIGN.md section 2. Twin and action ids are runtime strings, not unions.
+- **Registry.** `src/twins/registry.ts` is the only list of twin definitions. It is empty; `createTwinRegistry` exists for tests and future registration. Duplicate ids are refused.
+- **Server.** `startTwin(definition, options)` builds a Hono app and always calls `serve` with `hostname: "127.0.0.1"`. It reports the bound port, checks the Host header against that port, sends no CORS headers (and strips any the twin tries to add), adds CSP/referrer/nosniff headers to HTML, limits bodies to 1 MB, emits request/response events, runs authentication and live-key detection, applies the shared C5 failure step, serves and submits the shared checkout page with an Origin check, and registers the twin's signer and retry schedule with the dispatcher. It returns a handle whose `stop()` unregisters and closes the server.
+- **State.** `FrameworkStateStore` adapts the core JSON store to the twin interface. The core store gained `remove` so the interface is complete. `MemoryIdempotencyStore` is the in-memory optional idempotency store.
+- **Checkout renderer.** `src/twins/framework/html.ts` renders the shared server-side checkout page and result page with Ibeji tokens, local fonts fallback, the amount via the twin's `formatDisplay`, the record email/reference, declared outcomes, authentication choices, and a failure-override notice. No service branding or internet assets are used.
+- **Contract helper.** `src/twins/framework/contract.ts` loads a fixture, sends its request to a running twin, and compares status, keys at every level, and value types. Missing, renamed, extra, wrong-type and wrong-length fields produce a `ContractMismatchError` naming each path. Values such as ids and dates may differ.
+- **Conformance suite.** `runConformance(definition)` runs 17 checks: definition contract, lifecycle, Host/HTTP safety, credentials, authentication, action/route parity, events, failure support, failure order, checkout, webhook build/sign, verification-failure methods, webhook delivery behaviours, money, idempotency, event summaries, and registry extensibility. It reads only the definition; it contains no service names or twin ids.
+- **Fake twins.** `test/fixtures/fake-twin/` has a complete fake definition, a deliberately broken live-key twin, a broken route twin, and a header-idempotency variant. They are test fixtures only.
+- **T7 guard.** `test/setup/t7-network.ts` is loaded for the whole suite. It removes `HTTP_PROXY`, `HTTPS_PROXY`, `http_proxy`, `https_proxy`, and patches `net.Socket.prototype.connect` so only `127.0.0.1`, `::1`, `::ffff:127.0.0.1`, `[::1]` and `localhost` can be reached. UNIX sockets are left alone because they do not leave the computer.
+
+### Decisions
+
+- **One server pipeline, many adapters.** The framework owns routing, Host checks, body limits, security headers, event emission, authentication orchestration, the C5 order, checkout rendering, and dispatcher registration. Each twin still owns its key parsing, live detection, error bodies, result shaping, webhook body/signature/verification, money rules, and checkout outcome semantics.
+- **The Host check uses the actual bound port.** Port 0 becomes the real port before any request is handled. `127.0.0.1:<port>` and `localhost:<port>` are accepted case-insensitively and with a trailing dot; everything else gets `FORBIDDEN_HOST`.
+- **Live-key events never contain the key.** The warning event carries only the SHA-256 fingerprint (first eight hex characters), the action id, and the fixed C4 warning text.
+- **Idempotency runs before the failure step.** A replay or adapter error returns immediately and skips the failure step. `complete` runs only when the action produced a response and the adapter supplied a key, and it runs before any post-action timeout or network drop.
+- **Checkout actions are framework-handled.** Actions with `kind: "checkout"` are rendered/submitted by the framework; the twin's declared handler is not called. The record id comes from the first path parameter, then `reference`, then `id`. A POST must carry the twin's own `Origin`. The page notice is derived from the active `payment-declined` or `authentication-required` rule so the tester sees why the button was overridden.
+- **Webhook registration is explicit.** `WebhookDispatcher` gained `registerTwin` and `unregisterTwin`; `startTwin` calls them when a dispatcher is supplied. The optional shared `webhookTwins` registry remains for callers that inspect the registered source.
+- **The conformance suite reads definitions, not services.** Live-key detection is tested by transforming the twin's own secret test key into candidate live forms and asking that twin's `isLiveKey`; no service prefix is hardcoded. Money is checked by round-tripping the twin's own formatting, not by assuming a display symbol.
+- **T7 blocks before DNS.** A non-loopback host name is rejected before resolution, so a test cannot leak through DNS. Local servers on 127.0.0.1 continue to work.
+- **No SPEC.md change.** No C21 entry is needed; this implements C2, C3, C4, C8, C10, C12, C13, C17 T3/T7/T14 and TWIN-DESIGN.md section 2.
+
+### Tests
+
+- Added 56 tests: contract helper, fake-twin conformance, integration server/security/failure/checkout/webhook tests, T7 network guard, registry/state, and renderer.
+- Total suite: 370 tests.
+- Coverage is 100% of statements, branches, functions and lines for `src/twins/framework/` and for the whole repository as reported by the C17 run.
+- The fake twin passes all 17 conformance checks. The broken live-key twin fails only `authentication`; the broken route twin fails `definition-contract` and `lifecycle`.
+- `pnpm test` passed twice in a row; all C18 gates that exist now passed.
+
+### Later
+
+- Register the real Paystack and Flutterwave definitions in Phase 4.2 and run `runConformance` against each.
+- Add the real C6 scenarios and the six scenario files in Step 5.2.
+- Wire the framework into the control API and session loop.
+- Add UI checkout/Playwright coverage in Phase 6; the server-rendered page is ready for it.
+- Add a dispatcher registration test when the control layer owns one long-lived dispatcher.

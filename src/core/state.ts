@@ -101,6 +101,10 @@ export class TwinStateStore {
     return clone(updated as T);
   }
 
+  remove(collection: string, id: StateId): void {
+    this.requireCollection(collection).records.delete(String(id));
+  }
+
   reset(): void {
     for (const collection of this.collections.values()) {
       collection.records.clear();

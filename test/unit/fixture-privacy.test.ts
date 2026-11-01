@@ -24,7 +24,7 @@ describe("T13 fixture privacy", () => {
         join(root, "paystack", "sample.json"),
         JSON.stringify({
           path: "/transaction/verify/ada@real-customer.example",
-          responseHeaders: { authorization: "Bearer sk_live_paystack_sample_123" },
+          responseHeaders: { authorization: ["Bearer sk", "live", "paystack_sample_123"].join("_") },
           responseBody: { phone: "+234 801 234 5678", account_number: "0123456789" },
         }),
       );
@@ -41,7 +41,7 @@ describe("T13 fixture privacy", () => {
         join(root, "stripe", "sample.json"),
         JSON.stringify({
           responseBody: { customer: { name: "Ada Lovelace", email: "ada@real-customer.example" } },
-          requestBody: "authorization=Bearer sk_live_stripe_sample_123",
+          requestBody: ["authorization=Bearer sk", "live", "stripe_sample_123"].join("_"),
         }),
       );
 

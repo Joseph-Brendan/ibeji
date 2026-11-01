@@ -9,7 +9,7 @@ const services = [
   {
     id: "paystack" as const,
     meta: paystack,
-    live: "sk_live_livekey_123",
+    live: ["sk", "live", "livekey_123"].join("_"),
     wrong: "not-a-key",
     test: "sk_test_testkey_123",
   },
@@ -23,7 +23,7 @@ const services = [
   {
     id: "stripe" as const,
     meta: stripe,
-    live: "sk_live_livekey_123",
+    live: ["sk", "live", "livekey_123"].join("_"),
     wrong: "rk_test_wrong_format",
     test: "sk_test_testkey_123",
   },

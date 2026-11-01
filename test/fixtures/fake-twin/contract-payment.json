@@ -1,0 +1,28 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/payments",
+    "headers": {
+      "authorization": "Bearer sk_test_ibeji_fixture0001",
+      "content-type": "application/json"
+    },
+    "body": "{}"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "status": "success",
+      "data": {
+        "id": "pay_ref-1",
+        "object": "payment",
+        "amount": 1000,
+        "currency": "USD",
+        "reference": "ref-1",
+        "status": "succeeded"
+      },
+      "meta": {
+        "note": "created"
+      }
+    }
+  }
+}

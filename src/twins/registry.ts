@@ -1,0 +1,61 @@
+import { IbejiError } from "../core/errors.js";
+import type { TwinDefinition } from "./framework/types.js";
+
+export type TwinRegistry = {
+  readonly list: () => readonly TwinDefinition[];
+  readonly require: (id: string) => TwinDefinition;
+  readonly has: (id: string) => boolean;
+};
+
+function duplicateTwin(id: string): IbejiError {
+  return new IbejiError("BAD_REQUEST", {
+    what: `The twin "${id}" is registered twice.`,
+    why: "The twin registry must contain each twin id only once.",
+    fix: "Remove the duplicate definition from src/twins/registry.ts.",
+  });
+}
+
+function buildRegistry(definitions: readonly TwinDefinition[]): TwinRegistry {
+  const byId = new Map<string, TwinDefinition>();
+  for (const definition of definitions) {
+    if (byId.has(definition.id)) {
+      throw duplicateTwin(definition.id);
+    }
+    byId.set(definition.id, definition);
+  }
+
+  return {
+    list: () => [...byId.values()],
+    require: (id) => {
+      const definition = byId.get(id);
+      if (definition === undefined) {
+        throw new IbejiError("UNKNOWN_TWIN", {
+          why: `"${id}" is not a twin in the registry.`,
+        });
+      }
+      return definition;
+    },
+    has: (id) => byId.has(id),
+  };
+}
+
+/**
+ * The one list of real twin definitions. Version 0.1.0 fills this in Phase 4
+ * with Paystack and Flutterwave. Tests use createTwinRegistry with fake twins
+ * so this list stays empty until a real twin is approved.
+ */
+export const TWIN_DEFINITIONS: readonly TwinDefinition[] = Object.freeze([]);
+
+export const registry: TwinRegistry = buildRegistry(TWIN_DEFINITIONS);
+
+export function listTwins(): readonly TwinDefinition[] {
+  return registry.list();
+}
+
+export function requireTwin(id: string): TwinDefinition {
+  return registry.require(id);
+}
+
+export function createTwinRegistry(definitions: readonly TwinDefinition[]): TwinRegistry {
+  return buildRegistry(definitions);
+}
