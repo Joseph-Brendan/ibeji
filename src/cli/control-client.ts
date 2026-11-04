@@ -4,9 +4,13 @@ import { ERROR_DEFINITIONS, type ErrorCode, IbejiError } from "../core/errors.js
 import type {
   EventItem,
   EventList,
+  FailureInfo,
+  FailureList,
   FailureSupport,
   Rule,
   RuleList,
+  ScenarioInfo,
+  ScenarioList,
   StatusResponse,
   TwinList,
   TwinSummary,
@@ -16,51 +20,17 @@ import type {
 export type {
   EventItem,
   EventList,
+  FailureInfo,
+  FailureList,
   FailureSupport,
   Rule,
   RuleList,
+  ScenarioInfo,
+  ScenarioList,
   StatusResponse,
   TwinList,
   TwinSummary,
   WebhookUrlResponse,
-};
-
-export type FailureInfo = {
-  readonly id: string;
-  readonly name: string;
-  readonly realLife: string;
-  readonly whatToCheck: string;
-  readonly settingsSchema: unknown;
-  readonly support: readonly {
-    readonly twin: string;
-    readonly source: "docs" | "real-story" | "assumed";
-    readonly actions: readonly string[];
-    readonly sourceReference?: string;
-  }[];
-};
-
-export type FailureList = {
-  readonly failures: readonly FailureInfo[];
-};
-
-export type ScenarioInfo = {
-  readonly id: string;
-  readonly name: string;
-  readonly story: string;
-  readonly twins: readonly string[];
-  readonly rules: readonly {
-    readonly id: string;
-    readonly failureId: string;
-    readonly settings: Readonly<Record<string, unknown>>;
-    readonly actions?: string | readonly string[];
-  }[];
-  readonly steps: readonly { readonly afterSeconds: number; readonly removeRule: string }[];
-  readonly running: boolean;
-};
-
-export type ScenarioList = {
-  readonly scenarios: readonly ScenarioInfo[];
-  readonly active: string | null;
 };
 
 export type ResetResponse = {

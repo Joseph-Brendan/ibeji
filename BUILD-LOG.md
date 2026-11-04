@@ -1833,7 +1833,7 @@ Built the Live activity and Data pages with the existing app shell, twin switche
 
 - Kept the simple full list. No virtualisation library was added.
 - Playwright mocks 5,000 events, measures from the Live activity click to 5,000 rendered rows, and records the result with `console.log`.
-- Measured results on this Mac were 397–437 ms across runs (latest full run: 397 ms). The test asserts a 3,000 ms budget.
+- Measured results on this Mac were 387–437 ms across runs (latest full run: 387 ms). The test asserts a 3,000 ms budget.
 - The simple list is comfortably inside the budget, so virtualisation is not needed.
 
 ### Data
@@ -1858,3 +1858,55 @@ Built the Live activity and Data pages with the existing app shell, twin switche
 
 - Revisit virtualisation only if a slower device misses the 3,000 ms budget.
 - Apply the same table and filter patterns to the Webhooks page.
+
+---
+
+## Phase 6: Failures and Scenarios pages
+
+Date: 4 November 2026.
+
+Built the Failures and Scenarios pages. Reused the app shell, twin switcher, API client, SSE event feed, badges, status pills, confirmation dialog, error panel and design tokens. No new dependency was added.
+
+### Failures
+
+- One card per failure returned by `GET /failures`, with its plain name, real-life paragraph, source label, per-twin source detail and the "What to check in your app" disclosure.
+- `Assumed: not confirmed by the service's documentation.` appears whenever any supported twin marks the failure as assumed.
+- Settings fields are generated from the JSON Schema in `GET /failures`:
+  - integer fields use the schema minimum, maximum and default;
+  - nullable numbers accept an empty value and become `null`;
+  - enum fields use plain option labels from the UI plan;
+  - verification methods use wrong-secret, corrupted and missing when the API gives no enum.
+- Local validation reports missing required values, whole-number errors and range errors before any request is sent.
+- Twin choices include every registered twin. Unsupported twins are disabled with the reason in visible text and a hover title. Off twins are disabled with the start command.
+- Actions are chosen from the action ids supported by every selected twin; the default is all supported actions.
+- The switch creates one manual rule per selected twin, so each twin can be switched off independently. Switching off removes only the selected twins. Multi-twin rules created by the CLI are split without turning off the other twins.
+- Active cards show a purple left mark, an "On" status and a per-twin active list. Used-up rules and scenario-owned rules are labelled in text.
+- Settings can be saved for the selected twins. New rules are created before the old rules are deleted.
+- Clear all and per-twin clear both use `DELETE /rules` with the existing confirmation dialog. Clear all names the running scenario; per-twin clear names the twin and says other twins keep their rules.
+- The page refetches failures, rules and scenarios when rule or scenario events arrive over SSE. A rule added through the control API, as the CLI would add it, appears without a page refresh.
+
+### Scenarios
+
+- One card per scenario with its name, story, supported twins, a short rule list and a twin choice.
+- Cards are filtered by the twin switcher. Twins that are off are disabled with the start command in text and a hover title.
+- Running defaults to every supported running twin. The Run button is disabled when no twin is selected or while disconnected.
+- The active banner shows the scenario name, running twins, timed-step progress and a Stop button.
+- Progress lists each timed step, indicates the countdown, and changes the step to done when its `scenario-step` event arrives.
+- Starting another scenario asks for confirmation first, naming the scenario and explaining that the running scenario and its rules will be replaced.
+- Stop uses `POST /scenarios/stop` and shows "Scenario stopped."
+- Scenario events, including a run started from the control API, are reflected without a refresh.
+
+### Tests
+
+- Added unit tests for the JSON-Schema settings parser, defaults, limits, nullable values and validation errors.
+- Added control-client coverage for failure, rule and scenario routes.
+- Added 7 Playwright tests for settings defaults and validation, the working switch, unsupported twins, CLI-style rule updates, clear-all and per-twin clear, scenario run/progress/stop/replace, API-started scenarios and off twins.
+- Total suite: 721 Vitest tests across 71 files, plus 26 Playwright tests.
+- Coverage: 96.36% lines and 90.11% branches. The 100% thresholds for `src/core/` and `src/twins/framework/` still pass.
+- `pnpm test` passed twice in a row. `pnpm test:ui` passed.
+
+### Later
+
+- Add scenario progress completion tests with an injected clock.
+- Add axe keyboard coverage for the long failure cards.
+- Apply the same schema-form pattern to future twin settings.

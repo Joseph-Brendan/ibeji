@@ -7,8 +7,10 @@ import { AppLink } from "./components/AppLink";
 import { AppShell } from "./components/AppShell";
 import { DataPage } from "./components/DataPage";
 import { ErrorPanel } from "./components/ErrorPanel";
+import { FailuresPage } from "./components/FailuresPage";
 import { HomePage } from "./components/HomePage";
 import { LivePage } from "./components/LivePage";
+import { ScenariosPage } from "./components/ScenariosPage";
 import { SignInPage, type SignInState } from "./components/SignInPage";
 import { eventSummary } from "./event-label";
 import { formatLastUpdated } from "./format-time";
@@ -342,6 +344,24 @@ export function App(): ReactNode {
           api={api}
           twins={twins}
           selectedTwinId={selectedTwinId}
+          connection={connection}
+          onUnauthorized={onUnauthorized}
+        />
+      ) : pathname === "/failures" ? (
+        <FailuresPage
+          api={api}
+          twins={twins}
+          selectedTwinId={selectedTwinId}
+          events={events}
+          connection={connection}
+          onUnauthorized={onUnauthorized}
+        />
+      ) : pathname === "/scenarios" ? (
+        <ScenariosPage
+          api={api}
+          twins={twins}
+          selectedTwinId={selectedTwinId}
+          events={events}
           connection={connection}
           onUnauthorized={onUnauthorized}
         />

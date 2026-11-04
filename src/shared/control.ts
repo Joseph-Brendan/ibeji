@@ -150,3 +150,75 @@ export type HealthResponse = {
 export type LaunchLinkResponse = {
   readonly url: string;
 };
+
+export type FailureSourceInfo = {
+  readonly twin: string;
+  readonly source: FailureSource;
+  readonly actions: readonly string[];
+  readonly sourceReference?: string;
+};
+
+export type FailureInfo = {
+  readonly id: string;
+  readonly name: string;
+  readonly realLife: string;
+  readonly whatToCheck: string;
+  readonly settingsSchema: unknown;
+  readonly support: readonly FailureSourceInfo[];
+};
+
+export type FailureList = {
+  readonly failures: readonly FailureInfo[];
+};
+
+export type ScenarioRule = {
+  readonly id: string;
+  readonly failureId: string;
+  readonly settings: Readonly<Record<string, unknown>>;
+  readonly actions?: string | readonly string[];
+};
+
+export type ScenarioStep = {
+  readonly afterSeconds: number;
+  readonly removeRule: string;
+};
+
+export type ScenarioInfo = {
+  readonly id: string;
+  readonly name: string;
+  readonly story: string;
+  readonly twins: readonly string[];
+  readonly rules: readonly ScenarioRule[];
+  readonly steps: readonly ScenarioStep[];
+  readonly running: boolean;
+};
+
+export type ScenarioList = {
+  readonly scenarios: readonly ScenarioInfo[];
+  readonly active: string | null;
+};
+
+export type RuleResponse = {
+  readonly rule: Rule;
+};
+
+export type RuleDeleteResponse = {
+  readonly ok: boolean;
+  readonly rule: Rule;
+};
+
+export type ClearRulesResponse = {
+  readonly ok: boolean;
+  readonly removed: number;
+};
+
+export type RunScenarioResponse = {
+  readonly ok: boolean;
+  readonly scenario: string;
+  readonly twins: readonly string[];
+};
+
+export type StopScenarioResponse = {
+  readonly ok: boolean;
+  readonly stopped: string | null;
+};

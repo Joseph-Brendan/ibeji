@@ -1,11 +1,19 @@
 import type {
+  ClearRulesResponse,
   ControlErrorBody,
   CredentialsResponse,
   EventList,
+  FailureList,
   HealthResponse,
   ResetStateResponse,
+  RuleDeleteResponse,
+  RuleList,
+  RuleResponse,
+  RunScenarioResponse,
+  ScenarioList,
   StateResponse,
   StatusResponse,
+  StopScenarioResponse,
   TwinList,
   WebhookUrlResponse,
 } from "../../../src/shared/control.js";
@@ -241,6 +249,49 @@ export class ControlApi {
 
   getState(twinId: string): Promise<StateResponse> {
     return this.request<StateResponse>(`/twins/${encodeURIComponent(twinId)}/state`);
+  }
+
+  getFailures(): Promise<FailureList> {
+    return this.request<FailureList>("/failures");
+  }
+
+  getRules(): Promise<RuleList> {
+    return this.request<RuleList>("/rules");
+  }
+
+  addRule(input: {
+    readonly failureId: string;
+    readonly twins?: readonly string[];
+    readonly actions?: string;
+    readonly settings: Readonly<Record<string, unknown>>;
+  }): Promise<RuleResponse> {
+    return this.request<RuleResponse>("/rules", { method: "POST", body: input });
+  }
+
+  deleteRule(id: string): Promise<RuleDeleteResponse> {
+    return this.request<RuleDeleteResponse>(`/rules/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  }
+
+  clearRules(twinId?: string): Promise<ClearRulesResponse> {
+    const query = twinId === undefined ? "" : `?twin=${encodeURIComponent(twinId)}`;
+    return this.request<ClearRulesResponse>(`/rules${query}`, { method: "DELETE" });
+  }
+
+  getScenarios(): Promise<ScenarioList> {
+    return this.request<ScenarioList>("/scenarios");
+  }
+
+  runScenario(scenarioId: string, twins?: readonly string[]): Promise<RunScenarioResponse> {
+    return this.request<RunScenarioResponse>(`/scenarios/${encodeURIComponent(scenarioId)}/run`, {
+      method: "POST",
+      ...(twins === undefined ? {} : { body: { twins } }),
+    });
+  }
+
+  stopScenario(): Promise<StopScenarioResponse> {
+    return this.request<StopScenarioResponse>("/scenarios/stop", { method: "POST" });
   }
 
   resetState(twinId?: string): Promise<ResetStateResponse> {

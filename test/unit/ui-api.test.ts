@@ -99,6 +99,39 @@ describe("T8 UI API client", () => {
     expect(calls[1]?.url).toContain("limit=10");
   });
 
+  it("T8: failure, rule and scenario changes use the control API", async () => {
+    const calls: Call[] = [];
+    const api = new ControlApi({
+      baseUrl: "/api",
+      fetchImpl: fakeFetch(() => jsonResponse(200, { ok: true }), calls),
+    });
+
+    await api.getFailures();
+    expect(calls[0]?.url).toBe("/api/failures");
+    await api.getRules();
+    expect(calls[1]?.url).toBe("/api/rules");
+    await api.addRule({
+      failureId: "server-error",
+      twins: ["twin one"],
+      actions: "charge",
+      settings: { times: 1, status: 500 },
+    });
+    expect(calls[2]?.url).toBe("/api/rules");
+    expect(calls[2]?.init?.method).toBe("POST");
+    expect(new Headers(calls[2]?.init?.headers).get(REQUEST_HEADER)).toBe("1");
+    await api.clearRules("twin one");
+    expect(calls[3]?.url).toBe("/api/rules?twin=twin%20one");
+    expect(calls[3]?.init?.method).toBe("DELETE");
+    await api.getScenarios();
+    expect(calls[4]?.url).toBe("/api/scenarios");
+    await api.runScenario("slow-friday", ["twin one"]);
+    expect(calls[5]?.url).toBe("/api/scenarios/slow-friday/run");
+    expect(calls[5]?.init?.body).toBe(JSON.stringify({ twins: ["twin one"] }));
+    await api.stopScenario();
+    expect(calls[6]?.url).toBe("/api/scenarios/stop");
+    expect(calls[6]?.init?.method).toBe("POST");
+  });
+
   it("T8: C12 errors keep their what, why and fix", async () => {
     const calls: Call[] = [];
     const api = new ControlApi({
