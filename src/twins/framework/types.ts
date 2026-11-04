@@ -125,6 +125,7 @@ export type ActiveFailureEffects = {
 export type FailureSupport = {
   readonly id: FailureId;
   readonly source: "docs" | "real-story" | "assumed";
+  readonly sourceReference?: string;
   readonly actions: readonly ActionId[];
 };
 

@@ -252,6 +252,9 @@ function twinSummary(
       id: failure.id,
       actions: [...failure.actions],
       source: failure.source,
+      ...(failure.sourceReference === undefined
+        ? {}
+        : { sourceReference: failure.sourceReference }),
     })),
     currencyRules: {
       zeroDecimal: [...definition.money.zeroDecimal],
@@ -384,6 +387,7 @@ function failureCatalog(deps: ControlDependencies): readonly unknown[] {
           twin: definition.id,
           source: item.source,
           actions: [...item.actions],
+          ...(item.sourceReference === undefined ? {} : { sourceReference: item.sourceReference }),
         })),
     );
 

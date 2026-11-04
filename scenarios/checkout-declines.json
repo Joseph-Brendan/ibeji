@@ -1,0 +1,14 @@
+{
+  "id": "checkout-declines",
+  "name": "Checkout declines",
+  "story": "Bisi runs Bisi Beauty, a beauty shop in Ibadan. Half of her checkout payments are declined. Customers need a clear message and a way to try again. Her app must not treat a decline as a paid order.",
+  "twins": ["paystack", "flutterwave"],
+  "rules": [
+    {
+      "id": "declined-checkouts",
+      "failureId": "payment-declined",
+      "settings": { "percent": 50 },
+      "actions": "checkout.submit"
+    }
+  ]
+}

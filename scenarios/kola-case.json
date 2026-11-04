@@ -1,0 +1,14 @@
+{
+  "id": "kola-case",
+  "name": "Kola's lost refund",
+  "story": "Kola runs Kola Kitchen, a small food business in Lagos. A customer asks for a refund after an order goes wrong. The refund succeeds at the payment service, but the reply never reaches Kola's app. His app must not send the refund a second time.",
+  "twins": ["paystack", "flutterwave"],
+  "rules": [
+    {
+      "id": "lost-refund-reply",
+      "failureId": "timeout-after-commit",
+      "settings": { "mode": "hang" },
+      "actions": "refund.create"
+    }
+  ]
+}

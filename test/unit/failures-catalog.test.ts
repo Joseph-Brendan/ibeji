@@ -35,12 +35,12 @@ describe("C5 failure catalog", () => {
     expect(FAILURE_CATALOG.map((failure) => failure.id)).toEqual(FAILURE_IDS);
   });
 
-  it("C5: every failure has a stable id, name and two placeholder descriptions", () => {
+  it("C5: every failure has a stable id, a name and two descriptions", () => {
     for (const failure of FAILURE_CATALOG) {
       expect(failure.id).toBeDefined();
       expect(failure.name.length).toBeGreaterThan(0);
-      expect(failure.description.realLife).toContain("Step 5.2");
-      expect(failure.description.whatToCheck).toContain("Step 5.2");
+      expect(failure.description.realLife.length).toBeGreaterThan(0);
+      expect(failure.description.whatToCheck.length).toBeGreaterThan(0);
     }
   });
 

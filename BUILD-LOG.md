@@ -1603,3 +1603,39 @@ Built the control API, dashboard sign-in, SSE live updates, credentials store, s
 - Reuse the control Zod schemas in the CLI and MCP server when those layers are built.
 - Add webhook attempt events for the Live activity page if the UI needs them; the Webhooks page already reads deliveries and attempts.
 - Run the Windows file-permission check on a real Windows CI job; this machine only proves the macOS modes.
+
+---
+
+## Phase 5: failure library and scenarios
+
+Date: 4 November 2026.
+
+Built the full failure library text, the six C6 scenarios, and the generated docs. No new dependency was needed: the docs script uses Node and the installed TypeScript compiler.
+
+### What was built
+
+- **Failure library.** Every one of the 16 catalog failures now has a plain-English name, a real-life paragraph, and three app checks. The text uses Nigerian examples for the Paystack and Flutterwave twins, and an international example where the failure can apply to Stripe.
+- **Sources.** Each twin's failure support now carries a source reference. `docs` entries name the research file and section. `assumed` entries carry the C5 label "Assumed: not confirmed by the service's documentation." and name the research section that says a real story is needed. The control API returns the reference with each support entry.
+- **Scenarios.** Added `scenarios/kola-case.json`, `slow-friday.json`, `bank-outage.json`, `webhook-storm.json`, `stuck-payouts.json`, and `checkout-declines.json`. Each names a business, tells its story in four sentences, lists its supported twins, and uses the exact C6 rules and settings. The bank outage removes its rule after 120 seconds.
+- **Docs.** `scripts/generate-docs.mjs` compiles the project to a temporary folder, reads the catalog, the twin registry, and the scenario loader, and writes `docs/failures.md` and `docs/scenarios.md`. The script supports `--check` for the drift test. Generated text has no em dash or en dash.
+- **Tests.** Added checks for complete catalog text, a source and reference for every supported twin, the assumed label, docs drift, scenario settings and twin support, scenario lifecycle events on every supported twin with the fake clock, and the failure plan each scenario story describes.
+
+### Decisions
+
+- **No real-story source is used.** `STORIES.md` is not present in the repository, and TWIN-DESIGN.md section 2.11 lists no approved real-story source for the 0.1.0 twins. Every source is therefore `docs` or `assumed`. The test asserts that no `real-story` source is used until a cleared STORIES.md entry exists.
+- **`All` means the registered twins.** The C6 table says "All". In version 0.1.0 the registry holds Paystack and Flutterwave only, so each scenario lists those two twins. Stripe is not registered (C21 D42).
+- **Scenario actions are explicit where C6 names one.** Kola uses `refund.create`, the bank outage uses `transfer`, stuck payouts use `transfer`, and checkout declines use `checkout.submit`. Rules that apply to every action omit `actions`, so the rule store resolves them against each twin's support list.
+- **The docs script compiles the real modules.** This keeps the docs tied to the catalog and twin definitions instead of copying their text into the script. It copies the four twin JSON data files into the temporary build so the compiled registry loads.
+- **No SPEC.md change.** The route and file formats follow C5, C6, C19 and C20. No C21 entry is needed.
+
+### Tests
+
+- Added 16 tests across three new test files and one updated catalog test.
+- Total suite: 654 tests across 59 files.
+- Coverage remains above the C17 floor: 96.88% lines and 90.49% branches overall. The 100% threshold for `src/core/` and `src/twins/framework/` still passes.
+- `pnpm test` passed twice in a row; all existing C18 gates pass.
+
+### Later
+
+- Add approved real stories to `STORIES.md` and switch the matching sources to `real-story` when permission and credit are recorded.
+- Wire the scenario files into `startSession` and the CLI in the next phase. The control API already accepts loaded scenario definitions.

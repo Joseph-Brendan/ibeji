@@ -1,0 +1,18 @@
+{
+  "id": "webhook-storm",
+  "name": "Webhook storm",
+  "story": "Ngozi runs Ngozi Foods, a food shop in Enugu. A campaign brings many orders in one hour. Every webhook arrives twice and some arrive out of order. Her app must treat repeated messages as one order and keep the latest state.",
+  "twins": ["paystack", "flutterwave"],
+  "rules": [
+    {
+      "id": "duplicate-webhooks",
+      "failureId": "webhook-duplicated",
+      "settings": { "copies": 2, "gapSeconds": 3 }
+    },
+    {
+      "id": "unordered-webhooks",
+      "failureId": "webhook-out-of-order",
+      "settings": { "windowSeconds": 15 }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "stuck-payouts",
+  "name": "Stuck payouts",
+  "story": "Tunde runs Tunde Textiles, a fabric business in Kano. He pays suppliers by bank transfer. The transfers stay pending for ten minutes. Half of them then fail and the rest succeed, so his app must show the final state and tell each supplier the truth.",
+  "twins": ["paystack", "flutterwave"],
+  "rules": [
+    {
+      "id": "pending-payouts",
+      "failureId": "transfer-stuck-pending",
+      "settings": { "seconds": 600, "thenFailPercent": 50 },
+      "actions": "transfer"
+    }
+  ]
+}

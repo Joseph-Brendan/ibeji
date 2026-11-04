@@ -7,6 +7,7 @@ export type FailureSupport = {
   readonly id: string;
   readonly actions: readonly string[];
   readonly source?: "docs" | "real-story" | "assumed";
+  readonly sourceReference?: string;
 };
 
 export type TwinCapability = {

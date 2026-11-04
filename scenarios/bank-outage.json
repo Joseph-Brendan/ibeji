@@ -1,0 +1,15 @@
+{
+  "id": "bank-outage",
+  "name": "Bank outage",
+  "story": "Chidi runs Chidi Logistics, a delivery business in Port Harcourt. He pays drivers by bank transfer. The bank network fails for two minutes and every transfer returns a server error. His app must retry safely and must not pay a driver twice.",
+  "twins": ["paystack", "flutterwave"],
+  "rules": [
+    {
+      "id": "failing-transfers",
+      "failureId": "server-error",
+      "settings": { "times": null },
+      "actions": "transfer"
+    }
+  ],
+  "steps": [{ "afterSeconds": 120, "removeRule": "failing-transfers" }]
+}

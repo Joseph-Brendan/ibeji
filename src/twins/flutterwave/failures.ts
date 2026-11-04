@@ -19,75 +19,91 @@ const ALL_ACTIONS = [
 ] as const;
 const WEBHOOK_ACTIONS = ["checkout.submit", "refund.create", "transfer.create"] as const;
 
+const ASSUMED = "research/flutterwave.md §14.2 says this needs a real story.";
+
 export const flutterwaveFailureSupport: readonly FailureSupport[] = [
   {
     id: "slow-response",
     source: "docs",
+    sourceReference: "research/flutterwave.md §14.2 and §14.1",
     actions: ALL_ACTIONS,
   },
   {
     id: "timeout-after-commit",
     source: "docs",
+    sourceReference: "research/flutterwave.md §14.2 and §14.1",
     actions: WRITE_ACTIONS,
   },
   {
     id: "timeout-before-commit",
     source: "docs",
+    sourceReference: "research/flutterwave.md §14.2 and §14.1",
     actions: WRITE_ACTIONS,
   },
   {
     id: "server-error",
     source: "docs",
+    sourceReference: "research/flutterwave.md §1.2 and §14.1",
     actions: ALL_ACTIONS,
   },
   {
     id: "rate-limited",
     source: "docs",
+    sourceReference: "research/flutterwave.md §14.2 and §14.1",
     actions: ALL_ACTIONS,
   },
   {
     id: "flaky-network",
     source: "assumed",
+    sourceReference: ASSUMED,
     actions: ALL_ACTIONS,
   },
   {
     id: "webhook-delayed",
     source: "assumed",
+    sourceReference: ASSUMED,
     actions: WEBHOOK_ACTIONS,
   },
   {
     id: "webhook-duplicated",
     source: "docs",
+    sourceReference: "research/flutterwave.md §14.2 and §6.1",
     actions: WEBHOOK_ACTIONS,
   },
   {
     id: "webhook-out-of-order",
     source: "assumed",
+    sourceReference: ASSUMED,
     actions: WEBHOOK_ACTIONS,
   },
   {
     id: "webhook-never-sent",
     source: "assumed",
+    sourceReference: ASSUMED,
     actions: WEBHOOK_ACTIONS,
   },
   {
     id: "webhook-verification-fails",
     source: "docs",
+    sourceReference: "research/flutterwave.md §8",
     actions: WEBHOOK_ACTIONS,
   },
   {
     id: "payment-declined",
     source: "docs",
+    sourceReference: "research/flutterwave.md §14.2 and §3",
     actions: ["checkout.submit"],
   },
   {
     id: "transfer-stuck-pending",
     source: "docs",
+    sourceReference: "research/flutterwave.md §14.1 and §11.3",
     actions: ["transfer.create"],
   },
   {
     id: "bank-resolve-fails",
     source: "assumed",
+    sourceReference: ASSUMED,
     actions: ["bank.resolve"],
   },
 ];
