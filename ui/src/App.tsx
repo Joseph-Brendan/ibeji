@@ -1,12 +1,16 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EventItem, StatusResponse, TwinSummary } from "../../src/shared/control.js";
+import { announceActivity, createActivityAnnouncement } from "./activity-announcer";
 import { API_PREFIX, ApiError, ConnectionError, ControlApi, isUnauthorized } from "./api/client";
 import { SseClient, type StreamState } from "./api/sse";
 import { AppLink } from "./components/AppLink";
 import { AppShell } from "./components/AppShell";
+import { DataPage } from "./components/DataPage";
 import { ErrorPanel } from "./components/ErrorPanel";
 import { HomePage } from "./components/HomePage";
+import { LivePage } from "./components/LivePage";
 import { SignInPage, type SignInState } from "./components/SignInPage";
+import { eventSummary } from "./event-label";
 import { formatLastUpdated } from "./format-time";
 import { twinFromUrl, useUrl, withTwin } from "./use-url";
 
@@ -19,6 +23,8 @@ type AuthState =
   | "offline"
   | "error";
 
+const MAX_UI_EVENTS = 5_000;
+
 function mergeEvents(
   current: readonly EventItem[],
   incoming: readonly EventItem[],
@@ -27,7 +33,7 @@ function mergeEvents(
   for (const event of [...current, ...incoming]) {
     byId.set(event.id, event);
   }
-  return [...byId.values()].sort((left, right) => right.id - left.id).slice(0, 500);
+  return [...byId.values()].sort((left, right) => right.id - left.id).slice(0, MAX_UI_EVENTS);
 }
 
 function unauthorizedState(error: unknown): AuthState {
@@ -77,10 +83,13 @@ export function App(): ReactNode {
   const [loadError, setLoadError] = useState<unknown>(undefined);
   const [announcement, setAnnouncement] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | undefined>(undefined);
-  const lastAnnouncement = useRef(0);
-  const pendingEvents = useRef(0);
+  const [eventsLoaded, setEventsLoaded] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const activityAnnouncement = useRef(createActivityAnnouncement());
   const previousConnection = useRef<StreamState>("connecting");
   const lastEventId = useRef<number | undefined>(undefined);
+  const seenEventIds = useRef(new Set<number>());
+  const pathnameRef = useRef(pathname);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,37 +163,54 @@ export function App(): ReactNode {
   }, []);
 
   useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
+  useEffect(() => {
     if (auth !== "signed-in") {
       return;
     }
     let cancelled = false;
     let stream: SseClient | undefined;
+    // Reading the retry token makes this effect restart when the user retries.
+    void reloadKey;
+    setEventsLoaded(false);
+    setLoadError(undefined);
 
     const handleEvent = (event: EventItem): void => {
-      setEvents((current) =>
-        current.some((item) => item.id === event.id) ? current : [event, ...current].slice(0, 500),
-      );
+      if (seenEventIds.current.has(event.id)) {
+        return;
+      }
+      seenEventIds.current.add(event.id);
+      setEvents((current) => [event, ...current].slice(0, MAX_UI_EVENTS));
       lastEventId.current = Math.max(lastEventId.current ?? 0, event.id);
       setLastUpdated(new Date());
-      pendingEvents.current += 1;
-      const now = Date.now();
-      if (now - lastAnnouncement.current >= 5_000) {
-        setAnnouncement(
-          `${pendingEvents.current} new event${pendingEvents.current === 1 ? "" : "s"}. Newest: ${event.summary}.`,
+
+      if (pathnameRef.current !== "/activity") {
+        const result = announceActivity(
+          activityAnnouncement.current,
+          1,
+          Date.now(),
+          eventSummary(event),
+          false,
         );
-        pendingEvents.current = 0;
-        lastAnnouncement.current = now;
+        activityAnnouncement.current = result.state;
+        if (result.text !== undefined) {
+          setAnnouncement(result.text);
+        }
       }
     };
 
-    void Promise.all([api.getTwins(), api.getEvents({ limit: 10 })])
+    void Promise.all([api.getTwins(), api.getEvents({ limit: 500 })])
       .then(([twinList, eventList]) => {
         if (cancelled) {
           return;
         }
         setTwins(twinList.twins);
         setEvents([...eventList.events].reverse());
+        seenEventIds.current = new Set(eventList.events.map((event) => event.id));
         lastEventId.current = eventList.events.at(-1)?.id;
+        setEventsLoaded(true);
         setLastUpdated(new Date());
       })
       .catch((error: unknown) => {
@@ -196,6 +222,7 @@ export function App(): ReactNode {
           return;
         }
         setLoadError(error);
+        setEventsLoaded(true);
       })
       .finally(() => {
         if (cancelled) {
@@ -215,7 +242,7 @@ export function App(): ReactNode {
       cancelled = true;
       stream?.stop();
     };
-  }, [api, auth, onUnauthorized]);
+  }, [api, auth, onUnauthorized, reloadKey]);
 
   useEffect(() => {
     if (connection === "connected" && previousConnection.current === "disconnected") {
@@ -224,6 +251,9 @@ export function App(): ReactNode {
       void api
         .getEvents({ ...(after === undefined ? {} : { after }), limit: 500 })
         .then((list) => {
+          for (const event of list.events) {
+            seenEventIds.current.add(event.id);
+          }
           setEvents((current) => mergeEvents(current, list.events));
           setLastUpdated(new Date());
         })
@@ -285,7 +315,7 @@ export function App(): ReactNode {
       {connection === "disconnected" && lastUpdated !== undefined ? (
         <p className="last-updated">Last updated at {formatLastUpdated(lastUpdated)}.</p>
       ) : null}
-      {loadError === undefined ? null : (
+      {loadError === undefined || pathname === "/activity" || pathname === "/data" ? null : (
         <ErrorPanel error={loadError} title="We couldn't load your test session." />
       )}
       {pathname === "/" ? (
@@ -295,6 +325,24 @@ export function App(): ReactNode {
           twins={twins}
           events={events}
           selectedTwinId={selectedTwinId}
+          onUnauthorized={onUnauthorized}
+        />
+      ) : pathname === "/activity" ? (
+        <LivePage
+          events={events}
+          twins={twins}
+          selectedTwinId={selectedTwinId}
+          connection={connection}
+          loading={!eventsLoaded}
+          error={loadError}
+          onRetry={() => setReloadKey((value) => value + 1)}
+        />
+      ) : pathname === "/data" ? (
+        <DataPage
+          api={api}
+          twins={twins}
+          selectedTwinId={selectedTwinId}
+          connection={connection}
           onUnauthorized={onUnauthorized}
         />
       ) : (

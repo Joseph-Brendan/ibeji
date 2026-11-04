@@ -1808,3 +1808,53 @@ Refreshed the dashboard after the first Home build. The goal was a calmer, moder
 - Apply the same flat visual language and plain copy to Connect your app, Live activity, Failures, Scenarios, Webhooks and Data.
 - Replace the remaining placeholder pages.
 - Add an axe pass for the refreshed colour surfaces.
+
+---
+
+## Phase 6: Live activity and Data pages
+
+Date: 4 November 2026.
+
+Built the Live activity and Data pages with the existing app shell, twin switcher, API client, SSE connection, badges, buttons, dialogs and error panel. No new dependency was added.
+
+### Live activity
+
+- Shows the shared event list newest first, with a twin badge, plain event type, plain summary, time and a Details button on every row.
+- Details expand in place and show the event id, twin and every entry in the event's `details` object.
+- The twin switcher filters by scope. The Event type selector filters by Requests, Responses, Webhooks, Failures, Warnings, Rules or Scenarios.
+- Pause stores the newest event id and freezes the list at that id. New events still arrive over the open SSE connection and are counted. Resume inserts them.
+- Empty, filtered-empty, loading, error, disconnected, paused and twin-off states are implemented.
+- A polite live region announces at most one summary every 5 seconds. The shared announcer is used by Home and Live activity.
+- The shared event buffer now holds up to 5,000 events. The initial fetch asks for 500, which is the control API's maximum page size. SSE and the reconnect catch-up fill the rest.
+- Reconnection uses `Last-Event-ID` and the `/events?after=<id>` catch-up. A forced-reconnection Playwright test proves an event created while disconnected still appears.
+- Jump to latest appears when the person has scrolled down and new events arrive while not paused.
+
+### Live activity performance
+
+- Kept the simple full list. No virtualisation library was added.
+- Playwright mocks 5,000 events, measures from the Live activity click to 5,000 rendered rows, and records the result with `console.log`.
+- Measured results on this Mac were 397–437 ms across runs (latest full run: 397 ms). The test asserts a 3,000 ms budget.
+- The simple list is comfortably inside the budget, so virtualisation is not needed.
+
+### Data
+
+- Shows one section per running twin, with the twin badge and status.
+- Collections, columns, labels and record kinds all come from `GET /twins/:twin/state`. No service field names are hard-coded in the UI.
+- Tables show a caption, column headers, row counts, local date and time with the time zone named, monospace identifiers with copy buttons, and a clear empty row.
+- Money comes from the twin's `currencyRules` on `GET /twins`. Formatting uses BigInt string arithmetic, never floating-point division.
+- A fast-check property test formats and parses 1,000 random amounts across NGN, USD, XOF, KWD and a default two-decimal currency.
+- Reset is available per twin and for all running twins. Confirmations name every record type, the abandoned webhooks and everything that is kept. Reset uses `DELETE /twins/:twin/state` or `DELETE /state`.
+- Disconnected and off-twin states are handled. Reset is disabled while disconnected.
+
+### Tests
+
+- Added unit tests for money formatting, the 5-second activity announcer, and the state and reset client routes.
+- Added 7 Playwright tests for pause/resume, waiting counts, filters, details, twin off, error, forced reconnection, 5,000-event performance, money formatting from API rules, empty tables and reset scope.
+- Total suite: 716 Vitest tests across 70 files, plus 19 Playwright tests.
+- Coverage: 96.36% lines and 90.11% branches. The 100% thresholds for `src/core/` and `src/twins/framework/` still pass.
+- `pnpm test` passed twice in a row. `pnpm test:ui` passed.
+
+### Later
+
+- Revisit virtualisation only if a slower device misses the 3,000 ms budget.
+- Apply the same table and filter patterns to the Webhooks page.

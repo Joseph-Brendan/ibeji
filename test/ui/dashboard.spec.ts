@@ -1,5 +1,3 @@
-import { execFileSync } from "node:child_process";
-
 import { expect, test } from "@playwright/test";
 
 import type { TwinSummary } from "../../src/shared/control.js";
@@ -8,7 +6,6 @@ import { type ControlSessionHarness, startControlSession } from "../helpers/cont
 let harness: ControlSessionHarness;
 
 test.beforeAll(async () => {
-  execFileSync("pnpm", ["build:ui"], { cwd: process.cwd(), stdio: "pipe" });
   harness = await startControlSession({});
 });
 
@@ -152,7 +149,7 @@ test("T8 the dashboard renders with no shadows or gradients", async ({ page }) =
 });
 
 test("T8 Home shows the newest activity when events exist", async ({ page }) => {
-  await page.route(/\/_ibeji\/api\/v1\/events\?limit=10$/u, async (route) => {
+  await page.route(/\/_ibeji\/api\/v1\/events\?limit=500$/u, async (route) => {
     await route.fulfill({
       json: {
         events: [

@@ -113,6 +113,35 @@ export type WebhookUrlResponse = {
   readonly url: string | null;
 };
 
+export type StateColumnKind = "text" | "money" | "date";
+
+export type StateColumn = {
+  readonly key: string;
+  readonly label: string;
+  readonly kind: StateColumnKind;
+};
+
+export type StateRecord = Readonly<Record<string, unknown>>;
+
+export type StateCollection = {
+  readonly id: string;
+  readonly label: string;
+  readonly columns: readonly StateColumn[];
+  readonly records: readonly StateRecord[];
+};
+
+export type StateResponse = {
+  readonly twin: string;
+  readonly collections: readonly StateCollection[];
+};
+
+export type ResetStateResponse = {
+  readonly ok: boolean;
+  readonly twin?: string;
+  readonly twins?: readonly string[];
+  readonly abandonedWebhooks: number;
+};
+
 export type HealthResponse = {
   readonly ok: boolean;
   readonly instance: string;

@@ -3,6 +3,8 @@ import type {
   CredentialsResponse,
   EventList,
   HealthResponse,
+  ResetStateResponse,
+  StateResponse,
   StatusResponse,
   TwinList,
   WebhookUrlResponse,
@@ -235,6 +237,17 @@ export class ControlApi {
 
   getWebhookUrl(twinId: string): Promise<WebhookUrlResponse> {
     return this.request<WebhookUrlResponse>(`/twins/${encodeURIComponent(twinId)}/webhook-url`);
+  }
+
+  getState(twinId: string): Promise<StateResponse> {
+    return this.request<StateResponse>(`/twins/${encodeURIComponent(twinId)}/state`);
+  }
+
+  resetState(twinId?: string): Promise<ResetStateResponse> {
+    return this.request<ResetStateResponse>(
+      twinId === undefined ? "/state" : `/twins/${encodeURIComponent(twinId)}/state`,
+      { method: "DELETE" },
+    );
   }
 
   getEvents(

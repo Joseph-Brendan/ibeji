@@ -59,6 +59,27 @@ describe("T8 UI API client", () => {
     expect(calls[0]?.init?.body).toBe(JSON.stringify({ twin: "twin one" }));
   });
 
+  it("T8: state reads and resets use the control API and mark changes", async () => {
+    const calls: Call[] = [];
+    const api = new ControlApi({
+      baseUrl: "/api",
+      fetchImpl: fakeFetch(() => jsonResponse(200, { ok: true }), calls),
+    });
+
+    await api.getState("twin one");
+    expect(calls[0]?.url).toBe("/api/twins/twin%20one/state");
+    expect(calls[0]?.init?.method).toBe("GET");
+
+    await api.resetState("twin one");
+    expect(calls[1]?.url).toBe("/api/twins/twin%20one/state");
+    expect(calls[1]?.init?.method).toBe("DELETE");
+    expect(new Headers(calls[1]?.init?.headers).get(REQUEST_HEADER)).toBe("1");
+
+    await api.resetState();
+    expect(calls[2]?.url).toBe("/api/state");
+    expect(calls[2]?.init?.method).toBe("DELETE");
+  });
+
   it("T8: exchange and event queries use the expected paths", async () => {
     const calls: Call[] = [];
     const api = new ControlApi({
