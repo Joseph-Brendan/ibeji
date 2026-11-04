@@ -247,6 +247,9 @@ function twinSummary(
       fractionDigits: fractions,
     },
     labelColourToken: labelColourToken(index),
+    ...(definition.connectionGuide === undefined
+      ? {}
+      : { connectionGuide: definition.connectionGuide }),
   };
 }
 

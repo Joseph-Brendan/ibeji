@@ -32,6 +32,21 @@ export type CurrencyRules = {
   readonly fractionDigits: Readonly<Record<string, number>>;
 };
 
+export type ConnectionGuideStep = {
+  readonly title: string;
+  readonly body: string;
+  readonly code?: string;
+};
+
+export type ConnectionGuideInfo = {
+  readonly summary: string;
+  readonly baseUrlNote: string;
+  readonly keysNote: string;
+  readonly steps: readonly ConnectionGuideStep[];
+  readonly webhookNote: string;
+  readonly agentInstruction: string;
+};
+
 export type TwinSummary = {
   readonly id: string;
   readonly displayName: string;
@@ -42,6 +57,7 @@ export type TwinSummary = {
   readonly failures: readonly FailureSupport[];
   readonly currencyRules: CurrencyRules;
   readonly labelColourToken: string;
+  readonly connectionGuide?: ConnectionGuideInfo;
 };
 
 export type TwinList = {
@@ -221,4 +237,56 @@ export type RunScenarioResponse = {
 export type StopScenarioResponse = {
   readonly ok: boolean;
   readonly stopped: string | null;
+};
+
+export type WebhookDeliveryStatus =
+  | "queued"
+  | "scheduled"
+  | "sending"
+  | "delivered"
+  | "failed"
+  | "unreachable"
+  | "not-sent"
+  | "abandoned";
+
+export type WebhookAttemptOutcome = "delivered" | "failed" | "unreachable";
+
+export type WebhookAttempt = {
+  readonly attempt: number;
+  readonly startedAt: number;
+  readonly finishedAt: number;
+  readonly outcome: WebhookAttemptOutcome;
+  readonly requestUrl: string;
+  readonly remoteAddress: string | undefined;
+  readonly responseStatus: number | undefined;
+  readonly responseHeaders: Readonly<Record<string, string>>;
+  readonly responseBody: string;
+  readonly error: string | undefined;
+  readonly errorCode: string | undefined;
+};
+
+export type WebhookDelivery = {
+  readonly id: string;
+  readonly eventId: string;
+  readonly twinId: string;
+  readonly actionId: string;
+  readonly raw: { readonly body: string; readonly contentType: "application/json" };
+  readonly status: WebhookDeliveryStatus;
+  readonly attempts: readonly WebhookAttempt[];
+  readonly createdAt: number;
+  readonly scheduledAt: number | undefined;
+  readonly holdUntil: number | undefined;
+  readonly failureMethod: string | undefined;
+  readonly resendOf: string | undefined;
+  readonly reason: string | undefined;
+  readonly url: string | undefined;
+  readonly sequence: number;
+};
+
+export type WebhookListResponse = {
+  readonly deliveries: readonly WebhookDelivery[];
+};
+
+export type WebhookDeliveryResponse = {
+  readonly delivery: WebhookDelivery;
 };

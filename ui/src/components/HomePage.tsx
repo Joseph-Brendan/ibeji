@@ -6,6 +6,7 @@ import type {
   TwinSummary,
 } from "../../../src/shared/control.js";
 import { type ControlApi, isUnauthorized } from "../api/client";
+import { credentialHelp } from "../credential-help";
 import { eventTypeLabel } from "../event-label";
 import { formatStarted, formatTimestamp } from "../format-time";
 import { twinLabelClass } from "../twin-label";
@@ -35,17 +36,6 @@ function twinName(scope: string, twins: readonly TwinSummary[]): string {
     return "Ibeji";
   }
   return twins.find((twin) => twin.id === scope)?.displayName ?? scope;
-}
-
-function credentialHelp(role: CredentialView["role"]): string {
-  switch (role) {
-    case "public":
-      return "Safe to use in browser test code.";
-    case "secret":
-      return "Keep this key on your server.";
-    case "webhook":
-      return "Use this to check that updates really came from Ibeji.";
-  }
 }
 
 function HomeSkeleton(): ReactNode {

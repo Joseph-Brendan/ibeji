@@ -6,6 +6,7 @@ type AppLinkProps = {
   readonly children: ReactNode;
   readonly className?: string;
   readonly ariaCurrent?: "page" | "true" | undefined;
+  readonly testId?: string;
   readonly onNavigate?: () => void;
 };
 
@@ -19,6 +20,7 @@ export function AppLink(props: AppLinkProps): ReactNode {
       href={props.href}
       className={props.className}
       aria-current={props.ariaCurrent}
+      data-testid={props.testId}
       onClick={(event) => {
         if (!isPlainClick(event)) {
           return;

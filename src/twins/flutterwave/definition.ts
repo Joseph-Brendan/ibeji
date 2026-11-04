@@ -4,6 +4,7 @@ import { bankActions } from "./bank.js";
 import { checkoutActions, flutterwaveCheckout } from "./checkout.js";
 import { flutterwaveCredentialSpecs } from "./credentials.js";
 import { flutterwaveFailures } from "./failures.js";
+import { flutterwaveConnectionGuide } from "./guide.js";
 import { flutterwaveMoney } from "./money.js";
 import { paymentActions } from "./payments.js";
 import { refundActions } from "./refunds.js";
@@ -41,4 +42,5 @@ export const flutterwaveTwin: TwinDefinition = {
   credentials: flutterwaveCredentialSpecs,
   money: flutterwaveMoney,
   retry: flutterwaveRetrySchedule,
+  connectionGuide: flutterwaveConnectionGuide,
 };

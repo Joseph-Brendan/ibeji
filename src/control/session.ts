@@ -1,6 +1,7 @@
 import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import { readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
+import { join } from "node:path";
 
 import { type Clock, realClock } from "../core/clock.js";
 import { DEFAULT_CONTROL_PORT, MAX_SEED } from "../core/config.js";
@@ -367,6 +368,9 @@ export async function startSession(options: StartSessionOptions): Promise<Runnin
   let control: RunningControlServer | undefined;
   let stopDispatch = (): void => {};
 
+  const fontsDir =
+    options.uiRoot === undefined ? undefined : join(options.uiRoot, "assets", "fonts");
+
   try {
     for (const definition of chosen) {
       const port = twinPorts.get(definition.id);
@@ -384,6 +388,7 @@ export async function startSession(options: StartSessionOptions): Promise<Runnin
         state,
         dispatcher,
         webhookUrl: () => webhookUrls.get(definition.id),
+        ...(fontsDir === undefined ? {} : { fontsDir }),
       });
       states.set(definition.id, state);
       runningTwins.set(definition.id, running);

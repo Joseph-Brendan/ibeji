@@ -5,6 +5,8 @@ import { withTwin } from "../use-url";
 import { AppLink } from "./AppLink";
 import { ConnectionBanner } from "./ConnectionBanner";
 import { HelpMenu } from "./HelpMenu";
+import type { LiveKeyWarning } from "./LiveKeyBanners";
+import { LiveKeyBanners } from "./LiveKeyBanners";
 import { TwinSwitcher } from "./TwinSwitcher";
 
 const PAGES = [
@@ -23,6 +25,7 @@ type AppShellProps = {
   readonly selectedTwinId: string | undefined;
   readonly pathname: string;
   readonly connection: StreamState;
+  readonly liveKeyWarnings: readonly LiveKeyWarning[];
   readonly children: ReactNode;
 };
 
@@ -43,6 +46,7 @@ export function AppShell(props: AppShellProps): ReactNode {
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
+      <LiveKeyBanners warnings={props.liveKeyWarnings} />
       <header className="top-bar">
         <span className="wordmark">Ibeji</span>
         <span className="top-bar-status">

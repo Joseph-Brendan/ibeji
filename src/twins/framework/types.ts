@@ -1,5 +1,4 @@
 import type { ZodType } from "zod";
-
 import type { Clock } from "../../core/clock.js";
 import type { SeededRandom } from "../../core/random.js";
 import type {
@@ -9,6 +8,7 @@ import type {
   WebhookHeaders,
   WebhookSignOptions,
 } from "../../core/webhooks/types.js";
+import type { ConnectionGuideInfo } from "../../shared/control.js";
 
 export type TwinId = string;
 export type ActionId = string;
@@ -348,4 +348,5 @@ export type TwinDefinition = {
   readonly credentials: readonly CredentialSpec[];
   readonly money: MoneyRules;
   readonly retry: RetrySchedule;
+  readonly connectionGuide?: ConnectionGuideInfo;
 };

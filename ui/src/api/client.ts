@@ -15,6 +15,8 @@ import type {
   StatusResponse,
   StopScenarioResponse,
   TwinList,
+  WebhookDeliveryResponse,
+  WebhookListResponse,
   WebhookUrlResponse,
 } from "../../../src/shared/control.js";
 
@@ -245,6 +247,33 @@ export class ControlApi {
 
   getWebhookUrl(twinId: string): Promise<WebhookUrlResponse> {
     return this.request<WebhookUrlResponse>(`/twins/${encodeURIComponent(twinId)}/webhook-url`);
+  }
+
+  setWebhookUrl(twinId: string, url: string): Promise<WebhookUrlResponse> {
+    return this.request<WebhookUrlResponse>(`/twins/${encodeURIComponent(twinId)}/webhook-url`, {
+      method: "PUT",
+      body: { url },
+    });
+  }
+
+  getWebhooks(
+    options: { readonly twin?: string; readonly status?: string } = {},
+  ): Promise<WebhookListResponse> {
+    const query = new URLSearchParams();
+    if (options.twin !== undefined) {
+      query.set("twin", options.twin);
+    }
+    if (options.status !== undefined) {
+      query.set("status", options.status);
+    }
+    const suffix = query.toString() === "" ? "" : `?${query.toString()}`;
+    return this.request<WebhookListResponse>(`/webhooks${suffix}`);
+  }
+
+  resendWebhook(id: string): Promise<WebhookDeliveryResponse> {
+    return this.request<WebhookDeliveryResponse>(`/webhooks/${encodeURIComponent(id)}/resend`, {
+      method: "POST",
+    });
   }
 
   getState(twinId: string): Promise<StateResponse> {

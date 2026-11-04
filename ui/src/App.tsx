@@ -5,13 +5,16 @@ import { API_PREFIX, ApiError, ConnectionError, ControlApi, isUnauthorized } fro
 import { SseClient, type StreamState } from "./api/sse";
 import { AppLink } from "./components/AppLink";
 import { AppShell } from "./components/AppShell";
+import { ConnectPage } from "./components/ConnectPage";
 import { DataPage } from "./components/DataPage";
 import { ErrorPanel } from "./components/ErrorPanel";
 import { FailuresPage } from "./components/FailuresPage";
 import { HomePage } from "./components/HomePage";
+import type { LiveKeyWarning } from "./components/LiveKeyBanners";
 import { LivePage } from "./components/LivePage";
 import { ScenariosPage } from "./components/ScenariosPage";
 import { SignInPage, type SignInState } from "./components/SignInPage";
+import { WebhooksPage } from "./components/WebhooksPage";
 import { eventSummary } from "./event-label";
 import { formatLastUpdated } from "./format-time";
 import { twinFromUrl, useUrl, withTwin } from "./use-url";
@@ -36,6 +39,37 @@ function mergeEvents(
     byId.set(event.id, event);
   }
   return [...byId.values()].sort((left, right) => right.id - left.id).slice(0, MAX_UI_EVENTS);
+}
+
+function liveKeyWarning(event: EventItem): LiveKeyWarning | undefined {
+  if (event.type !== "warning") {
+    return undefined;
+  }
+  const fingerprint = event.details.fingerprint;
+  if (typeof fingerprint !== "string") {
+    return undefined;
+  }
+  return {
+    eventId: event.id,
+    twinId: event.scope,
+    displayName: event.scope,
+    message: event.summary,
+    fingerprint,
+  };
+}
+
+function mergeLiveKeyWarnings(
+  current: readonly LiveKeyWarning[],
+  incoming: readonly LiveKeyWarning[],
+): readonly LiveKeyWarning[] {
+  const byTwin = new Map(current.map((warning) => [warning.twinId, warning]));
+  for (const warning of incoming) {
+    const existing = byTwin.get(warning.twinId);
+    if (existing === undefined || warning.eventId > existing.eventId) {
+      byTwin.set(warning.twinId, warning);
+    }
+  }
+  return [...byTwin.values()];
 }
 
 function unauthorizedState(error: unknown): AuthState {
@@ -81,6 +115,7 @@ export function App(): ReactNode {
   const [status, setStatus] = useState<StatusResponse | undefined>(undefined);
   const [twins, setTwins] = useState<readonly TwinSummary[]>([]);
   const [events, setEvents] = useState<readonly EventItem[]>([]);
+  const [liveKeyWarnings, setLiveKeyWarnings] = useState<readonly LiveKeyWarning[]>([]);
   const [connection, setConnection] = useState<StreamState>("connecting");
   const [loadError, setLoadError] = useState<unknown>(undefined);
   const [announcement, setAnnouncement] = useState("");
@@ -168,6 +203,16 @@ export function App(): ReactNode {
     pathnameRef.current = pathname;
   }, [pathname]);
 
+  const namedLiveKeyWarnings = useMemo(
+    () =>
+      liveKeyWarnings.map((warning) => ({
+        ...warning,
+        displayName:
+          twins.find((twin) => twin.id === warning.twinId)?.displayName ?? warning.displayName,
+      })),
+    [liveKeyWarnings, twins],
+  );
+
   useEffect(() => {
     if (auth !== "signed-in") {
       return;
@@ -184,6 +229,10 @@ export function App(): ReactNode {
         return;
       }
       seenEventIds.current.add(event.id);
+      const warning = liveKeyWarning(event);
+      if (warning !== undefined) {
+        setLiveKeyWarnings((current) => mergeLiveKeyWarnings(current, [warning]));
+      }
       setEvents((current) => [event, ...current].slice(0, MAX_UI_EVENTS));
       lastEventId.current = Math.max(lastEventId.current ?? 0, event.id);
       setLastUpdated(new Date());
@@ -209,6 +258,10 @@ export function App(): ReactNode {
           return;
         }
         setTwins(twinList.twins);
+        const initialWarnings = eventList.events
+          .map(liveKeyWarning)
+          .filter((warning): warning is LiveKeyWarning => warning !== undefined);
+        setLiveKeyWarnings((current) => mergeLiveKeyWarnings(current, initialWarnings));
         setEvents([...eventList.events].reverse());
         seenEventIds.current = new Set(eventList.events.map((event) => event.id));
         lastEventId.current = eventList.events.at(-1)?.id;
@@ -256,6 +309,10 @@ export function App(): ReactNode {
           for (const event of list.events) {
             seenEventIds.current.add(event.id);
           }
+          const caughtUpWarnings = list.events
+            .map(liveKeyWarning)
+            .filter((warning): warning is LiveKeyWarning => warning !== undefined);
+          setLiveKeyWarnings((current) => mergeLiveKeyWarnings(current, caughtUpWarnings));
           setEvents((current) => mergeEvents(current, list.events));
           setLastUpdated(new Date());
         })
@@ -310,6 +367,7 @@ export function App(): ReactNode {
       selectedTwinId={selectedTwinId}
       pathname={pathname}
       connection={connection}
+      liveKeyWarnings={namedLiveKeyWarnings}
     >
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {announcement}
@@ -341,6 +399,24 @@ export function App(): ReactNode {
         />
       ) : pathname === "/data" ? (
         <DataPage
+          api={api}
+          twins={twins}
+          selectedTwinId={selectedTwinId}
+          connection={connection}
+          onUnauthorized={onUnauthorized}
+        />
+      ) : pathname === "/connect" ? (
+        <ConnectPage
+          api={api}
+          twins={twins}
+          selectedTwinId={selectedTwinId}
+          events={events}
+          connection={connection}
+          onRefresh={() => setReloadKey((value) => value + 1)}
+          onUnauthorized={onUnauthorized}
+        />
+      ) : pathname === "/webhooks" ? (
+        <WebhooksPage
           api={api}
           twins={twins}
           selectedTwinId={selectedTwinId}

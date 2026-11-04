@@ -8,6 +8,7 @@ const EXPECTED = {
   purple: "#6b4fa1",
   darkGrey: "#3a3a3a",
   darkPurple: "#2f1b45",
+  red: "#8f1d21",
 } as const;
 
 function luminance(hex: string): number {
@@ -62,6 +63,7 @@ describe("T8 UI design tokens", () => {
       [EXPECTED.white, EXPECTED.purple],
       [EXPECTED.white, EXPECTED.darkGrey],
       [EXPECTED.white, EXPECTED.darkPurple],
+      [EXPECTED.white, EXPECTED.red],
     ];
 
     for (const [text, background] of pairs) {

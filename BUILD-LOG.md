@@ -1910,3 +1910,66 @@ Built the Failures and Scenarios pages. Reused the app shell, twin switcher, API
 - Add scenario progress completion tests with an injected clock.
 - Add axe keyboard coverage for the long failure cards.
 - Apply the same schema-form pattern to future twin settings.
+
+---
+
+## Phase 6: Webhooks, Connect your app and checkout alignment
+
+Date: 4 November 2026.
+
+Built the Webhooks and Connect your app pages, added the live-key banner to every dashboard page, and aligned the three test checkout pages with the dashboard's tokens and local fonts. Reused the app shell, twin switcher, API client, SSE feed, badges, status pills, error panel, copy button and design tokens. No new dependency was added.
+
+### Webhooks
+
+- Every delivery comes from `GET /webhooks`, filtered by the twin switcher and by status. All eight C7 statuses have plain words: Waiting to send, Waiting for retry, Sending, Delivered, App said no, No answer, Not sent and Stopped.
+- Each delivery names its twin and a plain event name. The name comes from the webhook body's event field when there is one, and otherwise from the action summary. The raw body is never shown as the event name.
+- Each delivery shows its destination, created time, attempt count and event id in monospace.
+- Expanding a delivery shows every attempt in order with the start and finish time, how long it took, the outcome, the app's HTTP response code, the remote address, error code and error text. The first 4 KB of the stored response is visible in the same expanded block, so it is one click from the delivery.
+- Resend posts to `POST /webhooks/:id/resend`, disables while busy and announces "Delivery queued again.".
+- The page has one webhook URL editor per twin, or only the chosen twin's editor when the switcher selects one twin. Saving and clearing use the existing control routes. Refused private and public addresses show the server's C12 what, why and fix, including the exact `--allow-private-webhooks` or `--allow-public-webhooks` start flag.
+- Empty, loading, error, disconnected and twin-off states are handled. The twin-off state keeps the URL editor available and hides deliveries for that twin.
+
+### Connect your app
+
+- With All selected, the page shows a card for each twin from `GET /twins`. Choosing one opens a guide with the twin badge, status, bound base URL and a copy button.
+- Every declared credential from `GET /twins/:twin/credentials` appears with its plain label, role help and a copy button.
+- The numbered steps, webhook note and coding-agent instruction come from the twin's own definition. The page replaces `{base}` with the bound address, so no default port is presented as the truth.
+- The Paystack guide explains that the official library cannot change its base URL and that `fetch` is the practical choice. The Flutterwave guide includes the third-argument base URL example, the hosted-payment caveat and the telemetry warning.
+- The shared webhook URL editor appears in the guide, so the person can set or clear the URL without leaving Connect your app.
+- "Check my connection" only reads the shared event log. It shows no request, the last request with its time, or the last request with the twin's HTTP response. It never contacts the person's app. The button refetches Ibeji's own events.
+- The safety block carries the C4 warning and points out that only a fingerprint is recorded. The footer names the registered services with plain names and says Ibeji is not affiliated with them.
+
+### Live-key banner
+
+- A warning event with a fingerprint is kept in app state, separate from the 5,000-event display buffer. The red banner therefore stays until dismissed even if the event list rolls over.
+- The banner uses the event's own summary, so the C4 text and the service name come from the twin that detected the key. It shows only the 8-character fingerprint in monospace and never any part of the key.
+- Dismiss hides that warning event. A new live-key warning for the same twin replaces the stored warning and appears again. Warnings for different twins are independent.
+- The safety link goes to `/connect#safety`. The banner sits above the top bar in the app shell, so it appears on every signed-in page.
+- The banner uses the new `--ibeji-red: #8f1d21` token. White text on that red passes the 4.5 to 1 contrast test.
+
+### Test checkout pages
+
+- The shared renderer now serves one stylesheet from `/_ibeji/checkout.css` and six known IBM Plex files from `/_ibeji/fonts/:file` on each twin port. Requests for these assets create no request or response events.
+- The checkout page and result page use the same core `--ibeji-*` tokens as `ui/src/styles.css`, the same font families and local font files. A unit test compares the token values so the two cannot drift.
+- Both pages are still server-rendered HTML with no React and no scripts. They contain no external URLs, no logos and no service colours. The service name appears only as a plain twin label.
+- The checkout page shows "Ibeji test checkout: [Service] twin. No real money moves.", "Choose a result.", the C5 override notice when a failure changed the result, "This page is part of Ibeji. It is not the real service." and an affiliation footer.
+- The result page names the twin, keeps the same tokens and fonts, and repeats the safety and affiliation lines.
+
+### Tests
+
+- Added Playwright tests for the per-twin webhook editors, private and public address errors, a delivery with attempts, response body, resend, status filtering, the live-key banner and its second appearance, Connect your app for both twins, no-request and recent-request connection checks, copy buttons, per-twin webhook save/clear and switching twins without carrying a URL across.
+- Added a framework unit test for token parity with the dashboard, local fonts, no scripts or external URLs, the choose-result and safety text, and the affiliation footer.
+- Added an integration test for the local CSS and font endpoints, the missing-font 404, and the rule that asset requests create no events.
+- Total suite: 725 Vitest tests across 72 files, plus 31 Playwright tests.
+- Coverage: 96.34% statements, 90.13% branches and 96.37% lines. The 100% thresholds for `src/core/` and `src/twins/framework/` still pass.
+- `pnpm test` passed twice in a row. `pnpm test:ui` passed.
+
+### C21 proposal (needs approval)
+
+- Add an optional `connectionGuide` object to each `GET /twins` entry. It carries the plain summary, base URL note, key note, numbered steps, webhook note and coding-agent instruction from that twin's own definition. The control API copies the object generically; the UI renders the shape and keeps a generic fallback. This is how the dashboard shows service-specific guidance without hard-coding service text in `ui/`.
+
+### Later
+
+- Add axe and keyboard-only coverage for Webhooks, Connect your app and the checkout pages.
+- Add a visual regression check for the red live-key banner on every page.
+- Revisit the 4 KB response body cap if apps need more for debugging.

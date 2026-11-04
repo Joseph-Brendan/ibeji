@@ -1,5 +1,7 @@
+import { readFile } from "node:fs/promises";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { join } from "node:path";
 import { type HttpBindings, serve } from "@hono/node-server";
 import { type Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -18,7 +20,7 @@ import type { RuleStore } from "../../core/failures/rules.js";
 import { SeededRandom } from "../../core/random.js";
 import { fingerprint } from "../../core/redact.js";
 import type { WebhookDispatcher, WebhookTwin } from "../../core/webhooks/dispatcher.js";
-import { renderCheckoutPage, renderCheckoutResult } from "./html.js";
+import { CHECKOUT_STYLES, renderCheckoutPage, renderCheckoutResult } from "./html.js";
 import {
   applyHtmlSecurityHeaders,
   errorResponseFrom,
@@ -66,7 +68,17 @@ export type StartTwinOptions = {
   readonly webhookUrl?: () => string | undefined;
   readonly dispatcher?: WebhookDispatcher;
   readonly onWebhookDraft?: (draft: TwinWebhookDraft) => void;
+  readonly fontsDir?: string;
 };
+
+const CHECKOUT_FONT_FILES = new Set([
+  "ibm-plex-sans-latin-400-normal.woff2",
+  "ibm-plex-sans-latin-600-normal.woff2",
+  "ibm-plex-sans-latin-ext-400-normal.woff2",
+  "ibm-plex-sans-latin-ext-600-normal.woff2",
+  "ibm-plex-mono-latin-400-normal.woff2",
+  "ibm-plex-mono-latin-ext-400-normal.woff2",
+]);
 
 export type RunningTwin = {
   readonly definition: TwinDefinition;
@@ -394,6 +406,11 @@ export async function startTwin(
   app.use("*", async (context, next) => {
     const method = context.req.method;
     const path = new URL(context.req.url).pathname;
+    if (path === "/_ibeji/checkout.css" || path.startsWith("/_ibeji/fonts/")) {
+      await next();
+      return;
+    }
+
     const action = matchAction(actions, method, path);
     context.set("actionId", action?.id);
     context.set("actionSummary", action?.summary);
@@ -456,6 +473,38 @@ export async function startTwin(
       onError: () => ibejiErrorResponse("BODY_TOO_LARGE"),
     }),
   );
+
+  app.get("/_ibeji/checkout.css", () => {
+    return new Response(CHECKOUT_STYLES, {
+      status: 200,
+      headers: {
+        "content-type": "text/css; charset=utf-8",
+        "cache-control": "no-cache",
+      },
+    });
+  });
+
+  if (options.fontsDir !== undefined) {
+    const fontsDir = options.fontsDir;
+    app.get("/_ibeji/fonts/:file", async (context) => {
+      const file = context.req.param("file");
+      if (!CHECKOUT_FONT_FILES.has(file)) {
+        return new Response(null, { status: 404 });
+      }
+      try {
+        const body = await readFile(join(fontsDir, file));
+        return new Response(body, {
+          status: 200,
+          headers: {
+            "content-type": "font/woff2",
+            "cache-control": "public, max-age=31536000, immutable",
+          },
+        });
+      } catch {
+        return new Response(null, { status: 404 });
+      }
+    });
+  }
 
   const runIdempotency = (
     adapter: IdempotencyAdapter,
@@ -573,7 +622,7 @@ export async function startTwin(
         headers: { location: result.redirectUrl },
       });
     }
-    return new Response(renderCheckoutResult(result), {
+    return new Response(renderCheckoutResult(result, definition.displayName), {
       status: 200,
       headers: { "content-type": "text/html; charset=utf-8" },
     });

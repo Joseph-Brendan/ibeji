@@ -4,6 +4,7 @@ import { bankActions } from "./bank.js";
 import { paystackCheckout } from "./checkout.js";
 import { paystackCredentialSpecs } from "./credentials.js";
 import { paystackFailures } from "./failures.js";
+import { paystackConnectionGuide } from "./guide.js";
 import { paystackMoney } from "./money.js";
 import { recipientActions } from "./recipients.js";
 import { refundActions } from "./refunds.js";
@@ -42,4 +43,5 @@ export const paystackTwin: TwinDefinition = {
   credentials: paystackCredentialSpecs,
   money: paystackMoney,
   retry: paystackRetrySchedule,
+  connectionGuide: paystackConnectionGuide,
 };
