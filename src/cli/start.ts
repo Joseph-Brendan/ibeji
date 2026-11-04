@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type { RunningSession } from "../control/session.js";
 import { type StartSessionOptions, startSession } from "../control/session.js";
 import { createDefaultConfig, MAX_SEED, mergeConfig } from "../core/config.js";
@@ -231,6 +232,7 @@ export async function runStart(args: readonly string[], options: StartCliOptions
     allowPrivateWebhooks: config.allowPrivateWebhooks,
     allowPublicWebhooks: config.allowPublicWebhooks,
     version: project.packageInfo.version,
+    uiRoot: join(project.root, "dist", "ui"),
     ...(config.seed === undefined ? {} : { seed: config.seed }),
   };
 

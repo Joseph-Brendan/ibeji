@@ -39,4 +39,5 @@ export type ControlDependencies = {
   readonly addressPolicy: AddressPolicy;
   readonly logger: Logger;
   readonly controlPort: { value: number };
+  readonly uiRoot?: string;
 };

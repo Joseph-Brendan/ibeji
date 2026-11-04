@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { serveStatic } from "@hono/node-server/serve-static";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -195,24 +198,6 @@ function bearerToken(header: string | undefined): string | undefined {
 
 function isChangingMethod(method: string): boolean {
   return method === "POST" || method === "PUT" || method === "DELETE";
-}
-
-function renderPlaceholder(notice?: string): string {
-  const message = notice === undefined ? "" : `<p role="alert">${notice}</p>`;
-  return `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ibeji</title></head>
-<body><main><h1>Ibeji</h1><p>Ibeji dashboard is coming in Phase 6</p>${message}</main></body>
-</html>`;
-}
-
-function htmlResponse(html: string, status = 200): Response {
-  const headers = new Headers({
-    "content-type": "text/html; charset=utf-8",
-    "cache-control": "no-store",
-  });
-  applyHtmlSecurityHeaders(headers);
-  return new Response(html, { status, headers });
 }
 
 function labelColourToken(index: number): string {
@@ -440,8 +425,13 @@ export function createControlApp(deps: ControlDependencies): Hono {
     }
 
     const cookie = cookieValue(context.req.header("cookie"), UI_COOKIE);
-    if (cookie === undefined || !deps.secrets.matchesUiToken(cookie)) {
+    if (cookie === undefined) {
       throw new IbejiError("UNAUTHORIZED");
+    }
+    if (!deps.secrets.matchesUiToken(cookie)) {
+      const response = ibejiErrorResponse("UNAUTHORIZED");
+      response.headers.set("x-ibeji-stale-session", "1");
+      return response;
     }
 
     if (isChangingMethod(context.req.method)) {
@@ -454,32 +444,6 @@ export function createControlApp(deps: ControlDependencies): Hono {
     }
 
     await next();
-  });
-
-  app.get("/", (context) => {
-    const launch = new URL(context.req.url).searchParams.get("launch");
-    if (launch === null) {
-      return htmlResponse(renderPlaceholder());
-    }
-
-    let uiToken: string;
-    try {
-      uiToken = deps.secrets.exchangeLaunchCode(launch);
-    } catch (error) {
-      if (isIbejiError(error) && error.code === "LAUNCH_CODE_INVALID") {
-        return htmlResponse(
-          renderPlaceholder(
-            "That launch link is not valid. Run ibeji open to get a new dashboard link.",
-          ),
-          401,
-        );
-      }
-      throw error;
-    }
-
-    const headers = new Headers({ location: "/", "cache-control": "no-store" });
-    headers.set("set-cookie", `${UI_COOKIE}=${uiToken}; HttpOnly; SameSite=Strict; Path=/`);
-    return new Response(null, { status: 303, headers });
   });
 
   app.get(HEALTH_PATH, () => jsonResponse({ ok: true, instance: deps.instanceId }));
@@ -795,6 +759,42 @@ export function createControlApp(deps: ControlDependencies): Hono {
       }),
     );
   });
+
+  const uiRoot = deps.uiRoot;
+  const uiReady = uiRoot !== undefined && existsSync(join(uiRoot, "index.html"));
+
+  if (uiReady) {
+    const onFound = (path: string, context: Context): void => {
+      if (path.endsWith("index.html")) {
+        context.header("cache-control", "no-store");
+        applyHtmlSecurityHeaders(context.res.headers);
+        return;
+      }
+      context.header("cache-control", "public, max-age=31536000, immutable");
+    };
+
+    app.use("*", serveStatic({ root: uiRoot, onFound }));
+    const serveIndex = serveStatic({
+      root: uiRoot,
+      path: "/index.html",
+      onFound,
+    });
+    app.use("*", async (context, next) => {
+      if (context.req.method !== "GET" && context.req.method !== "HEAD") {
+        await next();
+        return;
+      }
+      if (
+        context.req.path.startsWith(API_PREFIX) ||
+        context.req.path.startsWith("/assets/") ||
+        /\.[^/]+$/u.test(context.req.path)
+      ) {
+        await next();
+        return;
+      }
+      return serveIndex(context, next);
+    });
+  }
 
   app.notFound(() => ibejiErrorResponse("NOT_FOUND"));
 

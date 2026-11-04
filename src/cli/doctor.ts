@@ -225,33 +225,9 @@ async function credentialsCheck(home: string): Promise<DoctorCheck> {
   };
 }
 
-async function dashboardCheck(
-  project: ProjectInfo,
-  session: SessionFile | undefined,
-): Promise<DoctorCheck> {
+async function dashboardCheck(project: ProjectInfo): Promise<DoctorCheck> {
   if (project.uiIndexPath !== undefined) {
     return { name: "Dashboard build", problems: [] };
-  }
-
-  if (session !== undefined) {
-    try {
-      const html = await new ControlClient(session).placeholder();
-      if (html.includes("Ibeji dashboard is coming in Phase 6")) {
-        return { name: "Dashboard build", problems: [] };
-      }
-    } catch {
-      return {
-        name: "Dashboard build",
-        problems: [
-          problem(
-            "INTERNAL",
-            "The dashboard page could not be read.",
-            "The running control server did not return the placeholder page.",
-            "Restart Ibeji and try again.",
-          ),
-        ],
-      };
-    }
   }
 
   return {
@@ -374,7 +350,7 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   }
   checks.push(await portCheck(ports, session));
   checks.push(await credentialsCheck(options.home));
-  checks.push(await dashboardCheck(options.project, session));
+  checks.push(await dashboardCheck(options.project));
   checks.push(
     await webhookCheck(
       config.webhookUrls,

@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
+    globalSetup: ["test/setup/global-ui-build.ts"],
     setupFiles: ["test/setup/t7-network.ts"],
     environment: "node",
     coverage: {

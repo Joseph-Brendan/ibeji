@@ -1724,3 +1724,52 @@ Wrote `UI-PLAN.md`, a detailed plan for the Ibeji dashboard. No UI code was writ
 - The plan contains no em dash or en dash.
 - Font packages, file contents and licence were checked in `node_modules`.
 - The existing code and tests were not changed by this task.
+
+---
+
+## Phase 6: UI foundation, twin switcher and Home page
+
+Date: 4 November 2026.
+
+Built the React dashboard foundation, the API-backed twin switcher and the Home page. No new dependency was needed. The UI uses the installed React, Vite, React plugin, Playwright and Fontsource packages.
+
+### What was built
+
+- **React app.** Added `ui/` with a strict `ui/tsconfig.json` that includes the DOM library. Vite builds it into `dist/ui`. `pnpm build` now runs `tsup` and `vite build`, and `pnpm typecheck` checks both the server and the UI.
+- **Serving.** The control server serves `dist/ui/index.html` at `/`, serves hashed assets with a one-year immutable cache, and falls back to `index.html` for page routes. API routes keep their JSON responses. Unknown API paths and missing assets still return `NOT_FOUND`. HTML responses keep the CSP, referrer and nosniff headers.
+- **Tokens and fonts.** All palette, type, spacing and radius tokens are in `ui/src/styles.css`. IBM Plex Sans and IBM Plex Mono are declared with local `@font-face` rules and bundled under `dist/ui/assets/fonts/`. `pnpm prepare:ui` copies the font binaries, both licences and a third-party notice before Vite builds. A preload points at the local Latin Sans 400 file. No external font, image or script request exists.
+- **Sign-in.** The app reads `launch`, calls `POST /auth/exchange`, removes the launch code with `history.replaceState`, relies on the `ibeji_ui` cookie, and uses no `localStorage`, `sessionStorage` or IndexedDB. The API marks a rejected stale cookie with `x-ibeji-stale-session: 1`, so the UI can show "Ibeji was restarted." while a first visit with no cookie shows "Open Ibeji from your terminal."
+- **API client.** Added a typed client using shared types from `src/shared/control.ts`. Changing requests send `X-Ibeji-Request: 1`. C12 errors keep their what, why and fix text.
+- **Live connection.** Added a fetch-based SSE client with `Last-Event-ID`, automatic reconnection and exponential backoff. After a reconnect the app also asks `/events?after=<id>` for missed events, ignores duplicate ids and shows "Last updated at" while disconnected. The banner changes wording after 30 seconds and the restored message clears after 5 seconds.
+- **Shell.** Added the skip link, top bar connection state, the full Help term list in an Escape-closable panel, navigation links, page titles, light and dark focus styles and the API-driven twin switcher.
+- **Home.** Added the session strip, newest activity with a live dot, first-time guide, running twin cards with base URLs and full test keys, webhook URLs, active rules summary, copy buttons and key rotation with confirmation. The loading, empty first-run, normal, error, disconnected and twin-off states follow the plan, including the exact off-state base URL text.
+- **Shared types.** The CLI now imports the common API response types from `src/shared/control.ts` instead of keeping a second copy.
+
+### Decisions
+
+- **The UI uses fetch streaming, not `EventSource`.** This lets the client send `Last-Event-ID` and apply its own tested backoff. Cookies still travel with the same-origin request.
+- **Twin choice lives in `?twin=`.** Reloads, copied links and second tabs keep the choice without browser storage.
+- **The fourth twin test uses the API.** The UI maps `twin-label-N` tokens to CSS classes and uses a neutral fallback for an unknown token. No service id is hard-coded in the UI.
+- **The stale-session marker is a response header, not a new error code.** C12 codes keep their meaning. The header only tells the dashboard which sign-in page to show after a 401.
+- **The dashboard reads the twin list only from `GET /twins`.** The switcher, cards, off help and fourth-twin test all use the API record; adding a twin needs no UI edit.
+- **Font files are prepared as Vite public assets.** This keeps their exact paths under `assets/fonts`, avoids build-time URL warnings and leaves `dist/ui/index.html` preloading a real local file.
+- **Only the Home page is implemented in this step.** The other navigation links show a short placeholder until their pages are built.
+- **The control server no longer consumes launch links.** `GET /?launch=...` serves the UI, and the browser performs the exchange. This matches C8 and the UI plan.
+- **The doctor dashboard check now requires the built UI.** The Phase 5 placeholder exception is gone.
+- **The CLI integration test builds only the CLI.** It uses `tsup --no-clean` so it cannot delete `dist/ui` while other test files are serving the dashboard.
+
+### Tests
+
+- Added unit tests for the UI API client, the stale-session header, SSE reconnection with a fake clock, the token file and a guard that no service id or browser storage appears in UI source.
+- Added an integration test that serves the real built UI, checks asset and font content types and cache headers, checks the local font licences and notices, checks page fallback and checks that API auth is unchanged.
+- Added Playwright tests for sign-in, launch code removal, no web storage, reload, a second tab, the no-cookie page, the stale-cookie page, a made-up fourth twin, Home activity, the Help panel, the rotate confirmation, an off twin, a credential error and the connection banner.
+- Total suite: 706 Vitest tests across 68 files, plus 11 Playwright tests.
+- Coverage remains above the C17 floor: 96.36% lines and 90.11% branches overall. The 100% thresholds for `src/core/` and `src/twins/framework/` still pass.
+- `pnpm test` passed twice in a row. `pnpm test:ui` passed.
+
+### Later
+
+- Build the remaining pages from UI-PLAN.md.
+- Add axe and keyboard-only coverage for the remaining pages in T9.
+- Replace the placeholder route pages and add live rule refresh to Home when a rule changes outside the page.
+- Add the remaining UI tests once the pages exist.

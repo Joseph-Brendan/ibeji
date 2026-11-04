@@ -145,6 +145,20 @@ describe("T6 control API security", () => {
     });
   });
 
+  it("T6 marks a stale UI cookie so the dashboard can say Ibeji was restarted", async () => {
+    await withControlSession({}, async ({ session }) => {
+      const missing = await fetch(apiUrl(session, "/status"));
+      expect(missing.headers.get("x-ibeji-stale-session")).toBeNull();
+
+      const stale = await fetch(apiUrl(session, "/status"), {
+        headers: { cookie: "ibeji_ui=this-is-not-a-live-token" },
+      });
+      expect(stale.status).toBe(401);
+      expect(stale.headers.get("x-ibeji-stale-session")).toBe("1");
+      expect(await stale.json()).toMatchObject({ error: { code: "UNAUTHORIZED" } });
+    });
+  });
+
   it("T6 rejects a token placed in the query string", async () => {
     await withControlSession({}, async ({ session }) => {
       const response = await fetch(apiUrl(session, `/status?token=${session.token}`));
@@ -344,7 +358,7 @@ describe("T6 control API security", () => {
     await withControlSession({}, async ({ session }) => {
       const page = await fetch(session.addresses.control.url);
       expect(page.status).toBe(200);
-      expect(await page.text()).toContain("Ibeji dashboard is coming in Phase 6");
+      expect(await page.text()).toContain('<div id="root"></div>');
       expect(page.headers.get("content-security-policy")).toBe(
         "default-src 'self'; frame-ancestors 'none'",
       );
@@ -369,24 +383,30 @@ describe("T6 control API security", () => {
     });
   });
 
-  it("T6 serves the placeholder at / and consumes a launch link", async () => {
+  it("T6 serves the UI at / and leaves the launch code for the page", async () => {
     await withControlSession({}, async ({ session }) => {
-      const page = await fetch(session.launchLink, { redirect: "manual" });
-      expect(page.status).toBe(303);
-      expect(page.headers.get("location")).toBe("/");
-      expect(page.headers.get("set-cookie")).toContain("HttpOnly");
-      const cookie = cookieFrom(page);
+      const code = session.createLaunchCode();
+      const page = await fetch(
+        `${session.addresses.control.url}/?launch=${encodeURIComponent(code)}`,
+      );
+      expect(page.status).toBe(200);
+      expect(page.headers.get("set-cookie")).toBeNull();
+      expect(await page.text()).toContain('<div id="root"></div>');
+
+      const exchange = await exchangeCode(session, code);
+      expect(exchange.status).toBe(200);
+      const cookie = cookieFrom(exchange);
 
       const home = await fetch(session.addresses.control.url);
       expect(home.status).toBe(200);
-      expect(await home.text()).toContain("Ibeji dashboard is coming in Phase 6");
-
-      const used = await fetch(session.launchLink, { redirect: "manual" });
-      expect(used.status).toBe(401);
-      expect(await used.text()).toContain("That launch link is not valid");
+      expect(await home.text()).toContain('<div id="root"></div>');
 
       const withCookie = await fetch(apiUrl(session, "/status"), { headers: { cookie } });
       expect(withCookie.status).toBe(200);
+
+      const used = await exchangeCode(session, code);
+      expect(used.status).toBe(401);
+      expect(await used.json()).toMatchObject({ error: { code: "LAUNCH_CODE_INVALID" } });
     });
   });
 

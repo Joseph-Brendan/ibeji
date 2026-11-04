@@ -165,7 +165,7 @@ function waitForExit(child: ReturnType<typeof spawn>): Promise<number> {
   });
 }
 
-async function waitForPlaceholder(url: string): Promise<string> {
+async function waitForDashboard(url: string): Promise<string> {
   const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
   expect(response.status).toBe(200);
   return response.text();
@@ -194,7 +194,9 @@ async function withSession(
 }
 
 beforeAll(() => {
-  execFileSync("pnpm", ["build"], { cwd: ROOT, stdio: "pipe" });
+  // Build only the CLI. A full build empties dist/ui while other test files
+  // may still be serving the dashboard from it.
+  execFileSync("pnpm", ["exec", "tsup", "--no-clean"], { cwd: ROOT, stdio: "pipe" });
 });
 
 describe("T10 CLI help and usage", () => {
@@ -959,7 +961,7 @@ describe("T10 real CLI child process", () => {
     expect(packageJson.bin.ibeji).toBe("./dist/cli.js");
   });
 
-  it("T10: start --no-open prints each twin, serves the placeholder and cleans up on SIGTERM", async () => {
+  it("T10: start --no-open prints each twin, serves the dashboard and cleans up on SIGTERM", async () => {
     const home = await tempHome();
     const child = spawn(
       process.execPath,
@@ -1002,7 +1004,8 @@ describe("T10 real CLI child process", () => {
         throw new Error("the dashboard link was not printed");
       }
       const origin = new URL(dashboard).origin;
-      expect(await waitForPlaceholder(origin)).toContain("Ibeji dashboard is coming in Phase 6");
+      const dashboardHtml = await waitForDashboard(origin);
+      expect(dashboardHtml).toContain('<div id="root"></div>');
 
       const status = runProcess(["status", "--json"], home);
       expect(status.code).toBe(0);

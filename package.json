@@ -22,16 +22,19 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p ui/tsconfig.json --noEmit",
     "lint": "biome check --error-on-warnings .",
     "format": "biome format --write .",
-    "build": "tsup",
+    "build": "tsup && pnpm build:ui",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:ui": "node -e \"console.log('no UI tests yet')\"",
+    "test:ui": "playwright test",
     "check:package": "node -e \"console.log('added in Phase 8')\"",
     "test:smoke": "node -e \"console.log('added in Phase 8')\"",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "build:ui": "pnpm prepare:ui && vite build",
+    "dev:ui": "pnpm prepare:ui && vite",
+    "prepare:ui": "node scripts/prepare-ui-fonts.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

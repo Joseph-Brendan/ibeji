@@ -49,6 +49,7 @@ export type StartSessionOptions = {
   readonly instanceId?: string | undefined;
   readonly bytes?: ByteSource | undefined;
   readonly healthCheck?: HealthCheck | undefined;
+  readonly uiRoot?: string | undefined;
 };
 
 export type SessionTwin = {
@@ -409,6 +410,7 @@ export async function startSession(options: StartSessionOptions): Promise<Runnin
       addressPolicy,
       logger,
       controlPort: controlPortRef,
+      ...(options.uiRoot === undefined ? {} : { uiRoot: options.uiRoot }),
     };
 
     const startedControl = await startControlServer(controlDependencies, { port: controlPort });

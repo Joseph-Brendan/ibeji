@@ -50,6 +50,7 @@ export async function startControlSession(
       logger,
       handleSignals: false,
       ports: options.ports ?? defaultPorts(),
+      uiRoot: options.uiRoot ?? join(process.cwd(), "dist", "ui"),
     });
     return {
       session,

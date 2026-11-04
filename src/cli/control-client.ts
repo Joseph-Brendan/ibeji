@@ -1,69 +1,28 @@
 import type { SessionFile } from "../control/session-file.js";
 import { ERROR_DEFINITIONS, type ErrorCode, IbejiError } from "../core/errors.js";
 
-export type TwinSummary = {
-  readonly id: string;
-  readonly displayName: string;
-  readonly running: boolean;
-  readonly address: string | null;
-  readonly port: number | null;
-  readonly actions: readonly {
-    readonly id: string;
-    readonly method: string;
-    readonly path: string;
-    readonly summary: string;
-    readonly kind: string;
-  }[];
-  readonly failures: readonly FailureSupport[];
-  readonly currencyRules: {
-    readonly zeroDecimal: readonly string[];
-    readonly defaultFractionDigits: number;
-    readonly fractionDigits: Readonly<Record<string, number>>;
-  };
-  readonly labelColourToken: string;
-};
+import type {
+  EventItem,
+  EventList,
+  FailureSupport,
+  Rule,
+  RuleList,
+  StatusResponse,
+  TwinList,
+  TwinSummary,
+  WebhookUrlResponse,
+} from "../shared/control.js";
 
-export type FailureSupport = {
-  readonly id: string;
-  readonly actions: readonly string[];
-  readonly source: "docs" | "real-story" | "assumed";
-  readonly sourceReference?: string;
-};
-
-export type TwinList = {
-  readonly twins: readonly TwinSummary[];
-};
-
-export type Rule = {
-  readonly id: string;
-  readonly failureId: string;
-  readonly settings: Readonly<Record<string, unknown>>;
-  readonly twins: readonly string[];
-  readonly actions: string | undefined;
-  readonly resolvedActions: Readonly<Record<string, readonly string[]>>;
-  readonly scenarioId: string | undefined;
-  readonly counters: Readonly<Record<string, number>>;
-  readonly order: number;
-};
-
-export type RuleList = {
-  readonly rules: readonly Rule[];
-};
-
-export type StatusResponse = {
-  readonly version: string;
-  readonly instance: string;
-  readonly seed: number;
-  readonly startTime: string;
-  readonly twins: readonly {
-    readonly id: string;
-    readonly displayName: string;
-    readonly running: boolean;
-    readonly address: string | null;
-    readonly labelColourToken: string;
-  }[];
-  readonly rules: readonly Rule[];
-  readonly scenario: string | null;
+export type {
+  EventItem,
+  EventList,
+  FailureSupport,
+  Rule,
+  RuleList,
+  StatusResponse,
+  TwinList,
+  TwinSummary,
+  WebhookUrlResponse,
 };
 
 export type FailureInfo = {
@@ -102,24 +61,6 @@ export type ScenarioInfo = {
 export type ScenarioList = {
   readonly scenarios: readonly ScenarioInfo[];
   readonly active: string | null;
-};
-
-export type WebhookUrlResponse = {
-  readonly twin: string;
-  readonly url: string | null;
-};
-
-export type EventItem = {
-  readonly id: number;
-  readonly time: number;
-  readonly type: string;
-  readonly scope: string;
-  readonly summary: string;
-  readonly details: Readonly<Record<string, unknown>>;
-};
-
-export type EventList = {
-  readonly events: readonly EventItem[];
 };
 
 export type ResetResponse = {
