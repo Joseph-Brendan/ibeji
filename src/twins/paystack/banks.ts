@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import paystackAccountNames from "./data/account-names.json" with { type: "json" };
+import paystackBanks from "./data/banks.json" with { type: "json" };
 
 export type PaystackBank = {
   readonly id: number;
@@ -19,19 +20,11 @@ export type PaystackBank = {
   readonly updatedAt: string;
 };
 
-function readData<T>(file: string): T {
-  const text = readFileSync(new URL(file, import.meta.url), "utf8");
-  return JSON.parse(text) as T;
-}
-
 /** The recorded bank-list fixture, stored as package data. */
-export const PAYSTACK_BANKS: readonly PaystackBank[] =
-  readData<PaystackBank[]>("./data/banks.json");
+export const PAYSTACK_BANKS: readonly PaystackBank[] = paystackBanks;
 
 /** A fixed list of fictional names used for account resolution. */
-export const PAYSTACK_ACCOUNT_NAMES: readonly string[] = readData<string[]>(
-  "./data/account-names.json",
-);
+export const PAYSTACK_ACCOUNT_NAMES: readonly string[] = paystackAccountNames;
 
 export function listBanks(country: string | undefined): readonly PaystackBank[] {
   if (country === undefined || country.trim().toLowerCase() === "nigeria") {

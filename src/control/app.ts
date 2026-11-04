@@ -484,6 +484,11 @@ export function createControlApp(deps: ControlDependencies): Hono {
 
   app.get(HEALTH_PATH, () => jsonResponse({ ok: true, instance: deps.instanceId }));
 
+  app.post(`${API_PREFIX}/auth/launch`, () => {
+    const controlUrl = `http://127.0.0.1:${deps.controlPort.value}`;
+    return jsonResponse({ url: deps.secrets.createLaunchLink(controlUrl) });
+  });
+
   app.post(EXCHANGE_PATH, async (context) => {
     const body = await parseBody(context, exchangeBodySchema);
     const code = body.code ?? body.launchCode;

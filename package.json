@@ -11,7 +11,7 @@
   },
   "packageManager": "pnpm@10.34.9",
   "bin": {
-    "ibeji": "./dist/cli/index.js"
+    "ibeji": "./dist/cli.js"
   },
   "files": [
     "dist/",
@@ -25,13 +25,13 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check --error-on-warnings .",
     "format": "biome format --write .",
-    "build": "tsup src/cli/index.ts --format esm --target node22 --out-dir dist/cli --clean",
+    "build": "tsup",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:ui": "node -e \"console.log('no UI tests yet')\"",
     "check:package": "node -e \"console.log('added in Phase 8')\"",
     "test:smoke": "node -e \"console.log('added in Phase 8')\"",
-    "dev": "tsup src/cli/index.ts --format esm --target node22 --out-dir dist/cli --watch"
+    "dev": "tsup --watch"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -63,6 +63,7 @@
   "dependencies": {
     "@hono/node-server": "2.1.5",
     "hono": "4.13.14",
+    "open": "11.0.4",
     "zod": "4.6.7"
   }
 }

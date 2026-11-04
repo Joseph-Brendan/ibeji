@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import flutterwaveAccountNames from "./data/account-names.json" with { type: "json" };
+import flutterwaveBanks from "./data/banks.json" with { type: "json" };
 
 export type FlutterwaveBank = {
   readonly id: number;
@@ -6,19 +7,11 @@ export type FlutterwaveBank = {
   readonly name: string;
 };
 
-function readData<T>(file: string): T {
-  const text = readFileSync(new URL(file, import.meta.url), "utf8");
-  return JSON.parse(text) as T;
-}
-
 /** The recorded NG bank-list fixture, stored as package data. */
-export const FLUTTERWAVE_BANKS: readonly FlutterwaveBank[] =
-  readData<FlutterwaveBank[]>("./data/banks.json");
+export const FLUTTERWAVE_BANKS: readonly FlutterwaveBank[] = flutterwaveBanks;
 
 /** A fixed list of fictional Nigerian names used for account resolution. */
-export const FLUTTERWAVE_ACCOUNT_NAMES: readonly string[] = readData<string[]>(
-  "./data/account-names.json",
-);
+export const FLUTTERWAVE_ACCOUNT_NAMES: readonly string[] = flutterwaveAccountNames;
 
 export function banksForCountry(country: string): readonly FlutterwaveBank[] {
   return country.trim().toUpperCase() === "NG" ? FLUTTERWAVE_BANKS : [];

@@ -1639,3 +1639,49 @@ Built the full failure library text, the six C6 scenarios, and the generated doc
 
 - Add approved real stories to `STORIES.md` and switch the matching sources to `real-story` when permission and credit are recorded.
 - Wire the scenario files into `startSession` and the CLI in the next phase. The control API already accepts loaded scenario definitions.
+
+---
+
+## Phase 5: CLI
+
+Date: 4 November 2026.
+
+Built the `ibeji` command-line tool on Node's built-in `util.parseArgs`. It uses `startSession` for `start` and the control API for every other command that needs a running session. The CLI contains no twin logic and no service-specific ids; twin names, credentials, failures and scenarios come from the registry and the control API.
+
+### What was built
+
+- **Commands.** `start`, `open`, `status`, `fail`, `clear`, `scenario list`, `scenario run`, `scenario stop`, `webhook-url`, `keys`, `events`, `resend`, `reset`, `export`, `mcp` and `doctor`, with every C9 flag. `mcp` prints `added in Phase 7` and exits 0.
+- **Start.** Loads `ibeji.config.json`, applies flags after the file, calls `startSession`, starts a requested scenario, prints one section per running twin with its base URL, labelled credentials and webhook URL, then the seed, dashboard link, `ibeji open` hint and the Control and C stop hint. A public webhook warning goes to stderr. `open` is attempted through the `open` package unless `--no-open` is set, and a browser failure leaves the command successful.
+- **Session discovery.** Every command except `start`, `keys`, `mcp` and `doctor` reads the session file. A missing file gives `SESSION_NOT_RUNNING` with `Run: ibeji start`. An invalid or dead file gives `SESSION_STALE` and is removed.
+- **Failures.** `fail` builds its setting flags from the failure catalog, validates every setting with Zod, checks twin support and running state, and sends one rule only after all checks pass. Unknown flags are listed together. An unsupported twin names the twins that do support the failure.
+- **Output.** Every command has `--help` with an example. Data commands support `--json`. Usage errors exit 2, other errors exit 1, success exits 0. Human errors print what, why and fix. Output is kept to 80 columns.
+- **Build.** Added a `tsup.config.ts` that emits `dist/cli.js` with a `#!/usr/bin/env node` banner. `package.json` `bin.ibeji` points at `./dist/cli.js`. A test reads the built first line.
+- **Dependency.** Added `open@11.0.4`, as the task approved. It is pure JavaScript and has no native code or install script. The README and type definitions were read before use.
+- **Bank data.** The Paystack and Flutterwave bank data now uses JSON module imports, so tsup inlines it into the single `dist/cli.js`. This removes the old `dist/data` lookup that broke the bundled CLI.
+- **Doctor.** Checks Node against `engines`, ports, config parsing, the session file, credentials file mode, the dashboard build and webhook URLs. Until Phase 6, a running session's Phase 6 placeholder counts as the dashboard check passing. Every problem prints what, why and fix; exit 0 only when all checks pass.
+
+### Decisions
+
+- **`ibeji open` needs a fresh launch code.** The C8 route table has no route for a separate process to ask the running session for one. The CLI uses a new bearer-protected `POST /_ibeji/api/v1/auth/launch` route that returns a fresh launch link. This is a proposed C21 decision below and was not added to SPEC.md.
+- **Help examples use the first registered twin.** The CLI never hard-codes a service id. `help.ts` reads the registry and puts the first twin id in examples.
+- **JSON errors go to stdout.** When `--json` is present, the C12 error body is printed to stdout and the exit code still follows the error type.
+- **The dashboard check has a Phase 5 exception.** The real UI arrives in Phase 6. Doctor accepts the running control server's Phase 6 placeholder instead of failing every healthy session before the UI exists.
+- **Tests rebuild `dist/cli.js`.** The real-process tests run tsup first so they never test a stale bundle.
+
+### Tests
+
+- Added 33 tests across four CLI test files.
+- Total suite: 687 tests across 64 files.
+- Real child-process tests cover the built shebang, `start --no-open`, the placeholder page, SIGTERM cleanup, one-twin selection, config loading with flag override, and real `status`, `fail` and `clear`.
+- Coverage remains above the C17 floor: 96.36% lines and 90.09% branches overall. The 100% thresholds for `src/core/` and `src/twins/framework/` still pass.
+- `pnpm test` passed twice in a row; all existing C18 gates pass.
+
+### Later
+
+- Implement `ibeji mcp` in Phase 7.
+- Replace the placeholder dashboard check with the built `dist/ui/index.html` check in Phase 6.
+- Run the SIGTERM test on real Windows CI. The test uses SIGINT there because Windows has no SIGTERM.
+
+### Proposed C21 decision (not approved)
+
+**4 November 2026: add a bearer-protected launch-link route for `ibeji open`.** Add `POST /_ibeji/api/v1/auth/launch` to the C8 route table. It requires the session bearer token, creates one fresh single-use launch code that expires after two minutes, and returns `{ "url": "<dashboard link>" }`. The launch code is never logged, stored in an event, or included in an error or export. This route exists because C9's `ibeji open` runs in a separate process and C8 had no route for a fresh launch code.
