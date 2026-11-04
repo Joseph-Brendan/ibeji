@@ -1685,3 +1685,42 @@ Built the `ibeji` command-line tool on Node's built-in `util.parseArgs`. It uses
 ### Proposed C21 decision (not approved)
 
 **4 November 2026: add a bearer-protected launch-link route for `ibeji open`.** Add `POST /_ibeji/api/v1/auth/launch` to the C8 route table. It requires the session bearer token, creates one fresh single-use launch code that expires after two minutes, and returns `{ "url": "<dashboard link>" }`. The launch code is never logged, stored in an event, or included in an error or export. This route exists because C9's `ibeji open` runs in a separate process and C8 had no route for a fresh launch code.
+
+---
+
+## Phase 6: UI plan
+
+Date: 4 November 2026.
+
+Wrote `UI-PLAN.md`, a detailed plan for the Ibeji dashboard. No UI code was written and no dependency was added.
+
+### What was built
+
+- **Users.** Three first-five-minute journeys: a non-technical Nigerian shop builder, an international founder testing Stripe, and a developer testing an agent.
+- **Navigation.** The seven C10 pages, the app shell, the twin switcher, and the `?twin=` URL rule. The twin choice is in the URL, never in browser storage.
+- **Pages.** Home, Connect your app, Live activity, Failures, Scenarios, Webhooks, Data and the separate test checkout pages. Each page has its routes, actions, layout, six states and exact plain-English text.
+- **Connect your app.** Full steps for Paystack, Flutterwave and Stripe, including the base URL, every declared credential, webhook verification, and a ready-to-paste agent instruction that reads the base URL and keys from environment variables.
+- **Design system.** Five palette colours, three twin label tokens, a full contrast table, type sizes, spacing and radius.
+- **Accessibility.** Keyboard order, focus styles, screen-reader labels and polite live regions with a 5 second limit.
+- **Sign-in and recovery.** Launch code exchange, removal of the code from the address bar, reload and second tabs, used and expired links, restarted sessions, disconnection and reconnection.
+- **Fonts.** Checked `@fontsource/ibm-plex-sans` 5.3.0 and `@fontsource/ibm-plex-mono` 5.3.0. Both exist. Their `files/` folders contain only `.woff` and `.woff2` binaries, while the packages also contain CSS, SCSS, metadata and documentation. Both are SIL Open Font License 1.1. The plan names the exact files to bundle and the licence notice.
+
+### Decisions
+
+- **The label tokens reuse the five palette colours.** Label 1 is purple, label 2 is dark grey and label 3 is dark purple. They are always paired with the twin name, so colour is never the only signal.
+- **The twin choice lives in the URL.** It survives reloads, copied links and second tabs without breaking the no-storage rule.
+- **The compatibility notes are Step 4.7.** The task called them Step 4.9, but the BUILD-LOG.md entry is headed Phase 4, Step 4.7. The plan says so and uses those notes.
+- **The test checkout pages are outside the dashboard navigation.** They stay server-rendered on each twin port, as C10 requires.
+- **The dashboard check in `doctor` is still the Phase 5 placeholder exception.** The real build check moves to `dist/ui/index.html` when the UI ships.
+
+### Later
+
+- The control API does not expose a twin's verification failure methods. The plan uses the three C5 names in a select, with the failure help text, until the API adds a method list.
+- The scenario progress panel reads `scenario-started` and `scenario-step` events. If a future UI needs exact server-side progress, the control API should return the active start time.
+
+### Checks
+
+- No UI code was written.
+- The plan contains no em dash or en dash.
+- Font packages, file contents and licence were checked in `node_modules`.
+- The existing code and tests were not changed by this task.
