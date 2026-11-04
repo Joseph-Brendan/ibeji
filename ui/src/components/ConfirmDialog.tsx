@@ -68,7 +68,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): ReactNode {
           onClick={props.onConfirm}
           disabled={props.busy}
         >
-          {props.busy ? "Working..." : props.confirmLabel}
+          {props.busy ? "Please wait..." : props.confirmLabel}
         </button>
       </div>
     </dialog>

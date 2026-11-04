@@ -1,32 +1,32 @@
 export function eventTypeLabel(type: string): string {
   switch (type) {
     case "request":
-      return "Request";
+      return "Request received";
     case "response":
-      return "Response";
+      return "Reply sent";
     case "webhook-sent":
-      return "Webhook sent";
+      return "Update sent";
     case "webhook-delivered":
-      return "Webhook delivered";
+      return "Update delivered";
     case "webhook-failed":
-      return "Webhook failed";
+      return "Update failed";
     case "failure-fired":
-      return "Failure fired";
+      return "Test problem triggered";
     case "rule-added":
-      return "Failure switched on";
+      return "Problem turned on";
     case "rule-removed":
-      return "Failure switched off";
+      return "Problem turned off";
     case "scenario-started":
-      return "Scenario started";
+      return "Practice scenario started";
     case "scenario-step":
-      return "Scenario step";
+      return "Practice scenario step";
     case "scenario-finished":
-      return "Scenario finished";
+      return "Practice scenario finished";
     case "warning":
       return "Warning";
     case "state-reset":
-      return "Records reset";
+      return "Test data cleared";
     default:
-      return "Event";
+      return "Activity";
   }
 }

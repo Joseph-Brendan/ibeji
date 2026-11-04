@@ -80,6 +80,14 @@ describe("T8 UI design tokens", () => {
     }
   });
 
+  it("T8: the visual style uses no shadows or gradients", async () => {
+    const css = await readFile("ui/src/styles.css", "utf8");
+    expect(css).not.toMatch(/gradient\(/iu);
+    expect(css).not.toMatch(/drop-shadow/iu);
+    const shadowDeclarations = css.match(/(?:box|text)-shadow\s*:[^;]+;/gu) ?? [];
+    expect(shadowDeclarations).toEqual(["box-shadow: none;"]);
+  });
+
   it("T8: fonts load from local files and no address leaves the computer", async () => {
     const css = await readFile("ui/src/styles.css", "utf8");
     expect(css).toContain('url("/assets/fonts/ibm-plex-sans-latin-400-normal.woff2")');

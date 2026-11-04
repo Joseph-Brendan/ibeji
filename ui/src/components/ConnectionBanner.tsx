@@ -26,12 +26,12 @@ export function ConnectionBanner(props: ConnectionBannerProps): ReactNode {
   return (
     <div className="connection-banner" role="status" aria-live="polite">
       <h2 className="connection-banner-title">
-        {longOutage ? "Ibeji is still not answering." : "Ibeji is not answering."}
+        {longOutage ? "Ibeji is still not answering." : "Connection lost."}
       </h2>
       <p>
         {longOutage
           ? "Start Ibeji again with ibeji start."
-          : "The local process may have stopped. Ibeji will try again on its own."}
+          : "Ibeji may have stopped on your computer. It will try to reconnect on its own."}
       </p>
     </div>
   );

@@ -34,13 +34,13 @@ test("T8 the launch code signs in, leaves the address bar, survives reload and a
     "#main-content",
   );
   await expect(page.getByRole("navigation", { name: "Pages" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Twin" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Choose a twin" })).toBeVisible();
   await expect(page.getByTestId("twin-card-paystack")).toBeVisible();
   await expect(page.getByTestId("twin-card-flutterwave")).toBeVisible();
-  await expect(page.getByText("Nothing has happened yet.")).toBeVisible();
-  await expect(page.getByText("No failures are on.")).toBeVisible();
+  await expect(page.getByText("No activity yet.")).toBeVisible();
+  await expect(page.getByText("No failures are turned on.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Copy secret key for Paystack" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Copy base URL for Paystack" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy app address for Paystack" })).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
@@ -58,7 +58,7 @@ test("T8 a used or made-up launch code shows the invalid page without keeping th
   page,
 }) => {
   await page.goto(`${harness.session.addresses.control.url}/?launch=not-a-real-code`);
-  await expect(page.getByRole("heading", { name: "That launch link is not valid." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "This sign-in link has expired." })).toBeVisible();
   expect(new URL(page.url()).searchParams.has("launch")).toBe(false);
 });
 
@@ -66,9 +66,11 @@ test("T8 opening the dashboard with no cookie explains ibeji start and ibeji ope
   page,
 }) => {
   await page.goto(harness.session.addresses.control.url);
-  await expect(page.getByRole("heading", { name: "Open Ibeji from your terminal." })).toBeVisible();
   await expect(
-    page.getByText("Run ibeji start to start Ibeji, or ibeji open to get a new dashboard link.", {
+    page.getByRole("heading", { name: "Start Ibeji from your terminal." }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Run ibeji start to begin, or ibeji open to get a dashboard link.", {
       exact: true,
     }),
   ).toBeVisible();
@@ -118,6 +120,37 @@ test("T8 the twin switcher renders a made-up fourth twin from the API", async ({
   await expect(page.getByRole("link", { name: /Made Up Twin/u })).toBeVisible();
 });
 
+test("T8 the dashboard renders with no shadows or gradients", async ({ page }) => {
+  const visualEffects = async (): Promise<readonly string[]> =>
+    (await page.evaluate(`
+      (() => {
+        const found = [];
+        for (const element of document.querySelectorAll("*")) {
+          const style = getComputedStyle(element);
+          if (style.boxShadow !== "none") {
+            found.push(element.tagName + " has a box shadow");
+          }
+          if (style.textShadow !== "none") {
+            found.push(element.tagName + " has a text shadow");
+          }
+          if (style.backgroundImage.includes("gradient")) {
+            found.push(element.tagName + " has a gradient");
+          }
+        }
+        return found;
+      })()
+    `)) as readonly string[];
+
+  await page.goto(harness.session.createLaunchLink());
+  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  expect(await visualEffects()).toEqual([]);
+
+  await page.getByRole("button", { name: "Replace test keys" }).first().click();
+  await expect(page.getByRole("heading", { name: "Replace Paystack test keys?" })).toBeVisible();
+  expect(await visualEffects()).toEqual([]);
+  await page.getByRole("button", { name: "Cancel" }).click();
+});
+
 test("T8 Home shows the newest activity when events exist", async ({ page }) => {
   await page.route(/\/_ibeji\/api\/v1\/events\?limit=10$/u, async (route) => {
     await route.fulfill({
@@ -138,7 +171,7 @@ test("T8 Home shows the newest activity when events exist", async ({ page }) => 
 
   await page.goto(harness.session.createLaunchLink());
   await expect(page.getByText("Payment succeeded.")).toBeVisible();
-  await expect(page.getByText("Nothing has happened yet.")).not.toBeVisible();
+  await expect(page.getByText("No activity yet.")).not.toBeVisible();
 });
 
 test("T8 the Help menu opens with the plain-word terms and closes with Escape", async ({
@@ -148,24 +181,30 @@ test("T8 the Help menu opens with the plain-word terms and closes with Escape", 
   await page.getByRole("button", { name: "Help" }).click();
   const panel = page.getByRole("region", { name: "Help" });
   await expect(panel).toBeVisible();
-  await expect(panel.getByText("Base URL")).toBeVisible();
-  await expect(panel.getByText("The address your app sends payment requests to.")).toBeVisible();
+  await expect(panel.getByText("App address")).toBeVisible();
+  await expect(panel.getByText("The address your app uses to reach this twin.")).toBeVisible();
 
   await page.keyboard.press("Escape");
   await expect(panel).not.toBeVisible();
 });
 
-test("T8 the rotate action asks for confirmation and Cancel changes nothing", async ({ page }) => {
+test("T8 the replace-keys action asks for confirmation and Cancel changes nothing", async ({
+  page,
+}) => {
   await page.goto(harness.session.createLaunchLink());
-  await page.getByRole("button", { name: "Rotate test keys" }).first().click();
-  await expect(page.getByRole("heading", { name: "Rotate Paystack test keys?" })).toBeVisible();
+  await page.getByRole("button", { name: "Replace test keys" }).first().click();
+  await expect(page.getByRole("heading", { name: "Replace Paystack test keys?" })).toBeVisible();
   await expect(
-    page.getByText("The old keys stop working. Update your app with the new keys."),
+    page.getByText(
+      "Your old keys will stop working right away. Update your app with the new keys.",
+    ),
   ).toBeVisible();
   await expect(page.getByText("This cannot be undone.")).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("heading", { name: "Rotate Paystack test keys?" })).not.toBeVisible();
-  await expect(page.getByRole("button", { name: "Rotate test keys" }).first()).toBeFocused();
+  await expect(
+    page.getByRole("heading", { name: "Replace Paystack test keys?" }),
+  ).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Replace test keys" }).first()).toBeFocused();
 });
 
 test("T8 an off twin shows its off state and still shows its saved keys", async ({ page }) => {
@@ -187,9 +226,9 @@ test("T8 an off twin shows its off state and still shows its saved keys", async 
   await page.goto(harness.session.createLaunchLink());
   await page.getByRole("link", { name: /Flutterwave/u }).click();
   await expect(
-    page.getByText("Flutterwave is off. Start it with ibeji start --twins flutterwave."),
+    page.getByText("Flutterwave is off. To turn it on, run ibeji start --twins flutterwave."),
   ).toBeVisible();
-  await expect(page.getByText("Not available while this twin is off.")).toBeVisible();
+  await expect(page.getByText("Available when this twin is running.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Copy secret key for Flutterwave" })).toBeVisible();
 });
 
@@ -210,9 +249,7 @@ test("T8 a credential error shows what, why and fix", async ({ page }) => {
   });
 
   await page.goto(harness.session.createLaunchLink());
-  await expect(
-    page.getByRole("heading", { name: "Ibeji could not load this page." }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "We couldn't load this page." })).toBeVisible();
   await expect(page.getByText("The test keys could not be read.")).toBeVisible();
   await expect(page.getByText("The credentials store is unavailable.")).toBeVisible();
   await expect(page.getByText("Restart Ibeji with ibeji start.")).toBeVisible();
@@ -228,9 +265,9 @@ test("T8 a failed live stream shows the connection banner", async ({ page }) => 
   });
 
   await page.goto(harness.session.createLaunchLink());
-  await expect(page.getByRole("heading", { name: "Ibeji is not answering." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Connection lost." })).toBeVisible();
   await expect(
-    page.getByText("The local process may have stopped. Ibeji will try again on its own."),
+    page.getByText("Ibeji may have stopped on your computer. It will try to reconnect on its own."),
   ).toBeVisible();
   await expect(page.getByText(/^Last updated at /u)).toBeVisible();
 });

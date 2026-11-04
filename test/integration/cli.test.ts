@@ -850,7 +850,7 @@ describe("T10 CLI commands against a running session", () => {
     }
 
     const scenarios = await loadScenarios("scenarios");
-    const harness = await startControlSession({ twins: ["paystack"], scenarios });
+    const harness = await startControlSession({ scenarios });
     try {
       await run(["webhook-url", "paystack", `http://127.0.0.1:${address.port}/hook`], harness.home);
       const result = await run(["doctor", "--json"], harness.home);

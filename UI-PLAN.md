@@ -1435,3 +1435,34 @@ The UI work is ready to start when these plan items exist:
 - Reconnection catches up with `Last-Event-ID` and `/events?after=`.
 - The font files and licences are in `dist/ui`, and no request leaves the computer.
 - No live key is ever requested, shown or logged.
+
+---
+
+## 15. Usability refresh, 4 November 2026
+
+The dashboard was refreshed after a review of the first Home build. The goal is a flatter, quieter interface and wording that a first-time user can follow without knowing payment-industry terms.
+
+**Visual rules.**
+
+- No shadows and no gradients anywhere. Borders are 1 px hairlines derived from the Ibeji palette.
+- The top bar is white with a hairline bottom border. Connection state uses a small dot plus text.
+- The left navigation uses a soft lavender active state and a purple left mark, not a solid dark fill.
+- Cards and panels use flat surfaces, 14 px corners and hairline borders. Empty states and the first-time guide use a soft lavender surface.
+- Status uses a coloured dot plus text, never colour alone.
+- Buttons are flat. The main action is purple; secondary actions are quiet outlined buttons.
+- The interface stays usable at 390 px wide, not only at the 768 px target.
+
+**Words used in the interface.**
+
+| Instead of | Use |
+|---|---|
+| Base URL | App address |
+| Seed | Repeatable run |
+| Webhook URL | Webhook address |
+| Rotate test keys | Replace test keys |
+| What is happening now | Latest activity |
+| Active rules | Failures turned on |
+| Rule | Failure turned on for one or more twins |
+| Off twins stay visible | A twin that is off stays visible |
+
+The current source and the Playwright tests are the authority for exact text where the earlier sections of this plan still show the first draft. The original meaning, routes, states and safety rules do not change.

@@ -1773,3 +1773,38 @@ Built the React dashboard foundation, the API-backed twin switcher and the Home 
 - Add axe and keyboard-only coverage for the remaining pages in T9.
 - Replace the placeholder route pages and add live rule refresh to Home when a rule changes outside the page.
 - Add the remaining UI tests once the pages exist.
+
+---
+
+## Phase 6: UI refresh and plain-language copy
+
+Date: 4 November 2026.
+
+Refreshed the dashboard after the first Home build. The goal was a calmer, modern surface and copy that a first-time user can follow without payment-industry knowledge. No new dependency was added.
+
+### What changed
+
+- **Flat visual language.** Removed every shadow and gradient. The top bar is white with a hairline border, cards use flat surfaces and 1 px lines, and empty states and the first-time guide use a soft lavender surface derived from the Ibeji palette.
+- **Clear hierarchy.** The active navigation item now uses a soft lavender fill and a purple left mark. The main action is a purple button; secondary actions are quiet outlined buttons. Status uses a coloured dot plus text.
+- **Quieter chrome.** The twin switcher is a set of flat tabs with an underline on the current choice. The repeatable run moved from the top bar to the session summary so it is stated once.
+- **Plain words.** Visible copy now uses "app address", "repeatable run", "webhook address", "latest activity", "failures turned on" and "replace test keys". "Base URL", "seed" and "rotate" remain in the API and CLI, but not in the dashboard's visible copy.
+- **Explained test keys.** Each key now says what it is for: safe in browser code, keep on the server, or use to check webhook messages.
+- **Self-contained first-run guide.** The Home guide now points at the test details on the same page instead of sending a first-time user to a page that is not built yet. The other page links keep a short "coming next" state with a way back to Home.
+- **Friendlier errors.** Error panels use "What happened", "Why it happened" and "What to do next". Sign-in and connection messages describe what to do without naming internal processes.
+- **Mobile pass.** The 390 px layout, session summary, cards, keys and guide were checked and adjusted.
+- **Test robustness.** The doctor webhook test now starts every registered twin on port 0. This stops a user's running default-port session from making the test fail.
+
+### Tests
+
+- Added a Playwright test that checks every rendered element for box shadows, text shadows and gradients.
+- Added a unit test that rejects shadows or gradients in the stylesheet.
+- Updated the Playwright copy assertions for the refreshed words.
+- Total suite: 707 Vitest tests across 68 files, plus 12 Playwright tests.
+- Coverage: 96.30% lines and 90.07% branches. The 100% thresholds for `src/core/` and `src/twins/framework/` still pass.
+- `pnpm test` passed twice in a row. `pnpm test:ui` passed.
+
+### Later
+
+- Apply the same flat visual language and plain copy to Connect your app, Live activity, Failures, Scenarios, Webhooks and Data.
+- Replace the remaining placeholder pages.
+- Add an axe pass for the refreshed colour surfaces.

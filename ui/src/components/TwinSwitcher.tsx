@@ -16,14 +16,14 @@ export function TwinSwitcher(props: TwinSwitcherProps): ReactNode {
   const stoppedTwin = props.twins.find((twin) => !twin.running);
 
   return (
-    <nav className="twin-switcher" aria-label="Twin">
+    <nav className="twin-switcher" aria-label="Choose a twin">
       <div className="switcher-row">
         <AppLink
           href={withTwin(props.pathname, undefined)}
           className="switcher-item switcher-all"
           ariaCurrent={props.selectedTwinId === undefined ? "true" : undefined}
         >
-          <span className="switcher-name">All</span>
+          <span className="switcher-name">All twins</span>
           <span className="switcher-count" aria-hidden="true">
             {runningCount} running
           </span>
@@ -52,7 +52,8 @@ export function TwinSwitcher(props: TwinSwitcherProps): ReactNode {
 
       {stoppedTwin === undefined ? null : (
         <p className="switcher-help">
-          Off twins stay visible. Start one with <code>ibeji start --twins {stoppedTwin.id}</code>.
+          A twin that is off stays visible. To turn this one on, run{" "}
+          <code>ibeji start --twins {stoppedTwin.id}</code>.
         </p>
       )}
     </nav>

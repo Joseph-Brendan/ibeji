@@ -10,9 +10,9 @@ type ErrorPanelProps = {
 export function ErrorPanel(props: ErrorPanelProps): ReactNode {
   const error = props.error;
   const isApi = error instanceof ApiError;
-  const heading = props.title ?? "Ibeji could not do that.";
-  const what = isApi ? error.what : "Ibeji could not do that.";
-  const why = isApi ? error.why : "An unexpected problem happened in the browser.";
+  const heading = props.title ?? "Something went wrong.";
+  const what = isApi ? error.what : "The dashboard could not finish that action.";
+  const why = isApi ? error.why : "It ran into a problem it did not expect.";
   const fix = isApi
     ? error.fix
     : "Try again. If the problem continues, restart Ibeji with ibeji start.";
@@ -25,9 +25,9 @@ export function ErrorPanel(props: ErrorPanelProps): ReactNode {
       <dl className="error-details">
         <dt>What happened</dt>
         <dd>{what}</dd>
-        <dt>Why</dt>
+        <dt>Why it happened</dt>
         <dd>{why}</dd>
-        <dt>Fix</dt>
+        <dt>What to do next</dt>
         <dd>{fix}</dd>
       </dl>
       {props.onRetry === undefined ? null : (

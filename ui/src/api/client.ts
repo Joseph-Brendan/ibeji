@@ -110,48 +110,42 @@ function isApiErrorCode(value: string): value is ApiErrorCode {
   ].includes(value);
 }
 
-function fallbackError(status: number, text: string): ApiError {
+function fallbackError(status: number): ApiError {
   return new ApiError(status, {
     code: "INTERNAL",
-    what: "Ibeji could not do that.",
-    why:
-      text.trim() === ""
-        ? `The control API answered with HTTP ${status}.`
-        : `The control API answered with HTTP ${status}.`,
-    fix: "Try again. If the problem continues, restart Ibeji with ibeji start.",
+    what: "Ibeji could not finish that action.",
+    why: `Ibeji sent an unexpected answer (HTTP ${status}).`,
+    fix: "Try again. If it keeps happening, restart Ibeji with ibeji start.",
   });
 }
 
-function apiErrorFromBody(
-  status: number,
-  body: unknown,
-  text: string,
-  staleSession: boolean,
-): ApiError {
+function apiErrorFromBody(status: number, body: unknown, staleSession: boolean): ApiError {
   if (typeof body !== "object" || body === null || !("error" in body)) {
-    return fallbackError(status, text);
+    return fallbackError(status);
   }
   const error = body.error;
   if (typeof error !== "object" || error === null) {
-    return fallbackError(status, text);
+    return fallbackError(status);
   }
   if (!("code" in error) || typeof error.code !== "string" || !isApiErrorCode(error.code)) {
-    return fallbackError(status, text);
+    return fallbackError(status);
   }
   return new ApiError(
     status,
     {
       code: error.code,
       what:
-        "what" in error && typeof error.what === "string" ? error.what : "Ibeji could not do that.",
+        "what" in error && typeof error.what === "string"
+          ? error.what
+          : "Ibeji could not finish that action.",
       why:
         "why" in error && typeof error.why === "string"
           ? error.why
-          : `The control API answered with HTTP ${status}.`,
+          : `Ibeji sent an unexpected answer (HTTP ${status}).`,
       fix:
         "fix" in error && typeof error.fix === "string"
           ? error.fix
-          : "Try again. If the problem continues, restart Ibeji with ibeji start.",
+          : "Try again. If it keeps happening, restart Ibeji with ibeji start.",
     },
     staleSession,
   );
@@ -209,7 +203,6 @@ export class ControlApi {
       throw apiErrorFromBody(
         response.status,
         body,
-        text,
         response.headers.get("x-ibeji-stale-session") === "1",
       );
     }

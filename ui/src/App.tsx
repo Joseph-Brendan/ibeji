@@ -2,12 +2,13 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { EventItem, StatusResponse, TwinSummary } from "../../src/shared/control.js";
 import { API_PREFIX, ApiError, ConnectionError, ControlApi, isUnauthorized } from "./api/client";
 import { SseClient, type StreamState } from "./api/sse";
+import { AppLink } from "./components/AppLink";
 import { AppShell } from "./components/AppShell";
 import { ErrorPanel } from "./components/ErrorPanel";
 import { HomePage } from "./components/HomePage";
 import { SignInPage, type SignInState } from "./components/SignInPage";
 import { formatLastUpdated } from "./format-time";
-import { twinFromUrl, useUrl } from "./use-url";
+import { twinFromUrl, useUrl, withTwin } from "./use-url";
 
 type AuthState =
   | "checking"
@@ -44,7 +45,7 @@ const PAGE_TITLES: Readonly<Record<string, string>> = {
 };
 
 function pageTitle(pathname: string): string {
-  return PAGE_TITLES[pathname] ?? "Page not found";
+  return PAGE_TITLES[pathname] ?? "We can't find that page";
 }
 
 function removeLaunchCode(pathname: string): void {
@@ -218,7 +219,7 @@ export function App(): ReactNode {
 
   useEffect(() => {
     if (connection === "connected" && previousConnection.current === "disconnected") {
-      setAnnouncement("Connected again. Live updates resumed.");
+      setAnnouncement("Connected again. Live updates have resumed.");
       const after = lastEventId.current;
       void api
         .getEvents({ ...(after === undefined ? {} : { after }), limit: 500 })
@@ -257,7 +258,7 @@ export function App(): ReactNode {
             <span className="wordmark">Ibeji</span>
             <ErrorPanel
               error={authError}
-              title="Ibeji could not open the dashboard."
+              title="We couldn't open the dashboard."
               onRetry={() => window.location.reload()}
             />
           </div>
@@ -276,7 +277,6 @@ export function App(): ReactNode {
       twins={twins}
       selectedTwinId={selectedTwinId}
       pathname={pathname}
-      seed={status?.seed}
       connection={connection}
     >
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -286,7 +286,7 @@ export function App(): ReactNode {
         <p className="last-updated">Last updated at {formatLastUpdated(lastUpdated)}.</p>
       ) : null}
       {loadError === undefined ? null : (
-        <ErrorPanel error={loadError} title="Ibeji could not load the session." />
+        <ErrorPanel error={loadError} title="We couldn't load your test session." />
       )}
       {pathname === "/" ? (
         <HomePage
@@ -298,8 +298,20 @@ export function App(): ReactNode {
           onUnauthorized={onUnauthorized}
         />
       ) : (
-        <section className="panel">
-          <p>This page is planned for the next step.</p>
+        <section className="panel empty-page">
+          <p className="empty-title">
+            {pathname === "/connect"
+              ? "The step-by-step guide is coming next."
+              : "This page is coming next."}
+          </p>
+          <p className="help-text">
+            {pathname === "/connect"
+              ? "For now, copy each twin's app address and test keys from Home."
+              : "Home has your test details and latest activity for now."}
+          </p>
+          <AppLink href={withTwin("/", selectedTwinId)} className="button button-secondary">
+            Back to Home
+          </AppLink>
         </section>
       )}
     </AppShell>

@@ -37,6 +37,17 @@ function twinName(scope: string, twins: readonly TwinSummary[]): string {
   return twins.find((twin) => twin.id === scope)?.displayName ?? scope;
 }
 
+function credentialHelp(role: CredentialView["role"]): string {
+  switch (role) {
+    case "public":
+      return "Safe to use in browser test code.";
+    case "secret":
+      return "Keep this key on your server.";
+    case "webhook":
+      return "Use this to check that updates really came from Ibeji.";
+  }
+}
+
 function HomeSkeleton(): ReactNode {
   return (
     <div className="home-skeleton" aria-busy="true">
@@ -116,7 +127,7 @@ export function HomePage(props: HomePageProps): ReactNode {
     try {
       await props.api.rotateCredentials(rotateTwin.id);
       setRotateTwin(undefined);
-      setToast(`${rotateTwin.displayName} test keys rotated.`);
+      setToast(`${rotateTwin.displayName} test keys replaced.`);
       void load();
     } catch (rotateError) {
       if (isUnauthorized(rotateError)) {
@@ -138,7 +149,7 @@ export function HomePage(props: HomePageProps): ReactNode {
     return (
       <ErrorPanel
         error={undefined}
-        title="That twin is not known."
+        title="We can't find that twin."
         onRetry={() => {
           void load();
         }}
@@ -161,16 +172,18 @@ export function HomePage(props: HomePageProps): ReactNode {
 
   return (
     <div className="home-page" data-testid="home-page">
-      <p className="page-help">This page shows the session, the twins and the newest activity.</p>
+      <p className="page-help">
+        See what is running, copy your test details, and follow activity as it happens.
+      </p>
 
       <section className="session-strip" aria-label="Session">
         <div className="strip-item">
-          <span className="strip-label">Version</span>
-          <span className="strip-value">{props.status.version}</span>
+          <span className="strip-label">Ibeji version</span>
+          <span className="strip-value strip-value-mono">{props.status.version}</span>
         </div>
         <div className="strip-item">
-          <span className="strip-label">Seed</span>
-          <span className="strip-value" data-testid="seed-value">
+          <span className="strip-label">Repeatable run</span>
+          <span className="strip-value strip-value-mono" data-testid="seed-value">
             {props.status.seed}
           </span>
         </div>
@@ -179,15 +192,15 @@ export function HomePage(props: HomePageProps): ReactNode {
           <span className="strip-value">{formatStarted(props.status.startTime)}</span>
         </div>
         <div className="strip-item">
-          <span className="strip-label">Scenario:</span>
-          <span className="strip-value">{props.status.scenario ?? "none"}</span>
+          <span className="strip-label">Practice scenario</span>
+          <span className="strip-value">{props.status.scenario ?? "None running"}</span>
         </div>
       </section>
 
       {error === undefined ? null : (
         <ErrorPanel
           error={error}
-          title="Ibeji could not load this page."
+          title="We couldn't load this page."
           onRetry={() => {
             void load();
           }}
@@ -198,17 +211,17 @@ export function HomePage(props: HomePageProps): ReactNode {
         <div className="section-heading-row">
           <div className="section-title-group">
             <span className="live-dot" aria-hidden="true" />
-            <h2 id="now-heading">What is happening now</h2>
+            <h2 id="now-heading">Latest activity</h2>
             <span className="sr-only">Live updates</span>
           </div>
           <AppLink href="/activity" className="text-link">
-            Open Live activity
+            See all activity
           </AppLink>
         </div>
         {recentEvents.length === 0 ? (
           <div className="empty-state">
-            <p>Nothing has happened yet.</p>
-            <p className="help-text">Make a test request, or run a scenario.</p>
+            <p className="empty-title">No activity yet.</p>
+            <p className="help-text">Make a test payment, or try a practice scenario.</p>
           </div>
         ) : (
           <ol className="event-list">
@@ -226,27 +239,31 @@ export function HomePage(props: HomePageProps): ReactNode {
 
       <section className="panel guide-panel" aria-labelledby="guide-heading">
         <h2 id="guide-heading">First time here?</h2>
-        {emptyFirstRun ? <p className="guide-lead">Start with Connect your app.</p> : null}
+        {emptyFirstRun ? (
+          <p className="guide-lead">Start here: connect your app to a twin.</p>
+        ) : null}
         <ol className="guide-list">
-          <li>Open Connect your app.</li>
-          <li>Copy the base URL and test keys into your app.</li>
+          <li>Copy a twin's app address and test keys from the cards below.</li>
+          <li>Put them in your app's test settings.</li>
           <li>Make a test payment.</li>
-          <li>Watch it appear on Live activity.</li>
+          <li>Watch it appear in Latest activity.</li>
         </ol>
-        <AppLink
-          href={withTwin("/connect", props.selectedTwinId)}
-          className="button button-secondary"
-        >
-          Open Connect your app
-        </AppLink>
+        <a href="#twins-heading" className="button button-primary">
+          See your test details
+        </a>
       </section>
 
       <section className="twin-section" aria-labelledby="twins-heading">
-        <h2 id="twins-heading">{props.selectedTwinId === undefined ? "Running twins" : "Twin"}</h2>
+        <h2 id="twins-heading">
+          {props.selectedTwinId === undefined ? "Your running twins" : "Twin details"}
+        </h2>
+        <p className="section-intro">
+          Each twin is a local copy of a payment service. Use its address and test keys in your app.
+        </p>
         {targetTwins.length === 0 ? (
           <div className="empty-state">
-            <p>No twins are running.</p>
-            <p className="help-text">Start Ibeji with ibeji start.</p>
+            <p className="empty-title">No twins are running.</p>
+            <p className="help-text">Start Ibeji with ibeji start to turn them on.</p>
           </div>
         ) : (
           <div className="twin-grid">
@@ -265,38 +282,49 @@ export function HomePage(props: HomePageProps): ReactNode {
                     </StatusPill>
                   </div>
 
+                  <p className="card-intro">
+                    Use these details in your app when it talks to {twin.displayName}.
+                  </p>
+
                   {twin.running ? null : (
                     <p className="off-text">
-                      {twin.displayName} is off. Start it with ibeji start --twins {twin.id}.
+                      {twin.displayName} is off. To turn it on, run ibeji start --twins {twin.id}.
                     </p>
                   )}
 
-                  {twin.address === null ? (
-                    <p className="card-row">Base URL: not available while this twin is off.</p>
-                  ) : (
-                    <div className="card-row">
-                      <span className="card-label">Base URL</span>
+                  <div className="card-block">
+                    <span className="card-label">App address</span>
+                    {twin.address === null ? (
+                      <p className="card-value">Available when this twin is running.</p>
+                    ) : (
                       <span className="code-row">
                         <code>{twin.address}</code>
                         <CopyButton
                           value={twin.address}
-                          label={`base URL for ${twin.displayName}`}
+                          label={`app address for ${twin.displayName}`}
                         />
                       </span>
-                    </div>
-                  )}
+                    )}
+                    <p className="help-text">Use this address in your app.</p>
+                  </div>
 
                   <div className="card-block">
                     <span className="card-label">Test keys</span>
+                    <p className="help-text">
+                      These keys only work with Ibeji. They cannot move real money.
+                    </p>
                     {credentialsUnavailable ? (
-                      <p className="card-value">Test keys could not be loaded.</p>
+                      <p className="card-value">We couldn't load your test keys.</p>
                     ) : twinData === undefined || twinData.credentials.length === 0 ? (
-                      <p className="card-value">Loading test keys...</p>
+                      <p className="card-value">Getting your test keys...</p>
                     ) : (
                       <ul className="credential-list">
                         {twinData.credentials.map((credential) => (
                           <li key={credential.id} className="credential-row">
                             <span className="credential-label">{credential.label}</span>
+                            <span className="credential-help">
+                              {credentialHelp(credential.role)}
+                            </span>
                             <code>{credential.value}</code>
                             <CopyButton
                               value={credential.value}
@@ -306,38 +334,35 @@ export function HomePage(props: HomePageProps): ReactNode {
                         ))}
                       </ul>
                     )}
-                    <p className="help-text">
-                      These are fake test keys. They only work with Ibeji.
-                    </p>
                   </div>
 
-                  <div className="card-row">
-                    <span className="card-label">Webhook URL</span>
-                    <span className="card-value">
-                      {twinData === undefined
-                        ? credentialsUnavailable
-                          ? "Could not be loaded."
-                          : "Loading..."
-                        : (twinData.webhookUrl ?? "Not set.")}
-                    </span>
-                    <AppLink href={withTwin("/webhooks", twin.id)} className="text-link">
-                      Change
-                    </AppLink>
+                  <div className="card-block">
+                    <span className="card-label">Webhook address</span>
+                    <p className="help-text">Where Ibeji sends updates about payments.</p>
+                    <div className="card-row">
+                      <span className="card-value">
+                        {twinData === undefined
+                          ? credentialsUnavailable
+                            ? "We couldn't load it."
+                            : "Loading..."
+                          : (twinData.webhookUrl ?? "Not set up.")}
+                      </span>
+                      <AppLink href={withTwin("/webhooks", twin.id)} className="text-link">
+                        Edit
+                      </AppLink>
+                    </div>
                   </div>
 
                   <div className="card-actions">
-                    <AppLink
-                      href={withTwin("/connect", twin.id)}
-                      className="button button-secondary"
-                    >
-                      Open Connect your app
+                    <AppLink href={withTwin("/connect", twin.id)} className="button button-primary">
+                      How to connect
                     </AppLink>
                     <button
                       type="button"
                       className="button button-secondary"
                       onClick={() => setRotateTwin(twin)}
                     >
-                      Rotate test keys
+                      Replace test keys
                     </button>
                   </div>
                 </article>
@@ -349,19 +374,16 @@ export function HomePage(props: HomePageProps): ReactNode {
 
       <section className="panel" aria-labelledby="rules-heading">
         <div className="section-heading-row">
-          <h2 id="rules-heading">Active rules</h2>
+          <h2 id="rules-heading">Failures turned on</h2>
           <AppLink href={withTwin("/failures", props.selectedTwinId)} className="text-link">
-            Open Failures
+            Manage failures
           </AppLink>
         </div>
         <p>
           {ruleCount === 0
-            ? "No failures are on."
-            : `${ruleCount} failure rule${ruleCount === 1 ? "" : "s"} ${ruleCount === 1 ? "is" : "are"} on.`}
+            ? "No failures are turned on."
+            : `${ruleCount} failure${ruleCount === 1 ? "" : "s"} ${ruleCount === 1 ? "is" : "are"} turned on.`}
         </p>
-        {props.status.scenario === null ? null : (
-          <p className="help-text">Scenario: {props.status.scenario}</p>
-        )}
       </section>
 
       <span className="sr-only" role="status" aria-live="polite">
@@ -370,9 +392,9 @@ export function HomePage(props: HomePageProps): ReactNode {
 
       <ConfirmDialog
         open={rotateTwin !== undefined}
-        title={`Rotate ${rotateTwin?.displayName ?? "this twin"} test keys?`}
-        body="The old keys stop working. Update your app with the new keys. This cannot be undone."
-        confirmLabel="Rotate keys"
+        title={`Replace ${rotateTwin?.displayName ?? "this twin"} test keys?`}
+        body="Your old keys will stop working right away. Update your app with the new keys. This cannot be undone."
+        confirmLabel="Replace keys"
         busy={rotating}
         onConfirm={() => {
           void rotate();

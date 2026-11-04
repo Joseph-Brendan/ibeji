@@ -22,7 +22,6 @@ type AppShellProps = {
   readonly twins: readonly TwinSummary[];
   readonly selectedTwinId: string | undefined;
   readonly pathname: string;
-  readonly seed: number | undefined;
   readonly connection: StreamState;
   readonly children: ReactNode;
 };
@@ -32,9 +31,9 @@ function connectionText(state: StreamState): string {
     case "connected":
       return "Connected";
     case "connecting":
-      return "Connecting...";
+      return "Starting";
     case "disconnected":
-      return "Ibeji is not answering.";
+      return "Connection lost";
   }
 }
 
@@ -46,8 +45,13 @@ export function AppShell(props: AppShellProps): ReactNode {
       </a>
       <header className="top-bar">
         <span className="wordmark">Ibeji</span>
-        <span className="top-bar-status">{connectionText(props.connection)}</span>
-        {props.seed === undefined ? null : <span className="top-bar-seed">Seed {props.seed}</span>}
+        <span className="top-bar-status">
+          <span
+            className={`connection-dot connection-dot-${props.connection}`}
+            aria-hidden="true"
+          />
+          {connectionText(props.connection)}
+        </span>
         <HelpMenu />
       </header>
 
@@ -84,6 +88,11 @@ export function AppShell(props: AppShellProps): ReactNode {
           {props.children}
         </main>
       </div>
+
+      <footer className="app-footer">
+        <span>Test session on this computer</span>
+        <span>No real money moves.</span>
+      </footer>
     </div>
   );
 }

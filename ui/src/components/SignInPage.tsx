@@ -18,8 +18,8 @@ function content(state: SignInState): SignInCopy {
   switch (state) {
     case "invalid":
       return {
-        heading: "That launch link is not valid.",
-        body: "The link may have been used already, or it may be more than two minutes old.",
+        heading: "This sign-in link has expired.",
+        body: "It may have been used already, or it may be more than two minutes old.",
         help: "Run ibeji open to get a new link.",
         smallHelp: "If Ibeji is not running, start it with ibeji start.",
         button: "Try again",
@@ -34,8 +34,8 @@ function content(state: SignInState): SignInCopy {
       };
     case "no-cookie":
       return {
-        heading: "Open Ibeji from your terminal.",
-        body: "Run ibeji start to start Ibeji, or ibeji open to get a new dashboard link.",
+        heading: "Start Ibeji from your terminal.",
+        body: "Run ibeji start to begin, or ibeji open to get a dashboard link.",
         help: "",
         smallHelp: "",
         button: "Try again",
@@ -43,7 +43,7 @@ function content(state: SignInState): SignInCopy {
     case "offline":
       return {
         heading: "Ibeji is not answering.",
-        body: "The local process may have stopped. Start it again with ibeji start.",
+        body: "It may have stopped on your computer. Start it again with ibeji start.",
         help: "",
         smallHelp: "",
         button: "Check again",
@@ -51,7 +51,7 @@ function content(state: SignInState): SignInCopy {
     case "checking":
       return {
         heading: "Opening Ibeji...",
-        body: "Checking your dashboard session.",
+        body: "Checking your sign-in.",
         help: "",
         smallHelp: "",
         button: "",
