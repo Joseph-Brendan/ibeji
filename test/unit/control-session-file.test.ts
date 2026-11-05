@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ensureIbejiHome,
+  ensurePrivateFile,
   isMissingFile,
   readJsonFile,
   sessionPath,
@@ -144,6 +145,35 @@ describe("T6 session file helpers", () => {
       }
       expect(await readJsonFile(file)).toEqual({ kind: "ok", value: { value: 1 } });
     } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("T6 applies the POSIX permission branch when the platform is not Windows", async () => {
+    const home = await mkdtemp(join(tmpdir(), "ibeji-mode-"));
+    const descriptor = Object.getOwnPropertyDescriptor(process, "platform");
+    const realPlatform = process.platform;
+    Object.defineProperty(process, "platform", {
+      value: "darwin",
+      configurable: true,
+      enumerable: true,
+      writable: false,
+    });
+    try {
+      const directory = await ensureIbejiHome(home);
+      const file = join(directory, "file.json");
+      await writePrivateJson(file, { value: 1 });
+      await ensurePrivateFile(file);
+
+      expect(await readJsonFile(file)).toEqual({ kind: "ok", value: { value: 1 } });
+      if (realPlatform !== "win32") {
+        expect((await stat(directory)).mode & 0o777).toBe(0o700);
+        expect((await stat(file)).mode & 0o777).toBe(0o600);
+      }
+    } finally {
+      if (descriptor !== undefined) {
+        Object.defineProperty(process, "platform", descriptor);
+      }
       await rm(home, { recursive: true, force: true });
     }
   });

@@ -802,7 +802,10 @@ export async function startTwin(
     if (webhookTwins !== undefined) {
       delete webhookTwins[definition.id];
     }
-    server.closeAllConnections();
+    // Close idle keep-alive connections but let an in-flight response finish.
+    // Node 22 and later close idle connections from server.close(), and this
+    // avoids destroying a socket while a response is still being written.
+    server.closeIdleConnections();
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
         if (error === undefined) {
