@@ -463,7 +463,7 @@ Proposed C21 entry (not applied to SPEC.md; needs Joseph's approval):
 - Idempotency keys are up to 255 characters, retained at least 24 hours, return the saved status/body for the same parameters, add `Idempotent-Replayed: true`, and use `409 idempotency_key_in_use` for concurrent same-key requests. The exact status/code for a parameter mismatch is not documented; the twin uses `400 idempotency_error` as its policy.
 - Webhook signing uses `Stripe-Signature: t=...,v1=...`; HMAC-SHA256 over `timestamp.rawBody` with the `whsec_` endpoint secret; default tolerance 5 minutes; raw body required.
 - Stripe retries webhooks for up to three days with exponential backoff in live mode and three times over a few hours in sandbox; exact delays are not documented.
-- Lists use cursor pagination: `limit` 1–100 default 10, `starting_after`/`ending_before`, and `object: "list"`, `data`, `has_more`, `url`.
+- Lists use cursor pagination: `limit` 1-100 default 10, `starting_after`/`ending_before`, and `object: "list"`, `data`, `has_more`, `url`.
 - Test mode documents success cards, declines, and 3DS cards; the key cards and outcomes are recorded in the research file.
 - Money is in the smallest currency unit; zero-decimal currencies are listed, and ISK/UGX use two-decimal representations.
 - The official `stripe` Node library can be pointed at a local twin with `host`, `port`, and `protocol` options; `telemetry` defaults to true and must be disabled for local compatibility tests.
@@ -1214,9 +1214,9 @@ Added bank listing, account resolution, transfer recipients, transfers, transfer
 
 These actions could not be recorded successfully. Their success shapes and life-cycle details follow `research/paystack.md` and are marked in code with `Source: documentation, not recorded`:
 
-- **`transfer.create`** — success response and status life cycle. The saved transfer-create fixtures are the recorder account's starter-business limit (`transfer_unavailable`), not a transfer result.
-- **`transfer.fetch`** — the recorded step is skipped. The fetch object follows the documented fetch/verify object.
-- **`transfer.verify`** — the recorded step is skipped. The verify object follows the documented fetch/verify object.
+- **`transfer.create`** - success response and status life cycle. The saved transfer-create fixtures are the recorder account's starter-business limit (`transfer_unavailable`), not a transfer result.
+- **`transfer.fetch`** - the recorded step is skipped. The fetch object follows the documented fetch/verify object.
+- **`transfer.verify`** - the recorded step is skipped. The verify object follows the documented fetch/verify object.
 
 `transfer_recipient.create` was recorded for an account-number recipient. Its `authorization_code` variant is also documentation-only and is marked in the code.
 
@@ -1331,13 +1331,13 @@ Added Flutterwave bank listing, account resolution, transfers, transfer status c
 
 These could not be recorded successfully and follow `research/flutterwave.md`. Their success/behaviour code is marked with `Source: documentation, not recorded`:
 
-- **`transfer.create`** — success response, `NEW` status, message, fee, `complete_message`, generated reference and status life cycle. The recorded `transfer-create.account-limit` fixture is the recorder account’s IP-whitelisting limit, not a transfer result.
-- **`transfer.fetch`** — the success object and non-numeric ID validation. The recorded non-numeric response is an HTML 200 page; the twin deliberately does not copy it. A missing numeric transfer returns the documented JSON 404.
-- **`transfer.list`** — non-empty transfer items. The recorded list fixture is empty; the item follows the documented `§1.6` transfer object.
-- **`transfer.completed`** — the full documented webhook payload, including `event.type: "Transfer"` and `fullname`.
-- **Test-transfer timing** — the `_PMCK`, `_PMCK_ST_F` and `DU_n` schedules come from the testing guide, not from a fixture.
-- **Duplicate transfer references** — the v3 docs call the reference unique but do not state the duplicate behaviour; the twin rejects a reused reference in Flutterwave’s error shape.
-- **Per-transfer fields not exercised** — `callback_url` and the conditional `meta[]` requirements are accepted/ignored for now; the framework currently has one webhook URL per twin.
+- **`transfer.create`** - success response, `NEW` status, message, fee, `complete_message`, generated reference and status life cycle. The recorded `transfer-create.account-limit` fixture is the recorder account’s IP-whitelisting limit, not a transfer result.
+- **`transfer.fetch`** - the success object and non-numeric ID validation. The recorded non-numeric response is an HTML 200 page; the twin deliberately does not copy it. A missing numeric transfer returns the documented JSON 404.
+- **`transfer.list`** - non-empty transfer items. The recorded list fixture is empty; the item follows the documented `§1.6` transfer object.
+- **`transfer.completed`** - the full documented webhook payload, including `event.type: "Transfer"` and `fullname`.
+- **Test-transfer timing** - the `_PMCK`, `_PMCK_ST_F` and `DU_n` schedules come from the testing guide, not from a fixture.
+- **Duplicate transfer references** - the v3 docs call the reference unique but do not state the duplicate behaviour; the twin rejects a reused reference in Flutterwave’s error shape.
+- **Per-transfer fields not exercised** - `callback_url` and the conditional `meta[]` requirements are accepted/ignored for now; the framework currently has one webhook URL per twin.
 
 `bank.list` success and invalid-country cases were recorded, as were `bank.resolve` success and invalid-request cases. The invalid-key fixture is reproduced exactly by the Flutterwave auth adapter.
 
@@ -1833,7 +1833,7 @@ Built the Live activity and Data pages with the existing app shell, twin switche
 
 - Kept the simple full list. No virtualisation library was added.
 - Playwright mocks 5,000 events, measures from the Live activity click to 5,000 rendered rows, and records the result with `console.log`.
-- Measured results on this Mac were 387–437 ms across runs (latest full run: 387 ms). The test asserts a 3,000 ms budget.
+- Measured results on this Mac were 387-437 ms across runs (latest full run: 387 ms). The test asserts a 3,000 ms budget.
 - The simple list is comfortably inside the budget, so virtualisation is not needed.
 
 ### Data
@@ -2239,3 +2239,54 @@ The Windows glob was not the problem, so the original `test/**/*.test.ts` includ
 
 - Add Stripe to the smoke loop when the Stripe twin is registered in 0.2.0. The smoke currently prints that Stripe is 0.2.0.
 - Generate `CHANGELOG.md` with Changesets in Phase 10 instead of keeping the starter entry.
+
+---
+
+## Phase 8: documentation
+
+Wrote the user documentation for version 0.1.0.
+
+### What was written
+
+- `README.md`: one-sentence description, Musa story in four lines, the three twins, the not-affiliated line, a 2-minute dashboard quick start, a developer CLI quick start, MCP setup, fixture recording dates and links to every doc.
+- `docs/connect-your-app.md`: the same steps as the Connect your app page for Paystack, Flutterwave and the planned Stripe twin, including the ready-to-paste coding-agent instructions.
+- `docs/safety.md`: the live-key rule, the dashboard sign-in, webhook address rules, local-only listening and what Ibeji cannot protect.
+- `docs/limits.md`: unsupported actions for each twin, Stripe payouts and Connect, v4 Flutterwave, the pinned Stripe API version, and every action that relies on documentation only.
+- `docs/stripe-and-ibeji.md`: a factual comparison with Stripe test mode, the Stripe CLI and `stripe-mock`, based only on `research/stripe.md` section 25.
+- `docs/cli.md`: every command with an example and real output where useful.
+- `CITATION.cff`: title, author Joseph Brendan, MIT licence and the GitHub repository.
+- `.changeset/config.json` and `.changeset/version-0-1-0.md`: the first changeset, a minor bump to 0.1.0 with a plain-English summary. `pnpm exec changeset status` reports `minor` for `ibeji`.
+- `scripts/screenshots.mjs` and the `screenshots` package script: start a real session, open the dashboard with Playwright, write `docs/images/home.png` and `docs/images/failures.png`, and remove the temporary session.
+- `test/unit/documentation-dashes.test.ts`: fails if any Markdown file outside `node_modules` contains an em dash or en dash.
+
+### Decisions
+
+- **The screenshots are real.** The script starts a real session with both 0.1.0 twins and opens the dashboard through the launch link. The Home image is a full-page screenshot. The Failures image is a 1280 by 1400 viewport screenshot so the file stays readable.
+- **The docs and images are for the repository README.** The C16 published file list does not include `docs/`, so the README links work on GitHub but not in the packed npm README. Adding docs to the package would change C16 and is left for a later decision.
+- **The Stripe guide is marked 0.2.0.** It uses the approved UI plan text for the planned Stripe twin and says clearly that the twin is not in 0.1.0.
+- **No command was invented.** The CLI examples were run against a real local session from the packed package. The source-checkout start and a few control commands were also run with `node dist/cli.js`. `pnpm exec playwright install chromium` and `pnpm screenshots` were run. `pnpm exec changeset status` was run.
+- **Punctuation cleanup.** The new dash test found em dashes and en dashes in `BUILD-LOG.md`, `TWIN-DESIGN.md` and the three research files. Replaced them with hyphens. No fact, number, path, field name or decision changed. The generated `docs/failures.md` and `docs/scenarios.md` already had none and were not edited by hand.
+- **Not-affiliated line and SPEC C19.** The task requires the line "Ibeji is not affiliated with or endorsed by Paystack, Flutterwave, or Stripe" in the README. SPEC.md C19 says the 0.1.0 line should name only Paystack and Flutterwave, with Stripe added in 0.2.0. The README uses the task line because it also introduces the planned Stripe twin and clearly marks it as 0.2.0. SPEC.md was not edited. Proposed C21 decision: in 0.1.0 the README may name all three services in the not-affiliated line while the Stripe twin remains version 0.2.0. This needs Joseph's approval.
+
+### Commands not run
+
+- The Stripe CLI examples in `docs/stripe-and-ibeji.md` were not run. There is no Stripe CLI or Stripe account in this environment, and the Stripe twin is version 0.2.0. The commands and their limits come from `research/stripe.md` section 25.
+- The planned Stripe library and HTTP examples in `docs/connect-your-app.md` were not run, because the Stripe twin is not built in 0.1.0.
+- Individual Paystack and Flutterwave refund and transfer HTTP examples in `docs/connect-your-app.md` were not run as standalone requests. The Paystack and Flutterwave payment, checkout, webhook and delivery flows were run by the smoke test and UI tests.
+
+### Gates
+
+- `pnpm typecheck` passed.
+- `pnpm lint` passed.
+- `pnpm build` passed.
+- `pnpm test` passed twice. The suite is now 749 tests across 76 files. Coverage is 96.41% statements, 90.17% branches, 98.10% functions and 96.46% lines.
+- `pnpm test:ui` passed twice, 93 tests.
+- `pnpm check:package` passed.
+- `pnpm test:smoke` passed twice.
+- The local gates pass. The six-job CI matrix runs on the pushed commit.
+
+### Later
+
+- Decide whether to add a Stripe guide page to the dashboard for 0.2.0. The documentation already includes the planned guide.
+- Decide whether to include `docs/` in the published package in a later release. C16 currently excludes it.
+- Add a screenshot for the Connect your app page when the Stripe twin exists.

@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use Ibeji in your work, cite it as below."
+title: "Ibeji"
+version: "0.1.0"
+abstract: "Local twins of Paystack and Flutterwave for testing payments, webhooks and failures without real money."
+authors:
+  - family-names: "Brendan"
+    given-names: "Joseph"
+license: MIT
+repository-code: "https://github.com/Joseph-Brendan/ibeji"
+url: "https://github.com/Joseph-Brendan/ibeji"
+keywords:
+  - payments
+  - testing
+  - webhooks
+  - paystack
+  - flutterwave
+  - stripe
+  - mcp

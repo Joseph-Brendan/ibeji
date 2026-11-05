@@ -116,10 +116,10 @@ The API error reference documents these statuses:
 
 The four documented error `type` values are:
 
-- `api_error` — temporary or other server-side problem.
-- `card_error` — a card or payment method could not be charged.
-- `idempotency_error` — an idempotency key reused on a request that does not match the first request's endpoint and parameters.
-- `invalid_request_error` — invalid parameters or invalid request state.
+- `api_error` - temporary or other server-side problem.
+- `card_error` - a card or payment method could not be charged.
+- `idempotency_error` - an idempotency key reused on a request that does not match the first request's endpoint and parameters.
+- `invalid_request_error` - invalid parameters or invalid request state.
 
 Relevant documented `code` values for C4c include:
 
@@ -199,7 +199,7 @@ C4c covers PaymentIntents, Checkout Sessions, the local checkout page, Refunds, 
 - Stripe's `charge` object is not a C4c action. A `charge.refunded` event payload is a `charge`, however, so the twin needs a decision about that one event; see §15 and §27.
 - C4c has no Charge API, Customer API, Price API, PaymentMethod API, or webhook-endpoint management API. The twin may need local internal records for IDs it must return, but it does not need to expose those APIs.
 
-## 1. PaymentIntents — Create
+## 1. PaymentIntents - Create
 
 **Documentation:** `https://docs.stripe.com/api/payment_intents/create`
 **Date:** 28 October 2026.
@@ -355,7 +355,7 @@ This is Stripe's documented create response. Field availability can vary with ac
 
 ### 1.6 Errors
 
-Common shape and status table: §0.3–§0.4.
+Common shape and status table: §0.3-§0.4.
 
 - Missing or invalid auth: `401`; exact body/message for a missing key is **UNCONFIRMED** beyond the error envelope.
 - Missing `amount` or `currency`: `400` `invalid_request_error`, commonly `parameter_missing`.
@@ -369,11 +369,11 @@ Common shape and status table: §0.3–§0.4.
 
 ### 1.7 Webhooks triggered
 
-- **`payment_intent.created`** — `data.object` is a `payment_intent`.
+- **`payment_intent.created`** - `data.object` is a `payment_intent`.
 - If the create includes `confirm=true`, the confirm events in §3.7 can also occur.
 - Creating a PaymentIntent may also cause Stripe-generated `charge.*` events, but Charge is outside C4c; the twin should not invent a Charge API. See §27.
 
-## 2. PaymentIntents — Retrieve
+## 2. PaymentIntents - Retrieve
 
 **Documentation:** `https://docs.stripe.com/api/payment_intents/retrieve`
 **Date:** 28 October 2026.
@@ -431,7 +431,7 @@ The ellipsis-free full shape is the field table in §1.4; this example omits onl
 
 None. Retrieval is a read-only action and does not create an event.
 
-## 3. PaymentIntents — Confirm
+## 3. PaymentIntents - Confirm
 
 **Documentation:** `https://docs.stripe.com/api/payment_intents/confirm`
 **Date:** 28 October 2026.
@@ -509,17 +509,17 @@ Documented status transitions:
 
 Exact documented PaymentIntent events that can follow confirmation:
 
-- `payment_intent.requires_action` — `data.object` is `payment_intent`; transitions to `requires_action`.
-- `payment_intent.processing` — `data.object` is `payment_intent`.
-- `payment_intent.succeeded` — `data.object` is `payment_intent`.
-- `payment_intent.payment_failed` — `data.object` is `payment_intent`; inspect `last_payment_error`.
-- `payment_intent.amount_capturable_updated` — `data.object` is `payment_intent`; relevant to manual capture.
-- `payment_intent.canceled` — `data.object` is `payment_intent`; possible when the confirmation limit is reached.
-- `payment_intent.partially_funded` — documented for customer_balance PaymentIntents; outside C4c.
+- `payment_intent.requires_action` - `data.object` is `payment_intent`; transitions to `requires_action`.
+- `payment_intent.processing` - `data.object` is `payment_intent`.
+- `payment_intent.succeeded` - `data.object` is `payment_intent`.
+- `payment_intent.payment_failed` - `data.object` is `payment_intent`; inspect `last_payment_error`.
+- `payment_intent.amount_capturable_updated` - `data.object` is `payment_intent`; relevant to manual capture.
+- `payment_intent.canceled` - `data.object` is `payment_intent`; possible when the confirmation limit is reached.
+- `payment_intent.partially_funded` - documented for customer_balance PaymentIntents; outside C4c.
 
 Stripe may also emit `charge.succeeded` or `charge.failed`; Charge is outside C4c. See §27.
 
-## 4. PaymentIntents — Cancel
+## 4. PaymentIntents - Cancel
 
 **Documentation:** `https://docs.stripe.com/api/payment_intents/cancel`
 **Date:** 28 October 2026.
@@ -554,9 +554,9 @@ Cancellation is documented only for `requires_payment_method`, `requires_capture
 
 ### 4.6 Webhooks triggered
 
-- **`payment_intent.canceled`** — `data.object` is a `payment_intent`.
+- **`payment_intent.canceled`** - `data.object` is a `payment_intent`.
 
-## 5. PaymentIntents — List
+## 5. PaymentIntents - List
 
 **Documentation:** `https://docs.stripe.com/api/payment_intents/list`
 **Date:** 28 October 2026.
@@ -573,7 +573,7 @@ Query string. No body.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `limit` | integer | no | 1–100; default 10. |
+| `limit` | integer | no | 1-100; default 10. |
 | `starting_after` | string | no | Cursor; mutually exclusive with `ending_before`. |
 | `ending_before` | string | no | Cursor; mutually exclusive with `starting_after`. |
 | `customer` | string | no | Filter by Customer ID. |
@@ -616,7 +616,7 @@ The full item shape is §1.4.
 
 None.
 
-## 6. Checkout Sessions — Create
+## 6. Checkout Sessions - Create
 
 **Documentation:** `https://docs.stripe.com/api/checkout/sessions/create`
 **Date:** 28 October 2026.
@@ -835,14 +835,14 @@ The `url` value in the documentation is a long signed URL; it is shortened here 
 
 Stripe's event catalog does **not** document a `checkout.session.created` event. Creating a session itself is not a documented webhook trigger. The created session can later emit:
 
-- `checkout.session.completed` — `data.object` is `checkout.session`.
-- `checkout.session.async_payment_succeeded` — `data.object` is `checkout.session`.
-- `checkout.session.async_payment_failed` — `data.object` is `checkout.session`.
-- `checkout.session.expired` — `data.object` is `checkout.session`.
+- `checkout.session.completed` - `data.object` is `checkout.session`.
+- `checkout.session.async_payment_succeeded` - `data.object` is `checkout.session`.
+- `checkout.session.async_payment_failed` - `data.object` is `checkout.session`.
+- `checkout.session.expired` - `data.object` is `checkout.session`.
 
 The corresponding PaymentIntent events can also occur. See §15.
 
-## 7. Checkout Sessions — Retrieve
+## 7. Checkout Sessions - Retrieve
 
 **Documentation:** `https://docs.stripe.com/api/checkout/sessions/retrieve`
 **Date:** 28 October 2026.
@@ -880,7 +880,7 @@ The retrieve response is the same documented object, for example with `status: "
 
 None.
 
-## 8. Checkout Sessions — List
+## 8. Checkout Sessions - List
 
 **Documentation:** `https://docs.stripe.com/api/checkout/sessions/list`
 **Date:** 28 October 2026.
@@ -895,7 +895,7 @@ GET https://api.stripe.com/v1/checkout/sessions
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `limit` | integer | no | 1–100; default 10. |
+| `limit` | integer | no | 1-100; default 10. |
 | `starting_after` | string | no | Cursor; mutually exclusive with `ending_before`. |
 | `ending_before` | string | no | Cursor; mutually exclusive with `starting_after`. |
 | `created` | object or integer | no | Date filter. |
@@ -921,7 +921,7 @@ GET https://api.stripe.com/v1/checkout/sessions
 
 None.
 
-## 9. Checkout — local test checkout page
+## 9. Checkout - local test checkout page
 
 **Documentation:** `https://docs.stripe.com/testing`, `https://docs.stripe.com/payments/3d-secure/authentication-flow`, and `https://docs.stripe.com/api/payment_intents/object#payment_intent_object-next_action`
 **Date:** 28 October 2026.
@@ -985,7 +985,7 @@ The local page's precise sequence is Ibeji's design, using Stripe's documented s
 
 `checkout.session.async_payment_*` is documented for delayed payment methods, not for the simple card outcomes in this local page. Exact local emission order is **UNCONFIRMED** as a Stripe fact; it is an Ibeji design choice.
 
-## 10. Refunds — Create
+## 10. Refunds - Create
 
 **Documentation:** `https://docs.stripe.com/api/refunds/create`
 **Date:** 28 October 2026.
@@ -1091,13 +1091,13 @@ C4c has no Charges API, so `charge` IDs are not created by a C4c action. The doc
 
 ### 10.7 Webhooks triggered
 
-- `refund.created` — `data.object` is `refund`.
-- `charge.refunded` — `data.object` is `charge` (not `refund`). This is a C4c gap because Charge is not a C4c action.
-- `refund.updated` — `data.object` is `refund`; later updates on all refunds.
-- `refund.failed` — `data.object` is `refund`.
-- `charge.refund.updated` — `data.object` is `refund`; documented for selected payment methods.
+- `refund.created` - `data.object` is `refund`.
+- `charge.refunded` - `data.object` is `charge` (not `refund`). This is a C4c gap because Charge is not a C4c action.
+- `refund.updated` - `data.object` is `refund`; later updates on all refunds.
+- `refund.failed` - `data.object` is `refund`.
+- `charge.refund.updated` - `data.object` is `refund`; documented for selected payment methods.
 
-## 11. Refunds — Retrieve
+## 11. Refunds - Retrieve
 
 **Documentation:** `https://docs.stripe.com/api/refunds/retrieve`
 **Date:** 28 October 2026.
@@ -1129,7 +1129,7 @@ Same documented example as §10.5; the returned status can be `pending`, `requir
 
 None.
 
-## 12. Refunds — List
+## 12. Refunds - List
 
 **Documentation:** `https://docs.stripe.com/api/refunds/list`
 **Date:** 28 October 2026.
@@ -1144,7 +1144,7 @@ GET https://api.stripe.com/v1/refunds
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `limit` | integer | no | 1–100; default 10. |
+| `limit` | integer | no | 1-100; default 10. |
 | `starting_after` | string | no | Cursor. |
 | `ending_before` | string | no | Cursor; mutually exclusive with `starting_after`. |
 | `charge` | string | no | Filter by charge. |
@@ -1166,7 +1166,7 @@ GET https://api.stripe.com/v1/refunds
 
 None.
 
-## 13. Events — Retrieve
+## 13. Events - Retrieve
 
 **Documentation:** `https://docs.stripe.com/api/events/retrieve`
 **Date:** 28 October 2026.
@@ -1235,7 +1235,7 @@ The `data.object` example is a SetupIntent because that is the documented exampl
 
 None.
 
-## 14. Events — List
+## 14. Events - List
 
 **Documentation:** `https://docs.stripe.com/api/events/list`
 **Date:** 28 October 2026.
@@ -1250,7 +1250,7 @@ GET https://api.stripe.com/v1/events
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `limit` | integer | no | 1–100; default 10. |
+| `limit` | integer | no | 1-100; default 10. |
 | `starting_after` | string | no | Cursor. |
 | `ending_before` | string | no | Cursor; mutually exclusive. |
 | `created` | object or integer | no | Date filter. |
@@ -1283,20 +1283,20 @@ C4c uses snapshot events. The payload is the Event object in §13.3, with `data.
 
 | Action | Documented event names | `data.object` |
 |---|---|---|
-| PaymentIntents — Create | `payment_intent.created` | `payment_intent` |
-| PaymentIntents — Retrieve | none | — |
-| PaymentIntents — Confirm | `payment_intent.requires_action`, `payment_intent.processing`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.amount_capturable_updated`, `payment_intent.canceled` | `payment_intent` |
-| PaymentIntents — Cancel | `payment_intent.canceled` | `payment_intent` |
-| PaymentIntents — List | none | — |
-| Checkout Sessions — Create | No `checkout.session.created` event is documented. Later: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired` | `checkout.session` |
-| Checkout Sessions — Retrieve | none | — |
-| Checkout Sessions — List | none | — |
-| Checkout — local page | `checkout.session.completed`, `payment_intent.succeeded`, `payment_intent.requires_action`, `payment_intent.payment_failed`, `checkout.session.expired` as the documented vocabulary; exact local sequence is an Ibeji design decision | `checkout.session` or `payment_intent` |
-| Refunds — Create | `refund.created`, `charge.refunded`; later `refund.updated`, `refund.failed`, `charge.refund.updated` | `refund` except `charge.refunded` → `charge` |
-| Refunds — Retrieve | none | — |
-| Refunds — List | none | — |
-| Events — Retrieve | none | — |
-| Events — List | none | — |
+| PaymentIntents - Create | `payment_intent.created` | `payment_intent` |
+| PaymentIntents - Retrieve | none | - |
+| PaymentIntents - Confirm | `payment_intent.requires_action`, `payment_intent.processing`, `payment_intent.succeeded`, `payment_intent.payment_failed`, `payment_intent.amount_capturable_updated`, `payment_intent.canceled` | `payment_intent` |
+| PaymentIntents - Cancel | `payment_intent.canceled` | `payment_intent` |
+| PaymentIntents - List | none | - |
+| Checkout Sessions - Create | No `checkout.session.created` event is documented. Later: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired` | `checkout.session` |
+| Checkout Sessions - Retrieve | none | - |
+| Checkout Sessions - List | none | - |
+| Checkout - local page | `checkout.session.completed`, `payment_intent.succeeded`, `payment_intent.requires_action`, `payment_intent.payment_failed`, `checkout.session.expired` as the documented vocabulary; exact local sequence is an Ibeji design decision | `checkout.session` or `payment_intent` |
+| Refunds - Create | `refund.created`, `charge.refunded`; later `refund.updated`, `refund.failed`, `charge.refund.updated` | `refund` except `charge.refunded` → `charge` |
+| Refunds - Retrieve | none | - |
+| Refunds - List | none | - |
+| Events - Retrieve | none | - |
+| Events - List | none | - |
 
 Additional exact documented events that can be generated by confirmation but whose payload is a Charge:
 
@@ -1383,7 +1383,7 @@ This is a twin-specific limitation: real Stripe can serve many versions, but Ibe
 - Same key, same endpoint and parameters: Stripe returns the saved response, including saved `500` errors, while the key is retained. A replayed response has `Idempotent-Replayed: true`.
 - Same key, different endpoint or parameters: Stripe's idempotency layer compares the incoming parameters with the original and errors to prevent misuse. The error type is `idempotency_error`. The exact HTTP status and exact `code` for this parameter-mismatch case are **UNCONFIRMED** in the cited pages; the twin should use the documented `idempotency_error` type and a clear message, and should not invent a code.
 - Concurrent identical key while the first request is still executing: `409 Conflict`; the documented error code is `idempotency_key_in_use`. Wait and retry with the same key and parameters.
-- Results are saved only after endpoint execution begins. Requests that fail before execution begins — invalid parameters, invalid API key, or rate limiting — are not cached and can be retried after fixing the cause.
+- Results are saved only after endpoint execution begins. Requests that fail before execution begins - invalid parameters, invalid API key, or rate limiting - are not cached and can be retried after fixing the cause.
 - `Stripe-Should-Retry` response header: `true` (retry with exponential backoff), `false` (do not retry), or absent (use status/body).
 - A `500` with an idempotency key is cached and replayed; do not retry it with a new key until the original outcome is reconciled.
 
@@ -1454,7 +1454,7 @@ Stripe documents:
 **Date:** 28 October 2026.
 
 - All top-level v1 list methods use cursor pagination.
-- `limit`: 1–100, default 10.
+- `limit`: 1-100, default 10.
 - `starting_after`: fetch the next page after the named object ID.
 - `ending_before`: fetch the previous page before the named object ID.
 - `starting_after` and `ending_before` are mutually exclusive.
@@ -1619,11 +1619,11 @@ Stripe test mode already provides:
 
 The Stripe CLI is official and includes:
 
-- `stripe trigger <event>` — creates the real API objects needed for an event and triggers the event. The docs warn this causes side effects and may trigger related events. Supported examples include `payment_intent.succeeded`, `payment_intent.payment_failed`, `checkout.session.completed`, and `charge.refunded`.
-- `stripe listen --forward-to localhost:4242/webhook` — receives events and forwards them to a local URL, printing a `whsec_` signing secret. It works without configuring a Dashboard endpoint.
-- `stripe listen --latest` — receives events in the latest API version.
-- `stripe events resend <event_id> --webhook-endpoint=we_...` — resends an event for up to 30 days.
-- `stripe logs tail` — tails API request logs in a sandbox.
+- `stripe trigger <event>` - creates the real API objects needed for an event and triggers the event. The docs warn this causes side effects and may trigger related events. Supported examples include `payment_intent.succeeded`, `payment_intent.payment_failed`, `checkout.session.completed`, and `charge.refunded`.
+- `stripe listen --forward-to localhost:4242/webhook` - receives events and forwards them to a local URL, printing a `whsec_` signing secret. It works without configuring a Dashboard endpoint.
+- `stripe listen --latest` - receives events in the latest API version.
+- `stripe events resend <event_id> --webhook-endpoint=we_...` - resends an event for up to 30 days.
+- `stripe logs tail` - tails API request logs in a sandbox.
 - `stripe get`, resource commands, and HTTP commands for API objects.
 
 The CLI can trigger webhook events and real test-mode API objects; it is not a stateful failure-injection server. It cannot make an arbitrary API request hang, drop a connection after commit, duplicate a webhook on a custom schedule, or keep a local stateful record across all three services.

@@ -19,7 +19,7 @@ Every cell cites the research section it comes from. `P` = `research/paystack.md
 | Webhook signing or verification | `x-paystack-signature`, HMAC-SHA512 over the raw body, keyed by the secret key, hexadecimal (P §8). | `verif-hash` header containing a shared secret hash; string comparison, not HMAC (F §8). | `Stripe-Signature: t=...,v1=...`, HMAC-SHA256 over `timestamp.rawBody`, `whsec_` endpoint secret, 5-minute default tolerance (S §19). |
 | Webhook retries | Live: every 3 minutes for 4 tries, then hourly for 72 hours; test: hourly for 10 hours; 30-second timeout; exactly 200 stops retries (P §9). | If enabled: 3 retries at 30-minute intervals; 60-second timeout; any non-200 fails (F §9). | Live: up to 3 days with exponential backoff; sandbox: 3 retries over a few hours; exact delays not documented; 2xx success (S §20). |
 | Idempotency | No general `Idempotency-Key`; transfer references are unique and retries use the same reference; duplicate recipient returns existing record; no documented refund idempotency (P §10). | No general v3 idempotency header; `tx_ref` and transfer reference are unique; duplicate behaviour **UNCONFIRMED**; refund has no documented idempotency (F §10). | `Idempotency-Key` for v1 POST; up to 255 characters; retained at least 24 hours; same key/parameters replays status and body, including 500; different parameters produce `idempotency_error`; concurrent use `409 idempotency_key_in_use` (S §18). |
-| Pagination | Mixed offset and cursor `meta` shapes. Offset: `total`, `skipped`, `perPage`, `page`, `pageCount`. Cursor: `next`, `previous`, `perPage`. List endpoints use page/perPage or cursor-style fields (P §0.10, §1.4, §3.3). | `meta.page_info` with `total`, `current_page`, `total_pages`; `page` and sometimes `page_size` (F §2.5, §5.3). | Cursor: `limit` 1–100 default 10, `starting_after`/`ending_before`, list envelope `object: "list"`, `data`, `has_more`, `url` (S §21). |
+| Pagination | Mixed offset and cursor `meta` shapes. Offset: `total`, `skipped`, `perPage`, `page`, `pageCount`. Cursor: `next`, `previous`, `perPage`. List endpoints use page/perPage or cursor-style fields (P §0.10, §1.4, §3.3). | `meta.page_info` with `total`, `current_page`, `total_pages`; `page` and sometimes `page_size` (F §2.5, §5.3). | Cursor: `limit` 1-100 default 10, `starting_after`/`ending_before`, list envelope `object: "list"`, `data`, `has_more`, `url` (S §21). |
 | Checkout flow | `POST /transaction/initialize` returns `data.authorization_url`; redirect, then verify by reference. Local page outcomes: success, declined, abandoned. Only `charge.success` is documented for success; no failed/abandoned webhook (P §2, §6.2). | `POST /v3/payments` returns `data.link`; redirect, then verify server-side. An unpaid hosted payment has no transaction yet, so verify by reference returns 400 until payment starts (F §2.3, §1.8). Local outcomes: success, failed, cancelled; cancelled maps to a documented failed result, not a separate status; `charge.completed` for success/failure (F §3, §6.2). | `POST /v1/checkout/sessions` returns `url`; local outcomes: success, card declined, requires 3DS then approve/fail. Success can produce `checkout.session.completed` and `payment_intent.succeeded`; decline `payment_intent.payment_failed`; 3DS `requires_action` (S §6, §9, §15). |
 | Which C5 failures apply | Yes: `server-error`, `rate-limited`, `webhook-verification-fails`, `payment-declined`, `transfer-stuck-pending`, `transfer-reversed` (docs); `slow-response`, `timeout-after-commit`, `timeout-before-commit`, `flaky-network`, `webhook-delayed`, `webhook-duplicated`, `webhook-out-of-order`, `webhook-never-sent`, `bank-resolve-fails` (assumed). No: `authentication-required` (P §14.2). | Yes: `slow-response`, `timeout-after-commit`, `timeout-before-commit`, `server-error`, `rate-limited`, `webhook-duplicated`, `webhook-verification-fails`, `payment-declined`, `transfer-stuck-pending` (docs); `flaky-network`, `webhook-delayed`, `webhook-out-of-order`, `webhook-never-sent`, `bank-resolve-fails` (assumed). No: `authentication-required`; `transfer-reversed` is not supported because v3 has no reversal status/event (C21 D33; F §14.2, §15). | Yes: `timeout-after-commit`, `server-error`, `rate-limited`, `flaky-network`, `webhook-duplicated`, `webhook-out-of-order`, `webhook-verification-fails`, `payment-declined`, `authentication-required` (docs); `slow-response`, `timeout-before-commit`, `webhook-delayed`, `webhook-never-sent` (assumed). No: `transfer-stuck-pending`, `transfer-reversed`, `bank-resolve-fails` (S §26). |
 
@@ -724,19 +724,19 @@ Shared code must not contain service paths, field names, key prefixes, event nam
 
 `src/twins/<twin>/` contains:
 
-- `definition.ts` — the `TwinDefinition` object and action catalog.
-- `actions/` — request parsers, action handlers, route registration, status transitions.
-- `auth.ts` — key extraction, live detection, issued-key comparison, and 401 shaping.
-- `idempotency.ts` — `{ mode: "none" }` or the service's header adapter, key/parameter comparison, replay, and error bodies.
-- `responses.ts` and `errors.ts` — success and error builders in the service's exact envelope, including 500/429/401 and all C5-shaped errors.
-- `state.ts` — the twin's Zod schema, initial state, record types, and UI collection metadata.
-- `money.ts` — unit conversion, currency list/special cases, formatting, validation.
-- `webhooks/` — event definitions, body builder, signer/marker, verifier, tamper methods, summaries.
-- `checkout.ts` — outcomes, page model, submit/apply logic, failure override.
-- `credentials.ts` — credential specs and generation formats.
-- `failures.ts` — the C5 support list with sources and action mapping.
-- `retry.ts` — the retry schedule.
-- `data/` — any built-in static data the twin needs, for example bank lists copied from fixtures.
+- `definition.ts` - the `TwinDefinition` object and action catalog.
+- `actions/` - request parsers, action handlers, route registration, status transitions.
+- `auth.ts` - key extraction, live detection, issued-key comparison, and 401 shaping.
+- `idempotency.ts` - `{ mode: "none" }` or the service's header adapter, key/parameter comparison, replay, and error bodies.
+- `responses.ts` and `errors.ts` - success and error builders in the service's exact envelope, including 500/429/401 and all C5-shaped errors.
+- `state.ts` - the twin's Zod schema, initial state, record types, and UI collection metadata.
+- `money.ts` - unit conversion, currency list/special cases, formatting, validation.
+- `webhooks/` - event definitions, body builder, signer/marker, verifier, tamper methods, summaries.
+- `checkout.ts` - outcomes, page model, submit/apply logic, failure override.
+- `credentials.ts` - credential specs and generation formats.
+- `failures.ts` - the C5 support list with sources and action mapping.
+- `retry.ts` - the retry schedule.
+- `data/` - any built-in static data the twin needs, for example bank lists copied from fixtures.
 - Tests that are specific to that twin. Cross-twin tests belong in `test/conformance/`.
 
 The twin may have a private HTTP base path helper (for example Flutterwave `/v3`), but the core must not hard-code it.
@@ -793,12 +793,12 @@ These decisions are approved in SPEC.md v1.3, C21 D31 to D41. The design matches
 
 ### 7.1 Approved service versions
 
-- **D40 — Flutterwave API v3.0.0 is approved.** The twin uses `/v3` routes, bearer auth, `verif-hash`, whole-currency amounts at the service edge, and no v3 idempotency. Flutterwave v4 is not imitated in v1.
-- **D41 — Stripe API version `2026-09-30.endive` is approved.** The Stripe twin answers in that shape. D37 governs how the `Stripe-Version` header is handled.
+- **D40 - Flutterwave API v3.0.0 is approved.** The twin uses `/v3` routes, bearer auth, `verif-hash`, whole-currency amounts at the service edge, and no v3 idempotency. Flutterwave v4 is not imitated in v1.
+- **D41 - Stripe API version `2026-09-30.endive` is approved.** The Stripe twin answers in that shape. D37 governs how the `Stripe-Version` header is handled.
 
 ### 7.2 Approved framework decisions
 
-**D31 — The C5 support matrix in §2.11 is approved, as changed by D33.**
+**D31 - The C5 support matrix in §2.11 is approved, as changed by D33.**
 
 - Paystack supports every C5 failure except `authentication-required`.
 - Flutterwave supports every C5 failure except `authentication-required` and `transfer-reversed`.
@@ -806,34 +806,34 @@ These decisions are approved in SPEC.md v1.3, C21 D31 to D41. The design matches
 - Failures marked `assumed` are offered with the "Assumed" label.
 - `transfer-stuck-pending` includes `thenFailPercent`: after the configured pending time, that share of transfers ends failed and the rest ends successful, using the service's own statuses and webhooks.
 
-**D32 — Flutterwave has no separate fetch action.**
+**D32 - Flutterwave has no separate fetch action.**
 
 Verify by id is the fetch. Verify by id and verify by reference are separate actions, `payment.verify` and `payment.verify_by_reference`, because each route maps to exactly one action and T14 checks that. No `payment.fetch` action or invented path exists.
 
-**D33 — `transfer-reversed` applies to Paystack only.**
+**D33 - `transfer-reversed` applies to Paystack only.**
 
 Flutterwave v3 documents no reversal status or event. The Flutterwave twin does not advertise `transfer-reversed`; the C5 row is Paystack-only. Flutterwave v4's `transfer.reversal` is not a v3 fact.
 
-**D34 — Stripe's `charge.refunded` event carries a documented Charge object.**
+**D34 - Stripe's `charge.refunded` event carries a documented Charge object.**
 
 The Stripe twin builds the Charge from the PaymentIntent's own data, following the documented Charge shape in `research/stripe.md`, and the Charge id matches the PaymentIntent's `latest_charge`. This is event payload data only; there is no Charge API in v1.
 
-**D35 — Retry schedules are approved.**
+**D35 - Retry schedules are approved.**
 
 Paystack test mode uses 10 retries hourly (documented); Flutterwave v3 uses 3 retries at 30 minutes (documented, treated as enabled); Stripe sandbox uses 3 retries at 1, 2, and 4 hours (assumed, because Stripe documents three retries over a few hours but not exact delays). C7's fallback remains for a future twin with no schedule.
 
-**D36 — Flutterwave's local "cancelled" outcome produces the documented failed result.**
+**D36 - Flutterwave's local "cancelled" outcome produces the documented failed result.**
 
 The local page labels the choice "Cancelled", but Flutterwave v3 has no separate cancelled status. The record and webhook use the documented failed result.
 
-**D37 — Stripe version-header handling is approved.**
+**D37 - Stripe version-header handling is approved.**
 
 - No `Stripe-Version` header: the twin answers as `2026-09-30.endive`.
 - A well-formed version, meaning a date optionally followed by a dot and a name such as `2025-09-30.clover`: the twin accepts it, answers in the `2026-09-30.endive` shape, and records a warning event once per version: "Your app asked for Stripe API version X. The Stripe twin answers as 2026-09-30.endive, so some fields may differ."
 - A malformed value: the twin rejects it with Stripe's error envelope and `invalid_request_error`. `research/stripe.md` §17 records that Stripe's exact behavior for an arbitrary invalid version is **UNCONFIRMED**; the twin must not invent a new error code.
 - The warning contains no key material and is scoped to the Stripe twin.
 
-**D38 — Money is stored inside Ibeji in smallest-unit whole numbers.**
+**D38 - Money is stored inside Ibeji in smallest-unit whole numbers.**
 
 The core and every twin state store amounts as `MinorUnits` integers. Each twin converts at its edge:
 
@@ -843,7 +843,7 @@ The core and every twin state store amounts as `MinorUnits` integers. Each twin 
 - The twin rejects more decimal places than the currency has, in the service's own error shape.
 - **UNCONFIRMED:** `research/flutterwave.md` §12 does not document the allowed decimal places, rounding, or decimal response behavior for Flutterwave v3 currencies. The Flutterwave twin must not invent those rules; it uses fixtures or a future C21 decision.
 
-**D39 — `TwinDefinition` includes idempotency.**
+**D39 - `TwinDefinition` includes idempotency.**
 
 The `idempotency` part is an adapter or `{ mode: "none" }`. The core calls `begin` after authentication/action resolution and **before** the failure step. A replay returns the stored response and skips both the failure step and the action. The core calls `complete` only when the action was performed and produced a response; results are stored only then. If `server-error`, `rate-limited`, or `timeout-before-commit` fires, nothing is stored and a retry with the same key runs normally. `timeout-after-commit` stores the result before the reply is lost, so a retry returns the original success.
 

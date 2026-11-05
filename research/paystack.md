@@ -32,7 +32,7 @@ Error responses use a different envelope; see §0.11.
 
 ### 0.2 Transaction object
 
-Used by verify, fetch, and list. The docs examples do not contain every field in every endpoint; fields marked "—" were absent from that sample. Types are inferred from the samples.
+Used by verify, fetch, and list. The docs examples do not contain every field in every endpoint; fields marked "-" were absent from that sample. Types are inferred from the samples.
 
 | Field | Type | Verify example | Fetch example | List example |
 |---|---|---|---|---|
@@ -40,13 +40,13 @@ Used by verify, fetch, and list. The docs examples do not contain every field in
 | `domain` | string | `"test"` | `"test"` | `"test"` |
 | `status` | string | `"success"` | `"success"` | `"success"` |
 | `reference` | string | `"re4lyvq3s3"` | `"re4lyvq3s3"` | `"re4lyvq3s3"` |
-| `receipt_number` | string or null | `null` | `null` | — |
+| `receipt_number` | string or null | `null` | `null` | - |
 | `amount` | integer | `40333` | `40333` | `40333` |
 | `message` | string or null | `null` | `null` | `null` |
 | `gateway_response` | string | `"Successful"` | `"Successful"` | `"Successful"` |
 | `gateway_response_code` | string or null | `null` | `null` | `"do_not_honor"` (corrected from fixture, 28 October 2026) |
 | `response_code` | string or null | `null` | `null` | `"05"` (corrected from fixture, 28 October 2026) |
-| `helpdesk_link` | string or null | — | `null` | — |
+| `helpdesk_link` | string or null | - | `null` | - |
 | `paid_at` | ISO date string or null | `"2024-08-22T09:15:02.000Z"` | `"2024-08-22T09:15:02.000Z"` | `"2024-08-22T09:15:02.000Z"` |
 | `created_at` | ISO date string | `"2024-08-22T09:14:24.000Z"` | `"2024-08-22T09:14:24.000Z"` | `"2024-08-22T09:14:24.000Z"` |
 | `channel` | string | `"card"` | `"card"` | `"card"` |
@@ -66,10 +66,10 @@ Used by verify, fetch, and list. The docs examples do not contain every field in
 | `requested_amount` | integer | `30050` | `30050` | `30050` |
 | `pos_transaction_data` | null in samples | `null` | `null` | `null` |
 | `source` | object or null | `null` | Source object | Source object |
-| `fees_breakdown` | null in samples | `null` | `null` | — |
+| `fees_breakdown` | null in samples | `null` | `null` | - |
 | `connect` | null in samples | `null` | `null` | `null` |
-| `transaction_date` | ISO date string | `"2024-08-22T09:14:24.000Z"` | — | — |
-| `plan_object` | object | `{}` | — | — |
+| `transaction_date` | ISO date string | `"2024-08-22T09:14:24.000Z"` | - | - |
+| `plan_object` | object | `{}` | - | - |
 | `subaccount` | object | `{}` | `{}` | `{}` |
 
 The sample also contains `log.history`, `authorization`, and `customer` nested objects; these are listed separately below.
@@ -143,8 +143,8 @@ The shape differs between create, list, and fetch. Types are inferred; `fully_de
 |---|---|---|---|---|
 | `transaction` | object (create) or integer (list/fetch) | Refund transaction object | `1641` | `1641` |
 | `integration` | integer | `412829` | `100982` | `100982` |
-| `dispute` | integer or null | — | `20` | `null` |
-| `settlement` | null in samples | — | `null` | `null` |
+| `dispute` | integer or null | - | `20` | `null` |
+| `settlement` | null in samples | - | `null` | `null` |
 | `domain` | string | `"live"` | `"live"` | `"live"` |
 | `amount` | integer | `10000` | `500000` | `500000` |
 | `deducted_amount` | integer | `0` | `500000` | `500000` |
@@ -153,15 +153,15 @@ The shape differs between create, list, and fetch. Types are inferred; `fully_de
 | `channel` | string or null | `null` | `"migs"` | `"migs"` |
 | `status` | string | `"pending"` | `"processed"` / `"pending"` | `"processed"` |
 | `refunded_by` | string (email) | `"refund@example.com"` (protected in page) | same | same |
-| `refunded_at` | ISO date string or null | — | `"2018-01-12T10:54:47.000Z"` | `"2018-01-12T10:54:47.000Z"` |
+| `refunded_at` | ISO date string or null | - | `"2018-01-12T10:54:47.000Z"` | `"2018-01-12T10:54:47.000Z"` |
 | `expected_at` | ISO date string | `"2021-12-16T09:21:17.016Z"` | `"2017-10-01T21:10:59.000Z"` | `"2017-10-01T21:10:59.000Z"` |
 | `customer_note` | string | `"Refund for transaction T685312322670591"` | `"xxx"` | `"xxx"` |
 | `merchant_note` | string | `"Refund for transaction T685312322670591 by customer@example.com"` | `"xxx"` | `"xxx"` |
 | `id` | integer | `3018284` | `1` | `1` |
-| `createdAt` | ISO date string (camel case) | `"2021-12-07T09:21:17.122Z"` | — | `"2017-09-24T21:10:59.000Z"` |
-| `created_at` | ISO date string (snake case) | — | `"2017-09-24T21:10:59.000Z"` | — |
-| `updatedAt` | ISO date string (camel case) | `"2021-12-07T09:21:17.122Z"` | — | `"2018-01-18T11:59:56.000Z"` |
-| `updated_at` | ISO date string (snake case) | — | `"2018-01-18T11:59:56.000Z"` | — |
+| `createdAt` | ISO date string (camel case) | `"2021-12-07T09:21:17.122Z"` | - | `"2017-09-24T21:10:59.000Z"` |
+| `created_at` | ISO date string (snake case) | - | `"2017-09-24T21:10:59.000Z"` | - |
+| `updatedAt` | ISO date string (camel case) | `"2021-12-07T09:21:17.122Z"` | - | `"2018-01-18T11:59:56.000Z"` |
+| `updated_at` | ISO date string (snake case) | - | `"2018-01-18T11:59:56.000Z"` | - |
 
 Fixture corrections for the refund object, 28 October 2026 (corrected from fixture):
 
@@ -199,8 +199,8 @@ C4a uses initiate, fetch, and verify. The objects differ, especially `recipient`
 
 | Field | Type | Initiate example | Fetch/verify example |
 |---|---|---|---|
-| `transfersessionid` | array | `[]` | — |
-| `transfertrials` | array | `[]` | — |
+| `transfersessionid` | array | `[]` | - |
+| `transfertrials` | array | `[]` | - |
 | `domain` | string | `"test"` | `"test"` |
 | `amount` | integer | `100000` | `100000` / `20000` |
 | `currency` | string | `"NGN"` | `"NGN"` |
@@ -219,10 +219,10 @@ C4a uses initiate, fetch, and verify. The objects differ, especially `recipient`
 | `recipient` | integer (initiate) or object (fetch/verify) | `56824902` | Transfer recipient object |
 | `createdAt` | ISO date string | `"2025-08-04T10:32:40.000Z"` | `"2024-02-01T08:32:21.000Z"` |
 | `updatedAt` | ISO date string | `"2025-08-04T10:32:40.000Z"` | `"2024-02-01T08:34:07.000Z"` |
-| `session` | object | — | `{ "provider": null, "id": null }` |
-| `fee_charged` | integer | — | `0` / `1000` |
-| `fees_breakdown` | null | — | `null` |
-| `gateway_response` | null | — | `null` |
+| `session` | object | - | `{ "provider": null, "id": null }` |
+| `fee_charged` | integer | - | `0` / `1000` |
+| `fees_breakdown` | null | - | `null` |
+| `gateway_response` | null | - | `null` |
 
 The docs also document these transfer statuses: `pending`, `success`, `reversed`, `failed`, `otp`, `abandoned`, `blocked`, `rejected`, `received`. See section 14.
 
@@ -405,7 +405,7 @@ Source: [Transactions API: Verify](https://paystack.com/docs/api/transaction/#ve
 }
 ```
 
-The sample also contains the full Customer, Authorization, and Log objects listed in §0.2–§0.5.
+The sample also contains the full Customer, Authorization, and Log objects listed in §0.2-§0.5.
 
 #### Errors and documented statuses
 
@@ -1152,7 +1152,7 @@ Specific documented behaviours:
 - Transfer `reference`: unique; retry an inconclusive transfer with the **same** reference to avoid double credit. A new reference is treated as a new transfer.
 - Transfer recipient: "A duplicate account number will lead to the retrieval of the existing record."
 - Refund create: no idempotency key or duplicate-refund rule is documented. **Not documented.**
-- Webhook resend: "Resending isn't idempotent—submitting the same event id twice delivers it twice."
+- Webhook resend: "Resending isn't idempotent-submitting the same event id twice delivers it twice."
 - There is no documented idempotency rule for `GET` requests, which is expected.
 
 ## 11. Test mode
@@ -1167,16 +1167,16 @@ The docs state the expiry date can be any future date.
 
 | Behaviour | Card number | Expiry | CVV | PIN / OTP |
 |---|---|---|---|---|
-| No validation (reusable) | `4084 0840 8408 4081` | `10/27` | `408` | — |
+| No validation (reusable) | `4084 0840 8408 4081` | `10/27` | `408` | - |
 | PIN validation | `5078 5078 5078 5078 12` | `10/27` | `081` | PIN `1111` |
 | PIN + OTP validation | `5060 6666 6666 6666 666` | `10/27` | `123` | PIN `1234`, OTP `123456` |
 | PIN + Phone + OTP | `5078 5078 5078 5078 04` | `10/27` | `884` | PIN `0000`, OTP `123456` |
-| Bank Auth Simulation (reusable) | `5192 6027 2058 4796` | `10/27` | `123` | — |
-| Declined | `4084 0800 0000 5408` | `10/27` | `001` | — |
+| Bank Auth Simulation (reusable) | `5192 6027 2058 4796` | `10/27` | `123` | - |
+| Declined | `4084 0800 0000 5408` | `10/27` | `001` | - |
 | Token Not Generated | `5078 5078 5078 5078 53` | `10/27` | `082` | PIN `0000` |
-| Refund: Failed | `4084 0800 0067 1803` | `10/27` | `180` | — |
-| Refund: Needs attention | `4084 0800 0067 1902` | `10/27` | `190` | — |
-| API errors: Insufficient funds | `4084 0800 0067 0037` | `10/27` | `787` | — |
+| Refund: Failed | `4084 0800 0067 1803` | `10/27` | `180` | - |
+| Refund: Needs attention | `4084 0800 0067 1902` | `10/27` | `190` | - |
+| API errors: Insufficient funds | `4084 0800 0067 0037` | `10/27` | `787` | - |
 
 ### 11.1.1 Refund test cards
 
@@ -1240,7 +1240,7 @@ Number formats are inconsistent in the docs:
 
 ## 13. Base URL in libraries
 
-The Paystack API docs do not document a Node library base-URL override. This section uses the published npm packages and their source because the task asks a library-specific question. Download counts are npm weekly downloads for 20–26 October 2026, from `https://api.npmjs.org/downloads/point/last-week/<package>`.
+The Paystack API docs do not document a Node library base-URL override. This section uses the published npm packages and their source because the task asks a library-specific question. Download counts are npm weekly downloads for 20-26 October 2026, from `https://api.npmjs.org/downloads/point/last-week/<package>`.
 
 | Library | Role / downloads | Can an app change the base URL to a twin? | Source |
 |---|---|---|---|

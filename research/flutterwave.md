@@ -255,13 +255,13 @@ Sources: [Create a transfer](https://developer.flutterwave.com/v3.0.0/reference/
 | `reference` | string | `"akhlm-pstmnpyt-rfxx007_PMCKDU_1"` | `"new-actual-transfer-ref1"` |
 | `meta` | object/array/null | `null` | `null` |
 | `narration` | string | `"Akhlm Pstmn Trnsfr xx007"` | `"Akhlm Pstmn Trnsfr xx007"` |
-| `approver` | null or object | — | `null` |
+| `approver` | null or object | - | `null` |
 | `complete_message` | string | `""` | `"Transaction was successful"` |
 | `requires_approval` | integer | `0` | `0` |
 | `is_approved` | integer | `1` | `1` |
 | `bank_name` | string | `"ACCESS BANK NIGERIA"` | `"GTBANK PLC"` |
-| `debit_currency_amount` | null or number | — | `null` |
-| `rate` | null or number | — | `null` |
+| `debit_currency_amount` | null or number | - | `null` |
+| `rate` | null or number | - | `null` |
 
 Transfer status values in documented examples: `NEW` on creation, `PENDING` while processing, `SUCCESSFUL`, `FAILED`. The docs do not document a v3 `REVERSED` transfer status; v4 documents `transfer.reversal`, but that is not v3. **UNCONFIRMED** for v3 reversal.
 
@@ -1148,11 +1148,11 @@ Successful payments:
 | PIN authentication | Mastercard | `5531886652142950` | `09/32` | `564` | `12345` | `3310` |
 | 3DS authentication | Mastercard | `5438898014560229` | `10/31` | `564` | `12345` | `3310` |
 | 3DS authentication | Visa | `4187427415564246` | `09/32` | `828` | `12345` | `3310` |
-| 3DS authentication | Afrigo | `5640003941605320` | `05/31` | `044` | — | — |
+| 3DS authentication | Afrigo | `5640003941605320` | `05/31` | `044` | - | - |
 | PIN authentication | Verve | `5061460410120223210` | `10/31` | `780` | `12345` | `3310` |
-| NoAuth | Verve | `5061460166976054667` | `10/29` | `564` | — | `3310` |
+| NoAuth | Verve | `5061460166976054667` | `10/29` | `564` | - | `3310` |
 | Address Verification (AVS) | Visa | `4556052704172643` | `09/32` | `899` | `12345` | `3310` |
-| Pre-authentication | Mastercard | `5377283645077450` | `09/31` | `789` | — | `3310` |
+| Pre-authentication | Mastercard | `5377283645077450` | `09/31` | `789` | - | `3310` |
 
 Failed payments:
 
@@ -1161,9 +1161,9 @@ Failed payments:
 | Do Not Honour | Mastercard | `5143010522339965` | `08/32` | `276` | `12345` | `3310` |
 | Card Fraudulent | Mastercard | `5590131743294314` | `11/32` | `887` | `12345` | `3310` |
 | Insufficient Funds | Mastercard | `5258585922666506` | `09/31` | `883` | `12345` | `3310` |
-| Do Not Honour | Mastercard | `5143010522339965` | `08/31` | `276` | — | `3310` |
-| Insufficient Funds | Mastercard | `5258585922666506` | `09/31` | `883` | `12345` | — |
-| Insufficient Funds | Afrigo | `5640007065275380` | `05/31` | `044` | — | — |
+| Do Not Honour | Mastercard | `5143010522339965` | `08/31` | `276` | - | `3310` |
+| Insufficient Funds | Mastercard | `5258585922666506` | `09/31` | `883` | `12345` | - |
+| Insufficient Funds | Afrigo | `5640007065275380` | `05/31` | `044` | - | - |
 | Incorrect PIN | Mastercard | `5399834697894723` | `09/31` | `883` | `12345` | `3310` |
 
 Special OTPs: any OTP passes in test mode; `5548` mocks a wrong OTP and `6648` mocks insufficient funds when the OTP is validated inside the payment modal. The docs say these special OTPs do not apply if redirected to the OTP validation page.
@@ -1225,7 +1225,7 @@ Documented v3 transfer currencies (Bank Account Transfer guide): EUR, GBP, GHS, 
 
 ## 13. Base URL in libraries
 
-The Flutterwave API docs do not document a Node base-URL override. This section uses the published npm packages and their source, because the task asks a library-specific question. Download counts are npm weekly downloads for 20–26 October 2026 from `https://api.npmjs.org/downloads/point/last-week/<package>`.
+The Flutterwave API docs do not document a Node base-URL override. This section uses the published npm packages and their source, because the task asks a library-specific question. Download counts are npm weekly downloads for 20-26 October 2026 from `https://api.npmjs.org/downloads/point/last-week/<package>`.
 
 | Library | Role / downloads | Can an app change the base URL to a v3 twin? | Source |
 |---|---|---|---|
@@ -1245,7 +1245,7 @@ Sources: [Bank Account Transfer](https://developer.flutterwave.com/v3.0.0/docs/b
 - Transfer statuses documented in the Bank Account Transfer guide: `NEW` (created), `PENDING` (processing), `SUCCESSFUL`, `FAILED`. `complete_message` explains the status. There is no v3 `REVERSED` status documented.
 - Test transfers default to `PENDING` and can be forced to succeed/fail after a delay (§11.3). This is documented evidence that pending transfers and delayed outcomes are realistic for the test environment.
 - A transfer can fail with HTTP 200 and `data.status: "FAILED"`; technical failures use 400/401/404/503.
-- Refund statuses are listed in §1.5; card refunds 3–15 days, mobile money 3–5 days, bank 24 hours. A refund can be `processing` or `pending-*`.
+- Refund statuses are listed in §1.5; card refunds 3-15 days, mobile money 3-5 days, bank 24 hours. A refund can be `processing` or `pending-*`.
 - Webhooks may occasionally be delivered more than once; apps must be idempotent. Retries: 3 times, 30-minute interval, if enabled; 60-second timeout.
 - API timeout: the docs say the system waits about 28 seconds and returns `503` with `{"status":"error","message":"An error occurred. Please contact support","data":null}`. A timeout can mean the request is still processing; query status before retrying.
 - Rate limit: HTTP `429`; no exact numeric limit or response body is documented in v3. The docs recommend backoff.
@@ -1297,7 +1297,7 @@ These are facts SPEC.md needs that the v3 documentation does not answer, or wher
 17. The full checkout UI, 3DS/OTP challenge flow, and all test-card interaction details are not documented as an API schema. Only outcomes and test credentials are.
 18. The v3 official Node library's third constructor argument is not documented in its README; it is visible only in source. Its telemetry code contacts `api.ravepay.co` and `signozservice-prod.f4b-flutterwave.com`; T15 must account for this.
 19. The v3 docs do not state how `session_duration`/`max_retry_attempt` behave for every payment method beyond the checkout guide.
-20. Refund status timing is approximate (3–15 days cards, 3–5 days mobile money, 24 hours bank); exact transitions are not documented.
+20. Refund status timing is approximate (3-15 days cards, 3-5 days mobile money, 24 hours bank); exact transitions are not documented.
 21. The v3 docs do not document all supported bank/mobile-money provider fields returned by `include_provider_type`.
 22. There is no official Flutterwave v4 Node library; the v4 community package is not official. This supports the v3 choice but remains a version/future risk.
 23. The v3 docs do not state whether a failed `charge.completed` event is sent for every failed attempt or only some methods; the Standard guide says notifications for failed attempts, but the event schema is not exhaustive.

@@ -49,6 +49,7 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:ui": "playwright test",
+    "screenshots": "node scripts/screenshots.mjs",
     "check:package": "node scripts/check-package.mjs",
     "test:smoke": "node scripts/smoke.mjs",
     "example:paystack:naive": "node examples/school-fees-app/run.js paystack naive",
