@@ -227,7 +227,9 @@ Example: ibeji export ibeji-session.json
 const MCP = `Usage:
   ibeji mcp [options]
 
-Runs the MCP server over stdio. This command is added in Phase 7.
+Runs the MCP server over stdio for an AI coding agent. Start Ibeji with
+"ibeji start" first. Only MCP messages go to standard output; logs go to
+standard error.
 
 Options:
   --help     Show this help.

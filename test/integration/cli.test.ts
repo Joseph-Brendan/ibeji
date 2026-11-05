@@ -1,4 +1,4 @@
-import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
@@ -6,7 +6,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { type RunCliOptions, runCli } from "../../src/cli/run.js";
 import { credentialsPath, sessionPath } from "../../src/control/paths.js";
 import { loadScenarios } from "../../src/core/scenarios/loader.js";
@@ -192,12 +192,6 @@ async function withSession(
     await harness.cleanup();
   }
 }
-
-beforeAll(() => {
-  // Build only the CLI. A full build empties dist/ui while other test files
-  // may still be serving the dashboard from it.
-  execFileSync("pnpm", ["exec", "tsup", "--no-clean"], { cwd: ROOT, stdio: "pipe" });
-});
 
 describe("T10 CLI help and usage", () => {
   it("T10: every command has help with a real example and lines within 80 characters", async () => {
@@ -511,9 +505,9 @@ describe("T10 CLI commands against a running session", () => {
         expect(details.mode & 0o777).toBe(0o600);
       }
 
-      const mcp = await run(["mcp"], harness.home);
+      const mcp = await run(["mcp", "--help"], harness.home);
       expect(mcp.code).toBe(0);
-      expect(mcp.stdout.trim()).toBe("added in Phase 7");
+      expect(mcp.stdout).toContain("Runs the MCP server over stdio");
 
       const doctor = await run(["doctor", "--json"], harness.home);
       expect(doctor.code).toBe(0);
@@ -688,9 +682,13 @@ describe("T10 CLI commands against a running session", () => {
       );
       expect(exportFailure.code).toBe(1);
 
+      const mcpHelp = await run(["mcp", "--help"], harness.home);
+      expect(mcpHelp.code).toBe(0);
+      expect(mcpHelp.stdout).toContain("Only MCP messages go to standard output");
+
       const mcpJson = await run(["mcp", "--json"], harness.home);
-      expect(mcpJson.code).toBe(0);
-      expect(json<{ message: string }>(mcpJson.stdout).message).toBe("added in Phase 7");
+      expect(mcpJson.code).toBe(2);
+      expect(mcpJson.stdout).toContain("unknown options");
 
       const doctorHuman = await run(["doctor"], harness.home);
       expect(doctorHuman.code).toBe(0);

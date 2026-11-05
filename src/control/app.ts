@@ -6,10 +6,9 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { IbejiError, isIbejiError, zodProblemsToError } from "../core/errors.js";
-import { EVENT_TYPES, IBEJI_SCOPE } from "../core/events.js";
-import { actionSelectorSchema, FAILURE_CATALOG } from "../core/failures/catalog.js";
+import { IBEJI_SCOPE } from "../core/events.js";
+import { FAILURE_CATALOG } from "../core/failures/catalog.js";
 import { resolveAllowedWebhookUrl } from "../core/webhooks/address.js";
-import { WEBHOOK_DELIVERY_STATUSES } from "../core/webhooks/dispatcher.js";
 import {
   applyHtmlSecurityHeaders,
   errorResponseFrom,
@@ -21,6 +20,17 @@ import {
 import type { TwinDefinition } from "../twins/framework/types.js";
 import { buildSessionExport } from "./export.js";
 import { SecretRedactor } from "./redact.js";
+import {
+  eventsQuerySchema,
+  exchangeBodySchema,
+  optionalTwinsSchema,
+  rotateBodySchema,
+  ruleBodySchema,
+  rulesQuerySchema,
+  scopeQuerySchema,
+  webhooksQuerySchema,
+  webhookUrlBodySchema,
+} from "./schemas.js";
 import { eventStreamResponse } from "./sse.js";
 import type { ControlDependencies } from "./types.js";
 
@@ -28,62 +38,6 @@ export const API_PREFIX = "/_ibeji/api/v1";
 const HEALTH_PATH = `${API_PREFIX}/health`;
 const EXCHANGE_PATH = `${API_PREFIX}/auth/exchange`;
 const UI_COOKIE = "ibeji_ui";
-
-const exchangeBodySchema = z
-  .strictObject({
-    code: z.string().min(1).optional(),
-    launchCode: z.string().min(1).optional(),
-  })
-  .superRefine((value, context) => {
-    const present = Number(value.code !== undefined) + Number(value.launchCode !== undefined);
-    if (present !== 1) {
-      context.addIssue({
-        code: "custom",
-        path: ["code"],
-        message: "Expected exactly one of code or launchCode.",
-        input: value,
-      });
-    }
-  });
-
-const optionalTwinsSchema = z.strictObject({
-  twins: z.array(z.string().min(1)).min(1).optional(),
-});
-
-const rotateBodySchema = z.strictObject({
-  twin: z.string().min(1).optional(),
-});
-
-const ruleBodySchema = z.strictObject({
-  failureId: z.string().min(1),
-  twins: z.array(z.string().min(1)).min(1).optional(),
-  actions: actionSelectorSchema.optional(),
-  settings: z.record(z.string(), z.unknown()).default({}),
-});
-
-const webhookUrlBodySchema = z.strictObject({
-  url: z.string(),
-});
-
-const webhooksQuerySchema = z.strictObject({
-  twin: z.string().min(1).optional(),
-  status: z.enum(WEBHOOK_DELIVERY_STATUSES).optional(),
-});
-
-const eventsQuerySchema = z.strictObject({
-  scope: z.string().min(1).optional(),
-  type: z.enum(EVENT_TYPES).optional(),
-  after: z.coerce.number().int().min(0).default(0),
-  limit: z.coerce.number().int().min(1).max(500).default(500),
-});
-
-const scopeQuerySchema = z.strictObject({
-  scope: z.string().min(1).optional(),
-});
-
-const rulesQuerySchema = z.strictObject({
-  twin: z.string().min(1).optional(),
-});
 
 const stateRecordSchema = z.record(z.string(), z.unknown());
 

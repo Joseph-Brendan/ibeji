@@ -2053,3 +2053,55 @@ Removed every coloured left border from the dashboard and the test checkout page
 - `pnpm test` passed: 726 tests across 72 files.
 - `pnpm test:ui` passed: 92 tests.
 - Coverage: 96.28% statements, 90.10% branches and 96.32% lines. The 100% thresholds for `src/core/` and `src/twins/framework/` still pass.
+
+---
+
+## Phase 7: MCP server
+
+Date: 5 November 2026.
+
+Built the `ibeji mcp` server, the 13 C11 tools and the T11 suite. The MCP server is a thin client of the running control API: it reads the session file again on every tool call, contains no twin logic, and never writes a log line to stdout.
+
+### MCP SDK v2 notes
+
+The installed packages are `@modelcontextprotocol/server` 2.4.0 (a runtime dependency) and `@modelcontextprotocol/client` 2.4.0 (a development dependency, approved before install). Their READMEs and type definitions were read before use. No version 1 import path is used.
+
+- **Creating a server.** `new McpServer({ name, version }, { capabilities: { tools: {} }, instructions })`. The `tools` capability must be declared; the SDK installs the `tools/list` and `tools/call` handlers when it is present.
+- **Registering a tool.** `registerTool(name, { title, description, inputSchema, annotations }, handler)`. Zod 4 schemas satisfy the SDK's Standard Schema contract and are converted to JSON Schema for `tools/list`. Annotations are `readOnlyHint`, `destructiveHint`, `idempotentHint` and `openWorldHint`; they are hints for the agent, not enforcement.
+- **Running over stdio.** `serveStdio(factory)` from `@modelcontextprotocol/server/stdio` owns the transport and the protocol-era decision. It calls the factory once per connection and defaults to `legacy: 'serve'`.
+- **Protocol versions.** The v2 package implements the 2026-07-28 revision for modern openings. It also serves a 2025-era `initialize` opening by default. The exported `SUPPORTED_PROTOCOL_VERSIONS` are `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05` and `2024-10-07`; `LATEST_PROTOCOL_VERSION` is `2025-11-25` and `DEFAULT_NEGOTIATED_PROTOCOL_VERSION` is `2025-03-26`. The T11 client opens with `initialize` and negotiates `2025-11-25`.
+
+### What was built
+
+- **Thirteen tools.** Every tool in the C11 table, with the exact annotations from that table: seven read-only tools, five changing tools, and `ibeji_reset_state` marked destructive. Every tool has an agent-facing description. The two credential tools say the values are Ibeji's fake local test keys, that MCP clients may log results, and that live keys must never be used.
+- **Shared schemas.** `src/control/schemas.ts` now owns the control API's Zod request schemas. `src/control/app.ts` and the MCP input schemas both import it. The MCP schemas replace the API's `scope` and `twins` selectors with the one optional `twin` plain string that C11 defines.
+- **Session on every call.** `src/mcp/session.ts` calls the control session reader for every tool. Nothing is cached, so a restart with a new port and token is found by the next call. Tests restart Ibeji under a live MCP connection.
+- **Connection guide.** `ibeji_get_connection_guide` returns the twin's base URL, labelled credentials, webhook URL, summary, notes, steps and agent instruction from `GET /twins`. It replaces `{base}` in the steps exactly as the Connect your app page does, so a coding agent can update an app itself.
+- **Clear errors.** A missing or stale session becomes `isError: true` with plain text saying Ibeji is not running and to run `ibeji start`. Unknown and stopped twins use the same C12 what, why and fix shape. No tool turns a session problem into a protocol error.
+- **Readable results.** Each success starts with plain sentences and adds structured details in `structuredContent`. Failure rules, event lists, webhook deliveries and credentials keep their full structured form.
+- **Output discipline.** The standard output stream carries only MCP messages. The CLI rejects `ibeji mcp --json` as a usage error instead of writing JSON to stdout. Logs and SDK errors go to stderr.
+- **Shared client code.** `ControlClient` and `requireSession` moved from `src/cli/` to `src/control/`. The CLI files re-export them, so the MCP server never imports the CLI. This also gave the MCP client methods for credentials, webhooks and richer event filters.
+- **README.** Added the MCP client configuration section, including `npx -y ibeji mcp`.
+
+### Decisions
+
+- **Twin checks use `GET /twins`.** A provided `twin` is always a plain string checked against the live list. An unknown twin is `UNKNOWN_TWIN` and the error names the registered twins.
+- **Two tools need one twin.** `ibeji_set_webhook_url` and `ibeji_get_connection_guide` keep `twin` optional in their schemas so a missing value becomes a C12 `isError` result, not a protocol error. The tool then explains that it needs one twin id.
+- **Off twins follow the control API.** Status, failures, scenarios, test keys and the connection guide work for a named twin that is off, because their control routes do. Events, webhooks, rules, scenario runs and state reset return `TWIN_NOT_RUNNING`, as their routes do. The connection guide reports `baseUrl: null` and says how to start the twin.
+- **Omitted twin means running twins.** For read tools, `ibeji_get_test_keys` reads every running twin. The other read tools pass no filter, so the control API returns every twin's data. `ibeji_reset_state` with no twin resets every running twin.
+- **The guide uses the same fallback as the UI.** Every registered 0.1.0 twin has a connection guide. The MCP server also has a small generic fallback for a future twin that does not declare one.
+- **The 0.1.0 registry has two twins.** The task text says three twins, but Stripe is version 0.2.0 (C21 D42) and is not registered. The T11 suite enumerates `registry.list()`, so it covers Stripe automatically when it is registered in 0.2.0.
+- **No new C12 code or C8 route.** The server reuses the existing control API and error shapes. No SPEC section was edited.
+
+### Tests
+
+- Added 14 tests: 11 integration tests for T11 and 3 unit tests for the MCP formatting and error helpers.
+- T11 coverage includes every tool over stdio to the built CLI, exact annotations and descriptions, a burst of no-session calls, unknown and stopped twins, a restart under a live connection, T4 parity for `webhook-delayed`, `server-error` and `payment-declined` through MCP, the CLI and the control API, a rule added through MCP read back from the control API, and a check that every stdout line is a JSON-RPC message.
+- Total suite: 740 tests across 74 files.
+- Coverage: 96.41% statements, 90.17% branches, 98.10% functions and 96.46% lines. The 100% line and branch thresholds for `src/core/` and `src/twins/framework/` pass.
+
+### Later
+
+- Add an MCP export tool if C11 later changes its "no export tool" decision.
+- Add child-process coverage collection for `src/mcp/run.ts`; its stdio path is tested through the built CLI, but Vitest's in-process coverage does not count the child process.
+- Cover Stripe in the T11 journey automatically when the Stripe twin is registered in 0.2.0.

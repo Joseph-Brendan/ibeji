@@ -4,6 +4,7 @@ import { CredentialsStore } from "../control/credentials.js";
 import { writePrivateJson } from "../control/paths.js";
 import { formatZodPath, IbejiError } from "../core/errors.js";
 import { getFailure } from "../core/failures/catalog.js";
+import { serveIbejiMcp } from "../mcp/run.js";
 import type { TwinDefinition } from "../twins/framework/types.js";
 import {
   booleanValue,
@@ -74,7 +75,9 @@ const RESET_OPTIONS = {
   ...JSON_HELP,
 } as const;
 const EXPORT_OPTIONS = JSON_HELP;
-const MCP_OPTIONS = JSON_HELP;
+const MCP_OPTIONS = {
+  help: { type: "boolean" },
+} as const;
 
 export type CliRuntime = {
   readonly home: string;
@@ -995,10 +998,6 @@ export async function runExport(args: readonly string[], runtime: CliRuntime): P
 export async function runMcp(args: readonly string[], runtime: CliRuntime): Promise<number> {
   const parsed = parseCli(args, MCP_OPTIONS);
   noPositionals(parsed.positionals, "mcp");
-  if (booleanValue(parsed.values, "json")) {
-    printJson(runtime.stdout, { ok: true, message: "added in Phase 7" });
-    return 0;
-  }
-  writeLine(runtime.stdout, "added in Phase 7");
+  serveIbejiMcp({ home: runtime.home });
   return 0;
 }
