@@ -91,8 +91,11 @@ describe("T6 session file, credentials and ports", () => {
         control: session.addresses.control.port,
       });
 
-      expect((await stat(sessionPath(home))).mode & 0o777).toBe(0o600);
-      expect((await stat(join(home, ".ibeji"))).mode & 0o777).toBe(0o700);
+      if (process.platform !== "win32") {
+        // Windows has no POSIX mode bits; these paths inherit the user's profile ACL.
+        expect((await stat(sessionPath(home))).mode & 0o777).toBe(0o600);
+        expect((await stat(join(home, ".ibeji"))).mode & 0o777).toBe(0o700);
+      }
       expect((await readdir(join(home, ".ibeji"))).sort()).toEqual([
         "credentials.json",
         "session.json",
@@ -115,7 +118,10 @@ describe("T6 session file, credentials and ports", () => {
       const firstCredentials = first.credentials;
       const firstFile = JSON.parse(await readFile(credentialsPath(home), "utf8")) as unknown;
       expect(firstFile).toMatchObject({ version: 1 });
-      expect((await stat(credentialsPath(home))).mode & 0o777).toBe(0o600);
+      if (process.platform !== "win32") {
+        // Windows has no POSIX mode bits; the file inherits the user's profile ACL.
+        expect((await stat(credentialsPath(home))).mode & 0o777).toBe(0o600);
+      }
       await first.stop();
 
       const second = await start(home);

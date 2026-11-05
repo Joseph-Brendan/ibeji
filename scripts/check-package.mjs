@@ -1,11 +1,24 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { readdir, readFile, rm, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const PNPM = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const IS_WINDOWS = process.platform === "win32";
+const SAFE_ARGUMENT = /^[A-Za-z0-9_.:=/-]+$/u;
+
+function runPnpm(args, options) {
+  if (!IS_WINDOWS) {
+    return execFileSync("pnpm", args, options);
+  }
+  for (const argument of args) {
+    if (!SAFE_ARGUMENT.test(argument)) {
+      throw new Error(`Refusing to run a pnpm argument with shell characters: ${argument}`);
+    }
+  }
+  return execSync(["pnpm", ...args].join(" "), options);
+}
 const EXPECTED_FILES = [
   "dist/",
   "scenarios/",
@@ -121,7 +134,7 @@ async function main() {
   }
 
   try {
-    execFileSync(PNPM, ["exec", "publint", "--strict"], {
+    runPnpm(["exec", "publint", "--strict"], {
       cwd: ROOT,
       stdio: "inherit",
     });
@@ -131,7 +144,7 @@ async function main() {
 
   let packed;
   try {
-    const output = execFileSync(PNPM, ["pack", "--json"], {
+    const output = runPnpm(["pack", "--json"], {
       cwd: ROOT,
       encoding: "utf8",
     });

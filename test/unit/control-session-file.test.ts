@@ -138,7 +138,10 @@ describe("T6 session file helpers", () => {
 
       const file = join(home, "file.json");
       await writePrivateJson(file, { value: 1 });
-      expect((await stat(file)).mode & 0o777).toBe(0o600);
+      if (process.platform !== "win32") {
+        // Windows has no POSIX mode bits; the file inherits the user's profile ACL.
+        expect((await stat(file)).mode & 0o777).toBe(0o600);
+      }
       expect(await readJsonFile(file)).toEqual({ kind: "ok", value: { value: 1 } });
     } finally {
       await rm(home, { recursive: true, force: true });

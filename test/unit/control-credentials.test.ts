@@ -99,7 +99,10 @@ describe("T6 credentials store", () => {
       expect(rotated).toEqual(["paystack", "flutterwave"]);
       expect(store.all()).not.toEqual(before);
       expect(store.secretValues()).toHaveLength(10);
-      expect((await stat(credentialsPath(home))).mode & 0o777).toBe(0o600);
+      if (process.platform !== "win32") {
+        // Windows has no POSIX mode bits; the file inherits the user's profile ACL.
+        expect((await stat(credentialsPath(home))).mode & 0o777).toBe(0o600);
+      }
     });
   });
 });
