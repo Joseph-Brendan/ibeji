@@ -114,7 +114,7 @@ function runCommand(command, args, options = {}) {
     });
     child.once("close", (code, signal) => {
       clearTimeout(timer);
-      if (code !== 0) {
+      if (code !== 0 && options.allowFailure !== true) {
         rejectRun(
           new Error(
             `${command} ${args.join(" ")} exited with code ${String(code)} signal ${String(
@@ -124,7 +124,7 @@ function runCommand(command, args, options = {}) {
         );
         return;
       }
-      resolveRun({ stdout, stderr });
+      resolveRun({ stdout, stderr, code });
     });
   });
 }
@@ -722,6 +722,23 @@ async function cleanup() {
 
   if (state.home !== undefined) {
     const sessionFile = join(state.home, ".ibeji", "session.json");
+    if (IS_WINDOWS && state.session !== undefined && (await exists(sessionFile))) {
+      // Windows cannot deliver SIGINT to another process, so the forced stop
+      // leaves a session file. The documented stale-session path removes it
+      // when the next command looks at it.
+      try {
+        await runCommand(NPX, ["--no-install", "ibeji", "status", "--json"], {
+          cwd: state.smokeDir,
+          env: cliEnv(),
+          timeout: 30_000,
+          allowFailure: true,
+        });
+      } catch (error) {
+        problems.push(
+          `could not run ibeji status after the Windows forced stop: ${messageOf(error)}`,
+        );
+      }
+    }
     if (await exists(sessionFile)) {
       problems.push("the session file was not removed after Ibeji stopped");
     }

@@ -173,6 +173,13 @@ function rawRequest(options: {
   });
 }
 
+async function drain(response: Response): Promise<void> {
+  // Read the whole body before the twin is stopped. A response that is still
+  // being written when closeAllConnections() runs can fail with EPIPE on a
+  // slower machine, which Vitest reports as an unhandled error.
+  await response.arrayBuffer();
+}
+
 async function startFor(definition: TwinDefinition): Promise<Harness> {
   const clock = new FakeClock(1_000);
   const events = new EventLog(clock);
@@ -446,6 +453,7 @@ const authentication: ConformanceCheck = {
         headers: { authorization: "Bearer ibeji_wrong_key" },
       });
       assert.equal(wrong.status, 401);
+      await drain(wrong);
 
       const liveKey = liveKeyFor(definition, harness.credentials);
       const live = await fetch(`http://127.0.0.1:${harness.running.port}${path}`, {
@@ -453,6 +461,7 @@ const authentication: ConformanceCheck = {
         headers: { authorization: `Bearer ${liveKey}` },
       });
       assert.equal(live.status, 401);
+      await drain(live);
 
       const warning = harness.events.after(0).find((event) => event.type === "warning");
       assert.ok(warning);
@@ -464,6 +473,7 @@ const authentication: ConformanceCheck = {
         headers: actionHeaders(definition, harness.credentials),
       });
       assert.notEqual(valid.status, 401);
+      await drain(valid);
     } finally {
       await harness.running.stop();
     }
@@ -487,6 +497,7 @@ const actionRouteParity: ConformanceCheck = {
           },
         );
         assert.notEqual(response.status, 404, `${action.id} should be reachable`);
+        await drain(response);
       }
 
       const unknown = await fetch(`http://127.0.0.1:${harness.running.port}/no-such-route`, {
@@ -501,6 +512,7 @@ const actionRouteParity: ConformanceCheck = {
         { method: "DELETE", headers: actionHeaders(definition, harness.credentials) },
       );
       assert.equal(wrongMethod.status, 404);
+      await drain(wrongMethod);
     } finally {
       await harness.running.stop();
     }
@@ -513,10 +525,14 @@ const eventsCheck: ConformanceCheck = {
     const harness = await startFor(definition);
     try {
       const action = nonCheckoutAction(definition);
-      await fetch(`http://127.0.0.1:${harness.running.port}${concretePath(action)}`, {
-        method: action.method,
-        headers: actionHeaders(definition, harness.credentials),
-      });
+      const actionResponse = await fetch(
+        `http://127.0.0.1:${harness.running.port}${concretePath(action)}`,
+        {
+          method: action.method,
+          headers: actionHeaders(definition, harness.credentials),
+        },
+      );
+      await drain(actionResponse);
 
       const all = harness.events.after(0);
       const request = all.find(
@@ -722,6 +738,7 @@ const checkout: ConformanceCheck = {
         body: `outcome=${encodeURIComponent(firstOutcome.id)}`,
       });
       assert.equal(missingOrigin.status, 403);
+      await drain(missingOrigin);
 
       const success = await fetch(`http://127.0.0.1:${running.port}${submitPath}`, {
         method: "POST",
@@ -744,6 +761,7 @@ const checkout: ConformanceCheck = {
         body: "outcome=not-a-real-outcome",
       });
       assert.equal(badOutcome.status, 400);
+      await drain(badOutcome);
 
       const rule = rules.add({
         failureId: "payment-declined",

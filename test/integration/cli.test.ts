@@ -165,6 +165,25 @@ function waitForExit(child: ReturnType<typeof spawn>): Promise<number> {
   });
 }
 
+async function stopStartedCli(child: ReturnType<typeof spawn>, home: string): Promise<void> {
+  if (process.platform === "win32") {
+    // Windows cannot deliver SIGINT or SIGTERM to another process. Killing is
+    // forceful, so the session file is cleaned by the documented stale-session
+    // path when the next CLI command looks at it.
+    child.kill();
+    const exitCode = await waitForExit(child);
+    if (exitCode === 0) {
+      return;
+    }
+    const stale = await run(["status", "--json"], home);
+    expect(errorCode(stale.stdout)).toBe("SESSION_STALE");
+    return;
+  }
+
+  child.kill("SIGTERM");
+  expect(await waitForExit(child)).toBe(0);
+}
+
 async function waitForDashboard(url: string): Promise<string> {
   const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
   expect(response.status).toBe(200);
@@ -959,7 +978,7 @@ describe("T10 real CLI child process", () => {
     expect(packageJson.bin.ibeji).toBe("./dist/cli.js");
   });
 
-  it("T10: start --no-open prints each twin, serves the dashboard and cleans up on SIGTERM", async () => {
+  it("T10: start --no-open prints each twin, serves the dashboard and cleans up on stop", async () => {
     const home = await tempHome();
     const child = spawn(
       process.execPath,
@@ -1013,10 +1032,7 @@ describe("T10 real CLI child process", () => {
         expect(line.length, line).toBeLessThanOrEqual(80);
       }
 
-      // Windows has no SIGTERM. Node maps SIGINT to its nearest equivalent.
-      child.kill(process.platform === "win32" ? "SIGINT" : "SIGTERM");
-      const exitCode = await waitForExit(child);
-      expect(exitCode).toBe(0);
+      await stopStartedCli(child, home);
       expect(existsSync(sessionPath(home))).toBe(false);
     } finally {
       if (child.exitCode === null && child.signalCode === null) {
@@ -1105,8 +1121,7 @@ describe("T10 real CLI child process", () => {
       expect(cleared.code).toBe(0);
       expect(json<{ removed: number }>(cleared.stdout).removed).toBe(1);
 
-      child.kill(process.platform === "win32" ? "SIGINT" : "SIGTERM");
-      expect(await waitForExit(child)).toBe(0);
+      await stopStartedCli(child, home);
       expect(existsSync(sessionPath(home))).toBe(false);
     } finally {
       if (child.exitCode === null && child.signalCode === null) {

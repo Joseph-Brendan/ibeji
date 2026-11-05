@@ -1,8 +1,5 @@
-import { execFileSync } from "node:child_process";
+import { runPnpm } from "./run-pnpm.js";
 
 export default function setup(): void {
-  execFileSync("pnpm", ["exec", "tsup", "--no-clean"], {
-    cwd: process.cwd(),
-    stdio: "pipe",
-  });
+  runPnpm(["exec", "tsup", "--no-clean"]);
 }
