@@ -2105,3 +2105,50 @@ The installed packages are `@modelcontextprotocol/server` 2.4.0 (a runtime depen
 - Add an MCP export tool if C11 later changes its "no export tool" decision.
 - Add child-process coverage collection for `src/mcp/run.ts`; its stdio path is tested through the built CLI, but Vitest's in-process coverage does not count the child process.
 - Cover Stripe in the T11 journey automatically when the Stripe twin is registered in 0.2.0.
+
+---
+
+## Phase 8: school-fees example app
+
+Date: 5 November 2026.
+
+Built the school-fees example app for the two twins registered in version 0.1.0: Paystack and Flutterwave. Stripe is version 0.2.0 (SPEC.md C21 D42) and was deferred with the user's approval.
+
+### What was built
+
+- **Small Node app.** `examples/school-fees-app/server.js` uses only Node's built-in `http` module. It serves a student list, a pay page, a return page, webhook endpoints, `/state` JSON for tests and `/health`.
+- **Provider adapters.** `examples/school-fees-app/providers.js` contains the Paystack and Flutterwave request and webhook rules. No new dependency was added.
+- **Paystack flow.** `POST /transaction/initialize` with JSON, amount in kobo, a unique reference and a callback URL. The parent is sent to `data.authorization_url`. The `charge.success` webhook is checked with `x-paystack-signature`, an HMAC SHA512 of the raw body using the secret key.
+- **Flutterwave flow.** `POST /v3/payments` with a whole-naira amount, `tx_ref`, currency, redirect URL and customer email. The parent is sent to `data.link`. The `charge.completed` webhook is checked with the `verif-hash` header against the webhook hash.
+- **Two modes.** `APP_MODE=naive` marks the student paid as soon as the payment starts and records every success webhook, so a duplicate creates a second record. `APP_MODE=safe` marks the student paid only after a verified success webhook and ignores duplicate webhooks for the same payment.
+- **Environment contract.** The app reads the same variables as the Connect your app guide: `IBEJI_PAYSTACK_BASE_URL`, `IBEJI_PAYSTACK_PUBLIC_KEY`, `IBEJI_PAYSTACK_SECRET_KEY`, `IBEJI_FLUTTERWAVE_BASE_URL`, `IBEJI_FLUTTERWAVE_PUBLIC_KEY`, `IBEJI_FLUTTERWAVE_SECRET_KEY` and `IBEJI_FLUTTERWAVE_WEBHOOK_HASH`. It rejects live key prefixes and non-local provider addresses.
+- **One-command scripts.** Added `pnpm example:paystack:naive`, `pnpm example:paystack:safe`, `pnpm example:flutterwave:naive` and `pnpm example:flutterwave:safe`. `run.js` sets the two mode variables and loads the server, so the same commands work on Windows.
+- **README.** `examples/school-fees-app/README.md` walks a non-technical person through starting Ibeji, copying the test details, setting the webhook URL, paying in naive mode, switching on declined payments and duplicate webhooks, seeing the wrong results, then switching to safe mode and seeing the correct results.
+
+### Library notes
+
+- **Paystack uses fetch.** The official `@paystack/paystack-sdk` hard-codes `https://api.paystack.co` and has no supported base-URL override (research/paystack.md section 13 and BUILD-LOG.md Phase 4 Step 4.7). The comment in `providers.js` says why.
+- **Flutterwave uses fetch.** Step 4.7 shows `flutterwave-node-v3` can be pointed at a twin for verify and refund, but its Charge group calls `/v3/charges`, not the Standard hosted `/v3/payments` flow needed here. Constructing the library also starts telemetry calls to external hosts. The app therefore uses fetch for the hosted create and keeps the example fully local. The comment in `providers.js` and the README explain this.
+
+### Decisions
+
+- **Stripe is not in this app.** The user approved building Paystack and Flutterwave now. The app stops with a plain message if asked for Stripe. The Stripe provider and its three scenario tests are left for 0.2.0.
+- **The safe duplicate key is the provider reference.** Paystack uses `data.reference`; Flutterwave uses `data.tx_ref`. The research files do not document a common event id, so the payment reference is the stable key both twins send.
+- **The return page never changes payment state.** In safe mode it only says that Ibeji is waiting for a verified webhook. Only the webhook handler marks the student paid.
+- **Student records are in memory.** Restarting the app clears the list, which keeps the example small and makes each test start clean.
+- **The app is local-only.** It binds `127.0.0.1`, accepts only local provider addresses, loads no external fonts or scripts, and prints no keys.
+- **No SPEC.md change.** The example app is described in C16 and the provider behaviour comes from research. No C21 entry is needed.
+
+### Tests
+
+- Added 7 tests in `test/integration/school-fees-app.test.ts`: the three required scenarios for Paystack, the three required scenarios for Flutterwave, and a plain-message check for Stripe.
+- Each scenario uses a real Ibeji session on port 0, real twin checkout pages, real webhook signing and the app's real HTTP server.
+- The tests prove naive payment-declined leaves the student paid while safe does not, naive duplicate webhooks create two records while safe keeps one, and safe rejects a forged webhook with HTTP 401 and leaves the student unpaid.
+- Total suite: 747 tests across 75 files.
+- Coverage is unchanged: 96.41% statements, 90.17% branches, 98.10% functions and 96.46% lines. The 100% line and branch thresholds for `src/core/` and `src/twins/framework/` pass.
+
+### Later
+
+- Add the Stripe provider flow and its three scenario tests in version 0.2.0.
+- Add persistence and an email receipt only if the example needs to grow beyond the Musa story.
+- Add a browser-driven walkthrough if the plain HTTP pages need to be tested with Playwright.
