@@ -2279,11 +2279,17 @@ Wrote the user documentation for version 0.1.0.
 - `pnpm typecheck` passed.
 - `pnpm lint` passed.
 - `pnpm build` passed.
-- `pnpm test` passed twice. The suite is now 749 tests across 76 files. Coverage is 96.41% statements, 90.17% branches, 98.10% functions and 96.46% lines.
+- `pnpm test` passed twice. The suite is now 750 tests across 76 files. Coverage is 96.41% statements, 90.17% branches, 98.10% functions and 96.47% lines.
 - `pnpm test:ui` passed twice, 93 tests.
 - `pnpm check:package` passed.
 - `pnpm test:smoke` passed twice.
 - The local gates pass. The six-job CI matrix runs on the pushed commit.
+
+### Windows UI teardown fix
+
+The first CI run after the documentation commit failed one job: Windows Node 24 UI tests. The test body passed, but tearing down `ibejiSession` hit the 30 second test timeout. The twin server waited for a held socket during shutdown.
+
+The twin stop still lets an in-flight response finish, but it now calls `server.closeAllConnections()` after two seconds so a held socket cannot keep shutdown open forever. Added a test that sends an incomplete request, waits for the server to receive it, stops the twin, and checks that stop takes about two seconds. The full suite is now 750 tests across 76 files. Coverage is 96.41% statements, 90.17% branches, 98.10% functions and 96.47% lines.
 
 ### Later
 

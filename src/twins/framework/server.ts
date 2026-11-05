@@ -804,10 +804,16 @@ export async function startTwin(
     }
     // Close idle keep-alive connections but let an in-flight response finish.
     // Node 22 and later close idle connections from server.close(), and this
-    // avoids destroying a socket while a response is still being written.
+    // avoids destroying a socket while a response is still being written. A
+    // held socket can otherwise keep shutdown open forever, so force the
+    // remaining connections closed after two seconds.
     server.closeIdleConnections();
     await new Promise<void>((resolve, reject) => {
+      const force = setTimeout(() => {
+        server.closeAllConnections();
+      }, 2_000);
       server.close((error) => {
+        clearTimeout(force);
         if (error === undefined) {
           resolve();
         } else {

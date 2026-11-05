@@ -116,6 +116,31 @@ describe("T6/T14 twin server framework", () => {
     await expect(fetch(`http://127.0.0.1:${running.port}/payments/ref-1`)).rejects.toThrow();
   });
 
+  it("T6 stop force-closes a request that never finishes sending", async () => {
+    const running = await startTwin(fakeTwinDefinition, { credentials: fakeCredentials });
+    const socket = net.connect({ host: "127.0.0.1", port: running.port });
+    socket.on("error", () => {
+      socket.destroy();
+    });
+    await new Promise<void>((resolve, reject) => {
+      socket.once("connect", resolve);
+      socket.once("error", reject);
+    });
+    const requestSeen = new Promise<void>((resolve) => {
+      running.server.once("request", () => resolve());
+    });
+    socket.write(
+      `POST /payments HTTP/1.1\r\nHost: 127.0.0.1:${running.port}\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{"`,
+    );
+    await requestSeen;
+    const started = Date.now();
+    await running.stop();
+    const elapsed = Date.now() - started;
+    expect(elapsed).toBeGreaterThanOrEqual(1_500);
+    expect(elapsed).toBeLessThan(5_000);
+    socket.destroy();
+  });
+
   it("T6 checks Host, sends no CORS headers, and limits bodies", async () => {
     const running = await startTwin(fakeTwinDefinition, { credentials: fakeCredentials });
     try {
