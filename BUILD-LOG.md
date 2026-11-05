@@ -2188,7 +2188,7 @@ Made the package publishable and replaced the `check:package` and `test:smoke` p
 
 `scripts/smoke.mjs` builds and packs the package, then creates a temporary folder whose full path contains a space and `é`. Because npm rejects a package name containing those characters, the project lives in a valid `project` subfolder; the full path still has the required space and non-English letter.
 
-The smoke test uses `pnpm add --offline ./ibeji.tgz`, so the packed file is the only explicit dependency and dependencies come from the local pnpm store, not the registry. It then runs every step with the installed package:
+The smoke test uses `npm install ./ibeji.tgz`, so the packed file is the only explicit dependency and the install follows the same path a stranger would use. It then runs every step with the installed package:
 
 - `npx ibeji --help`
 - `npx ibeji start --no-open --json --port 0 --twin-port paystack=0 --twin-port flutterwave=0`
@@ -2220,8 +2220,16 @@ Added `Check package` and `Smoke test` steps after `UI tests` in all six quality
 - `pnpm test:smoke` passed three times in a row.
 - All other C18 gates pass.
 
+### CI fix after the first Phase 8 push
+
+The first push showed two separate failures.
+
+- **Windows test job.** Vitest 5.0.5 read a cached setup module as a `Buffer`, and Vite 8.3.5 called `charCodeAt` on it. The run stopped before test collection with `TypeError: code.charCodeAt is not a function` and `No test files found`. This is Vitest issue #11682, fixed in Vitest 5.1.0. Updated `vitest` and `@vitest/coverage-v8` from 5.0.5 to 5.1.0. Vite stays at 8.3.5. The installed 5.1.0 source reads `result.tmp` as UTF-8, which is the fix.
+- **Smoke test on the macOS Node 22 and Ubuntu Node 24 jobs.** `pnpm add --offline ./ibeji.tgz` needed registry metadata for the package's dependencies. A fresh CI runner had the package files in the pnpm store but not that metadata cache, so it failed with `ERR_PNPM_NO_OFFLINE_META`. The smoke test now uses `npm install ./ibeji.tgz`, which resolves dependencies the way a stranger would and does not depend on a pnpm metadata cache.
+
+The Windows glob was not the problem, so the original `test/**/*.test.ts` include stays unchanged. The smoke test still checks that the packed file is the only explicit dependency, and still audits the installed tree for native files, install scripts and official payment libraries.
+
 ### Later
 
 - Add Stripe to the smoke loop when the Stripe twin is registered in 0.2.0. The smoke currently prints that Stripe is 0.2.0.
 - Generate `CHANGELOG.md` with Changesets in Phase 10 instead of keeping the starter entry.
-- Revisit the offline install if a future runtime dependency is not already in the pnpm store.

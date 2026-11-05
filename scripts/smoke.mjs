@@ -807,7 +807,10 @@ async function main() {
 
     await step("npm init and install the packed file", async () => {
       await runCommand(NPM, ["init", "-y"], { cwd: state.smokeDir, timeout: 60_000 });
-      await runCommand(PNPM, ["add", "--offline", "./ibeji.tgz"], {
+      // npm install is what a stranger does with the tarball. It resolves the
+      // package's dependencies from the registry instead of requiring pnpm's
+      // offline metadata cache, which a fresh CI runner does not have.
+      await runCommand(NPM, ["install", "--no-audit", "--no-fund", "./ibeji.tgz"], {
         cwd: state.smokeDir,
         timeout: 180_000,
       });
