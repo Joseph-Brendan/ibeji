@@ -72,7 +72,19 @@ export function HelpMenu(): ReactNode {
       </button>
       {open ? (
         <section ref={panel} id={panelId} className="help-popover" aria-label="Help">
-          <p className="help-intro">Plain words for the terms used here.</p>
+          <div className="help-popover-header">
+            <p className="help-intro">Plain words for the terms used here.</p>
+            <button
+              type="button"
+              className="button button-small"
+              onClick={() => {
+                setOpen(false);
+                button.current?.focus();
+              }}
+            >
+              Close
+            </button>
+          </div>
           <dl className="help-terms">
             {TERMS.map(([term, explanation]) => (
               <div key={term} className="help-term">

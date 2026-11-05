@@ -35,11 +35,26 @@ export function isAllowedOrigin(value: string | undefined, port: number): boolea
   return origin === `http://127.0.0.1:${port}` || origin === `http://localhost:${port}`;
 }
 
-/** C8's HTML protections: no framing, no referrer, and no content sniffing. */
-export function applyHtmlSecurityHeaders(headers: Headers): void {
+/** C8's HTML protections: no framing and no content sniffing. */
+function applyBaseHtmlSecurityHeaders(headers: Headers): void {
   headers.set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'");
-  headers.set("Referrer-Policy", "no-referrer");
   headers.set("X-Content-Type-Options", "nosniff");
+}
+
+/** C8's ordinary HTML protections: no framing, no referrer, and no content sniffing. */
+export function applyHtmlSecurityHeaders(headers: Headers): void {
+  applyBaseHtmlSecurityHeaders(headers);
+  headers.set("Referrer-Policy", "no-referrer");
+}
+
+/**
+ * Checkout pages need the same protections, but a form POST from Chromium sends
+ * Origin: null when Referrer-Policy is no-referrer. Same-origin keeps the Origin
+ * check working and still never sends a referrer to another site.
+ */
+export function applyCheckoutSecurityHeaders(headers: Headers): void {
+  applyBaseHtmlSecurityHeaders(headers);
+  headers.set("Referrer-Policy", "same-origin");
 }
 
 export function errorBody(error: IbejiError): string {

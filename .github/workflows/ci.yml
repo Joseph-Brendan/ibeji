@@ -39,3 +39,11 @@ jobs:
         run: pnpm build
       - name: Test
         run: pnpm test
+      - name: Install Playwright Chromium
+        if: runner.os != 'Linux'
+        run: pnpm exec playwright install chromium
+      - name: Install Playwright Chromium with system dependencies
+        if: runner.os == 'Linux'
+        run: pnpm exec playwright install chromium --with-deps
+      - name: UI tests
+        run: pnpm test:ui

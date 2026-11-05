@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { IbejiError } from "../../src/core/errors.js";
 import {
+  applyCheckoutSecurityHeaders,
   applyHtmlSecurityHeaders,
   errorBody,
   errorResponseFrom,
@@ -51,6 +52,16 @@ describe("T6 shared HTTP security helpers", () => {
       "default-src 'self'; frame-ancestors 'none'",
     );
     expect(headers.get("referrer-policy")).toBe("no-referrer");
+    expect(headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it("T6 lets a checkout form keep a same-origin referrer", () => {
+    const headers = new Headers();
+    applyCheckoutSecurityHeaders(headers);
+    expect(headers.get("content-security-policy")).toBe(
+      "default-src 'self'; frame-ancestors 'none'",
+    );
+    expect(headers.get("referrer-policy")).toBe("same-origin");
     expect(headers.get("x-content-type-options")).toBe("nosniff");
   });
 

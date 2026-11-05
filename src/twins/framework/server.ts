@@ -22,7 +22,7 @@ import { fingerprint } from "../../core/redact.js";
 import type { WebhookDispatcher, WebhookTwin } from "../../core/webhooks/dispatcher.js";
 import { CHECKOUT_STYLES, renderCheckoutPage, renderCheckoutResult } from "./html.js";
 import {
-  applyHtmlSecurityHeaders,
+  applyCheckoutSecurityHeaders,
   errorResponseFrom,
   ibejiErrorResponse,
   isAllowedHost,
@@ -438,7 +438,8 @@ export async function startTwin(
     });
 
     if (context.res.headers.get("content-type")?.toLowerCase().includes("text/html") === true) {
-      applyHtmlSecurityHeaders(context.res.headers);
+      // Every HTML page served by a twin is a checkout page.
+      applyCheckoutSecurityHeaders(context.res.headers);
     }
 
     const actionId = context.get("actionId");

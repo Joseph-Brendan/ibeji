@@ -376,8 +376,16 @@ button:focus-visible {
   border-radius: var(--radius-lg);
 }
 
-.help-intro {
+.help-popover-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
   margin-bottom: var(--space-3);
+}
+
+.help-intro {
+  margin-bottom: 0;
   color: var(--color-text-muted);
   font-size: var(--type-small);
   line-height: var(--type-small-line);
@@ -725,13 +733,9 @@ button:focus-visible {
   color: var(--color-text);
   text-decoration: none;
   cursor: pointer;
-  transition:
-    background var(--transition),
-    color var(--transition),
-    border-color var(--transition);
 }
 
-.button:hover {
+.button:hover:not(:disabled) {
   border-color: var(--color-line-strong);
   background: var(--color-surface-muted);
 }
@@ -740,6 +744,7 @@ button:focus-visible {
   color: var(--color-text-muted);
   cursor: not-allowed;
   opacity: 1;
+  transition: none;
 }
 
 .button-primary:disabled {
@@ -754,7 +759,7 @@ button:focus-visible {
   color: var(--color-text-inverse);
 }
 
-.button-primary:hover {
+.button-primary:hover:not(:disabled) {
   background: var(--color-accent-strong);
   border-color: var(--color-accent-strong);
 }
@@ -1287,7 +1292,7 @@ button:focus-visible {
   color: var(--color-accent-strong);
 }
 
-.button.destructive:hover {
+.button.destructive:hover:not(:disabled) {
   background: var(--color-danger-surface);
 }
 
@@ -1996,10 +2001,9 @@ button:focus-visible {
 }
 
 .guide-code {
-  max-height: 18rem;
   margin-top: var(--space-2);
   padding: var(--space-3);
-  overflow: auto;
+  overflow-wrap: anywhere;
   background: var(--color-surface-muted);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-md);
@@ -2018,10 +2022,9 @@ button:focus-visible {
 }
 
 .agent-instruction {
-  max-height: 24rem;
   margin-bottom: var(--space-3);
   padding: var(--space-4);
-  overflow: auto;
+  overflow-wrap: anywhere;
   background: var(--color-surface-muted);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-md);
@@ -2245,10 +2248,9 @@ button:focus-visible {
 }
 
 .response-body {
-  max-height: 18rem;
   margin-top: var(--space-2);
   padding: var(--space-3);
-  overflow: auto;
+  overflow-wrap: anywhere;
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-md);
@@ -2355,6 +2357,11 @@ button:focus-visible {
   .panel,
   .twin-card {
     padding: var(--space-4);
+  }
+
+  .twin-grid,
+  .twin-picker-grid {
+    grid-template-columns: 1fr;
   }
 
   .event-row {

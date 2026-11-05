@@ -1973,3 +1973,60 @@ Built the Webhooks and Connect your app pages, added the live-key banner to ever
 - Add axe and keyboard-only coverage for Webhooks, Connect your app and the checkout pages.
 - Add a visual regression check for the red live-key banner on every page.
 - Revisit the 4 KB response body cap if apps need more for debugging.
+
+---
+
+## Phase 6: UI tests and accessibility
+
+Date: 5 November 2026.
+
+Built the full Playwright suite for the dashboard and the test checkout pages, and fixed every problem the suite found. No new dependency was added.
+
+### Test session
+
+- `test/ui/fixtures.ts` starts a real session with `startSession`, the real clock, a temporary home folder and port 0 for the control server and every registered twin. It loads the built-in scenarios, opens the dashboard with the launch link, and stops the session and removes the home folder after each test.
+- The twin list comes from `registry.list()`. Version 0.1.0 registers Paystack and Flutterwave; Stripe is not registered (C21 D42). The suite will pick Stripe up automatically when 0.2.0 adds it.
+- `playwright.config.ts` uses Chromium only, one worker, no retries, fixed 30 second test and 5 second action/assertion limits, and clipboard permissions for the copy tests.
+- `test:ui` runs the real suite. The CI matrix job now installs Chromium before `pnpm test:ui`, with `--with-deps` on Linux, on all six OS and Node combinations.
+
+### T8 coverage
+
+- One group per page: Home, Connect your app, Live activity, Failures, Scenarios, Webhooks and Data.
+- Empty first run, normal data from every registered twin, the twin-off state, the C12 error state and the disconnected banner are covered for every page.
+- Actions covered: copy buttons, twin switcher, failure switches, failure clear confirmation, scenario Run and Stop, scenario replacement confirmation, webhook Resend and status filtering, webhook address refusal, and Data Reset with confirmation.
+- One full journey per registered twin: choose the twin, open Connect your app, save the webhook URL, make a payment through the twin API, complete it on that twin's hosted test checkout, see it in Live activity and Data, switch on Late webhook from the Failures page, make a second payment, see the delivery waiting on Webhooks, and see it delivered after the configured delay with the actual late timing checked.
+- The journey test uses the real checkout page in the browser. It caught a real browser-only problem: Chromium sends `Origin: null` for a same-origin form POST when the page has `Referrer-Policy: no-referrer`, so the framework rejected every checkout submission with `FORBIDDEN_ORIGIN`.
+
+### T9 coverage
+
+- Axe runs on every dashboard page, the sign-in states, every registered twin's checkout page, the checkout result page, and a checkout page with a failure override. Only serious and critical violations fail; no rules are disabled.
+- Axe also runs on dialogs and expanded states: failure clear, scenario replacement, Data reset, failure cards, delivery attempts and live event details.
+- Keyboard-only tests cover the skip link and every page. They use Tab and Shift+Tab only, then Space or Enter on the focused control: copy, open a guide, pause/resume, switch a failure, run/stop a scenario, resend, and open/cancel a reset dialog.
+- The offline test blocks every request whose hostname is not `127.0.0.1`. Every page and every checkout page still renders, and IBM Plex Sans and IBM Plex Mono are loaded with no external resource request.
+- Every page and every checkout page is checked at 1280 px and 768 px for horizontal page overflow, elements outside the viewport, and overlapping top-level sections. Tables and navigation stay inside their labelled scroll regions.
+
+### Problems found and fixed
+
+- **Connect rendered a guide before its data arrived.** The first render had no credentials and the webhook editor briefly existed with the wrong state. Fixed by rendering the guide skeleton until the twin's credentials and webhook URL have loaded, and by keeping already-loaded data while a retry runs.
+- **Copy feedback had the wrong accessible name.** The visible text changed from Copy to Copied or Copy failed, but the accessible name stayed "Copy ...", so axe reported a serious label-content-name mismatch. The accessible name now includes the visible feedback word.
+- **Scrollable code blocks were not keyboard reachable.** Axe reported `scrollable-region-focusable` on the agent instruction and the code and response blocks. Biome correctly refuses tabindex on a non-interactive `pre`, so the blocks no longer scroll: they wrap and expand instead. Long content is visible rather than hidden behind an unfocusable scroll area.
+- **Disabled primary buttons could take hover and transition colours.** Axe found serious contrast failures while the Scenarios page changed from idle to running. Hover styles now apply only to `:not(:disabled)`, and buttons no longer animate colour changes, so a disabled button cannot pass through a low-contrast colour.
+- **Checkout pages could not be submitted by a real browser.** `Referrer-Policy: no-referrer` made Chromium send `Origin: null` on the same-origin checkout form, and the required Origin check rejected it. Checkout HTML now uses `same-origin` through `applyCheckoutSecurityHeaders`; the control UI keeps `no-referrer`, and checkout pages still never send a referrer to another site. The conformance and HTTP-security tests were updated for this deliberate change.
+- **The 768 px card grids stayed in two columns.** Home and Connect your app now use one column at 768 px, matching UI-PLAN.md section 11.6.
+- **The Help panel was a scrollable region with no focusable content.** Axe reported `scrollable-region-focusable`. The panel now has a real Close button inside it, which also gives keyboard users a direct way to close it.
+
+### Tests
+
+- Added 92 Playwright tests in six files and one fixture/support folder. Vitest now has 726 tests across 72 files.
+- Coverage: 96.34% statements, 90.13% branches and 96.37% lines. The 100% line and branch thresholds for `src/core/` and `src/twins/framework/` pass.
+- `pnpm test` passed twice in a row. `pnpm test:ui` passed twice in a row.
+
+### C21 proposal (needs approval)
+
+- Change the checkout-page `Referrer-Policy` from `no-referrer` to `same-origin`. Chromium sends `Origin: null` for a same-origin form POST when the page sets `no-referrer`, which makes the C4/C10 required Origin check reject every real browser checkout. `same-origin` keeps referrers on the same page only and still never sends one to another site. The ordinary control-server HTML keeps `no-referrer`.
+
+### Later
+
+- Add a visual regression baseline for the 1280 px and 768 px screenshots once the UI text stabilises.
+- Add a cross-browser run if Firefox and WebKit become supported targets; the suite is Chromium-only by specification.
+- Add the Stripe journey driver when the Stripe twin is registered in 0.2.0.

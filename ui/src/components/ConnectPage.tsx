@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ConnectionGuideInfo,
   CredentialView,
@@ -273,18 +273,19 @@ export function ConnectPage(props: ConnectPageProps): ReactNode {
       : props.twins.find((twin) => twin.id === props.selectedTwinId);
   const selectedTwinId = selectedTwin?.id;
   const [data, setData] = useState<GuideData | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(undefined);
+  const loadedTwinId = useRef<string | undefined>(undefined);
 
   const load = useCallback(async (): Promise<void> => {
     if (selectedTwinId === undefined) {
       setData(undefined);
-      setLoading(false);
       return;
     }
-    setLoading(true);
     setError(undefined);
-    setData(undefined);
+    if (loadedTwinId.current !== selectedTwinId) {
+      loadedTwinId.current = selectedTwinId;
+      setData(undefined);
+    }
     try {
       const [credentials, webhook] = await Promise.all([
         props.api.getCredentials(selectedTwinId),
@@ -297,8 +298,6 @@ export function ConnectPage(props: ConnectPageProps): ReactNode {
         return;
       }
       setError(caught);
-    } finally {
-      setLoading(false);
     }
   }, [props.api, props.onUnauthorized, selectedTwinId]);
 
@@ -356,7 +355,7 @@ export function ConnectPage(props: ConnectPageProps): ReactNode {
             void load();
           }}
         />
-      ) : loading && data === undefined ? (
+      ) : data === undefined ? (
         <LoadingGuide />
       ) : guide === undefined ? null : (
         <Guide

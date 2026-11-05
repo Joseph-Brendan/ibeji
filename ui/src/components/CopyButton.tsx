@@ -26,7 +26,13 @@ export function CopyButton(props: CopyButtonProps): ReactNode {
       <button
         type="button"
         className={`button button-small ${props.className ?? ""}`}
-        aria-label={`Copy ${props.label}`}
+        aria-label={
+          state === "copied"
+            ? `Copied ${props.label}`
+            : state === "failed"
+              ? `Copy failed ${props.label}`
+              : `Copy ${props.label}`
+        }
         onClick={() => {
           if (navigator.clipboard === undefined) {
             setState("failed");

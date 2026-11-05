@@ -61,7 +61,8 @@ export function WebhookUrlEditor(props: WebhookUrlEditorProps): ReactNode {
         className="webhook-form"
         onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
-          void save(value.trim());
+          const submitted = new FormData(event.currentTarget).get("url");
+          void save(typeof submitted === "string" ? submitted.trim() : "");
         }}
       >
         <label className="field-label" htmlFor={`webhook-input-${props.twin.id}`}>
@@ -69,6 +70,7 @@ export function WebhookUrlEditor(props: WebhookUrlEditorProps): ReactNode {
         </label>
         <input
           id={`webhook-input-${props.twin.id}`}
+          name="url"
           className="text-input"
           type="url"
           value={value}

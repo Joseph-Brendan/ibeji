@@ -386,7 +386,7 @@ const hostAndHttpSafety: ConformanceCheck = {
         page.headers["content-security-policy"],
         "default-src 'self'; frame-ancestors 'none'",
       );
-      assert.equal(page.headers["referrer-policy"], "no-referrer");
+      assert.equal(page.headers["referrer-policy"], "same-origin");
       assert.equal(page.headers["access-control-allow-origin"], undefined);
 
       const post = definition.actions.find(
