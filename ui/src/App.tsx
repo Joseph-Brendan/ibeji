@@ -124,7 +124,7 @@ export function App(): ReactNode {
   const [reloadKey, setReloadKey] = useState(0);
   const activityAnnouncement = useRef(createActivityAnnouncement());
   const previousConnection = useRef<StreamState>("connecting");
-  const lastEventId = useRef<number | undefined>(undefined);
+  const lastEventId = useRef<number>(0);
   const seenEventIds = useRef(new Set<number>());
   const pathnameRef = useRef(pathname);
 
@@ -234,7 +234,7 @@ export function App(): ReactNode {
         setLiveKeyWarnings((current) => mergeLiveKeyWarnings(current, [warning]));
       }
       setEvents((current) => [event, ...current].slice(0, MAX_UI_EVENTS));
-      lastEventId.current = Math.max(lastEventId.current ?? 0, event.id);
+      lastEventId.current = Math.max(lastEventId.current, event.id);
       setLastUpdated(new Date());
 
       if (pathnameRef.current !== "/activity") {
@@ -264,7 +264,7 @@ export function App(): ReactNode {
         setLiveKeyWarnings((current) => mergeLiveKeyWarnings(current, initialWarnings));
         setEvents([...eventList.events].reverse());
         seenEventIds.current = new Set(eventList.events.map((event) => event.id));
-        lastEventId.current = eventList.events.at(-1)?.id;
+        lastEventId.current = eventList.events.at(-1)?.id ?? 0;
         setEventsLoaded(true);
         setLastUpdated(new Date());
       })
@@ -285,7 +285,10 @@ export function App(): ReactNode {
         }
         stream = new SseClient({
           url: `${API_PREFIX}/events/stream`,
-          ...(lastEventId.current === undefined ? {} : { initialLastEventId: lastEventId.current }),
+          // Start from event 0 when the first page load found no events, so a
+          // warning that arrives before the stream opens is replayed instead
+          // of being lost in the gap.
+          initialLastEventId: lastEventId.current,
           onEvent: handleEvent,
           onState: setConnection,
           onUnauthorized,
@@ -304,7 +307,7 @@ export function App(): ReactNode {
       setAnnouncement("Connected again. Live updates have resumed.");
       const after = lastEventId.current;
       void api
-        .getEvents({ ...(after === undefined ? {} : { after }), limit: 500 })
+        .getEvents({ after, limit: 500 })
         .then((list) => {
           for (const event of list.events) {
             seenEventIds.current.add(event.id);

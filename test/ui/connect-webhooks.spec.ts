@@ -263,6 +263,50 @@ test("T8 a live-key warning names the service, hides the key and returns after a
   }
 });
 
+test("T8 a live-key warning is replayed when it arrives before the event stream opens", async ({
+  page,
+}) => {
+  const harness = await startControlSession({});
+  let releaseStream = (): void => {};
+  let markStreamRequested = (): void => {};
+  const streamGate = new Promise<void>((resolve) => {
+    releaseStream = resolve;
+  });
+  const streamRequested = new Promise<void>((resolve) => {
+    markStreamRequested = resolve;
+  });
+
+  try {
+    const paystack = harness.session.addresses.twins.paystack;
+    if (paystack === undefined) {
+      throw new Error("the Paystack twin must be running");
+    }
+
+    await page.route("**/_ibeji/api/v1/events/stream", async (route) => {
+      markStreamRequested();
+      await streamGate;
+      await route.continue();
+    });
+
+    await page.goto(harness.session.createLaunchLink());
+    await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+    await streamRequested;
+
+    const liveKey = ["sk", "live", "beforeStreamKey00000000"].join("_");
+    await fetch(`${paystack.url}/transaction/initialize`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${liveKey}` },
+    });
+    releaseStream();
+
+    await expect(page.locator(".live-key-banner").filter({ hasText: "Paystack" })).toBeVisible();
+    expect(await page.locator("body").textContent()).not.toContain(liveKey);
+  } finally {
+    releaseStream();
+    await harness.cleanup();
+  }
+});
+
 test("T8 saving a loopback webhook URL succeeds and can be cleared", async ({ page }) => {
   const harness = await startControlSession({});
   try {
