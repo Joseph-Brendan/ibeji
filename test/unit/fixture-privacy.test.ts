@@ -24,7 +24,9 @@ describe("T13 fixture privacy", () => {
         join(root, "paystack", "sample.json"),
         JSON.stringify({
           path: "/transaction/verify/ada@real-customer.example",
-          responseHeaders: { authorization: ["Bearer sk", "live", "paystack_sample_123"].join("_") },
+          responseHeaders: {
+            authorization: ["Bearer sk", "live", "paystack_sample_123"].join("_"),
+          },
           responseBody: { phone: "+234 801 234 5678", account_number: "0123456789" },
         }),
       );

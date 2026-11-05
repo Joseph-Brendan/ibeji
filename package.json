@@ -1,10 +1,30 @@
 {
   "name": "ibeji",
   "version": "0.0.0",
-  "description": "Ibeji is a set of local \"twins\" of payment services.",
+  "description": "Local twins of payment services for safe payment, webhook and AI-agent testing.",
   "private": true,
   "license": "MIT",
   "author": "Joseph Brendan",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Joseph-Brendan/ibeji.git"
+  },
+  "homepage": "https://github.com/Joseph-Brendan/ibeji#readme",
+  "bugs": {
+    "url": "https://github.com/Joseph-Brendan/ibeji/issues"
+  },
+  "keywords": [
+    "paystack",
+    "flutterwave",
+    "stripe",
+    "testing",
+    "webhooks",
+    "ai-agents",
+    "mcp",
+    "nigeria",
+    "africa",
+    "payments"
+  ],
   "type": "module",
   "engines": {
     "node": "^22.18.0 || >=24.11.0"
@@ -29,8 +49,8 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:ui": "playwright test",
-    "check:package": "node -e \"console.log('added in Phase 8')\"",
-    "test:smoke": "node -e \"console.log('added in Phase 8')\"",
+    "check:package": "node scripts/check-package.mjs",
+    "test:smoke": "node scripts/smoke.mjs",
     "example:paystack:naive": "node examples/school-fees-app/run.js paystack naive",
     "example:paystack:safe": "node examples/school-fees-app/run.js paystack safe",
     "example:flutterwave:naive": "node examples/school-fees-app/run.js flutterwave naive",

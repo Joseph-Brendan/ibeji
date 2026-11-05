@@ -47,3 +47,7 @@ jobs:
         run: pnpm exec playwright install chromium --with-deps
       - name: UI tests
         run: pnpm test:ui
+      - name: Check package
+        run: pnpm check:package
+      - name: Smoke test
+        run: pnpm test:smoke

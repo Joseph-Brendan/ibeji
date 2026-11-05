@@ -2152,3 +2152,76 @@ Built the school-fees example app for the two twins registered in version 0.1.0:
 - Add the Stripe provider flow and its three scenario tests in version 0.2.0.
 - Add persistence and an email receipt only if the example needs to grow beyond the Musa story.
 - Add a browser-driven walkthrough if the plain HTTP pages need to be tested with Playwright.
+
+---
+
+## Phase 8: packaging and smoke tests
+
+Date: 5 November 2026.
+
+Made the package publishable and replaced the `check:package` and `test:smoke` placeholders with real gates. The package is still `private: true` until Phase 10. Stripe remains version 0.2.0, so the smoke test covers the registered 0.1.0 twins, Paystack and Flutterwave, the same two-provider scope approved for the example app.
+
+### Package changes
+
+- **Metadata.** Added `repository`, `homepage`, `bugs`, ten keywords, a clearer description, and kept the MIT licence. `bin` is `./dist/cli.js`, `engines` is `^22.18.0 || >=24.11.0`, and `packageManager` is `pnpm@10.34.9`. There is no `exports`, `types`, or `typings` field.
+- **Published files.** `files` is exactly `dist/`, `scenarios/`, `README.md`, `LICENSE`, `THIRD-PARTY-NOTICES` and `CHANGELOG.md`. `package.json` is always included by npm/pnpm. The pack check treats it as required package metadata and rejects every other top-level path.
+- **Notices.** Added the root `THIRD-PARTY-NOTICES` with both IBM Plex copyright lines and the full SIL Open Font License 1.1 text. The built UI keeps its own font licence files under `dist/ui/assets/fonts/`.
+- **Changelog.** Added a starter `CHANGELOG.md` in Changesets style.
+- **Scenarios.** Removed the internal `scenarios/.gitkeep`; the six real scenario JSON files are the only scenario files in the package.
+- **Scripts.** Replaced the placeholders with `node scripts/check-package.mjs` and `node scripts/smoke.mjs`.
+
+### check:package
+
+`scripts/check-package.mjs` checks the package fields, runs `publint --strict`, runs `pnpm pack`, prints the packed list, and fails on any extra or missing file. It checks:
+
+- `private` is true, the name, description, MIT licence, bin, engines, package manager, keywords, repository, homepage and bugs.
+- No `exports` or `types` fields.
+- `dist/cli.js` exists and starts with the Node shebang.
+- The root font notice and changelog exist.
+- The packed tree contains exactly `dist/`, `scenarios/`, `package.json`, `README.md`, `LICENSE`, `THIRD-PARTY-NOTICES` and `CHANGELOG.md` at the top level.
+- The packed `scenarios/` files exactly match the repository's `scenarios/*.json` files.
+- The packed UI includes its JavaScript, CSS, local fonts and font licence files.
+
+`publint --strict` reports **All good!**. The packed list is shown in the gate output.
+
+### test:smoke
+
+`scripts/smoke.mjs` builds and packs the package, then creates a temporary folder whose full path contains a space and `é`. Because npm rejects a package name containing those characters, the project lives in a valid `project` subfolder; the full path still has the required space and non-English letter.
+
+The smoke test uses `pnpm add --offline ./ibeji.tgz`, so the packed file is the only explicit dependency and dependencies come from the local pnpm store, not the registry. It then runs every step with the installed package:
+
+- `npx ibeji --help`
+- `npx ibeji start --no-open --json --port 0 --twin-port paystack=0 --twin-port flutterwave=0`
+- the dashboard launch link, launch-code exchange, authenticated UI, authenticated control API, and a 401 for the control API without a session
+- the copied school-fees app in safe mode, for every registered twin, completing a real checkout and checking the student becomes paid
+- `npx ibeji fail webhook-duplicated --twin <first twin> --copies 2 --gapSeconds 0`, then checking the safe app records one payment while the control API shows both delivered copies
+- `npx ibeji status --json`, and `npx ibeji mcp` with a real `initialize` and `tools/list`, checking every stdout line is JSON-RPC 2.0
+- a scan of the installed tree for `.node` files, `binding.gyp`, install scripts, and the official Paystack, Flutterwave and Stripe packages
+- stopping Ibeji, checking the session file was removed, and deleting the temporary folder and pack file even after a failure
+
+Each step prints a plain-English PASS or FAIL line. The final line is `PASS smoke test` or `FAIL smoke test`.
+
+### Problems found and fixed while building the smoke test
+
+- `npm init -y` rejected the temporary folder's name because it contained a space and `é`. The project now lives in a `project` subfolder; the full path still has both required characters.
+- The copied example app ran as CommonJS in the smoke folder. Added `examples/school-fees-app/package.json` with `"type": "module"`.
+- Cleanup tracked the app process instead of the app record, so a startup failure produced a second cleanup error. The record is now tracked and stopped correctly.
+- The help check expected the literal text `ibeji mcp`; the real help lists `mcp`. It now checks the real command description.
+
+### CI
+
+Added `Check package` and `Smoke test` steps after `UI tests` in all six quality jobs (Ubuntu, Windows and macOS, Node 22 and 24).
+
+### Tests and gates
+
+- Vitest remains at 747 tests across 75 files.
+- Coverage remains 96.41% statements, 90.17% branches, 98.10% functions and 96.46% lines. The 100% thresholds for `src/core/` and `src/twins/framework/` pass.
+- `pnpm check:package` passes.
+- `pnpm test:smoke` passed three times in a row.
+- All other C18 gates pass.
+
+### Later
+
+- Add Stripe to the smoke loop when the Stripe twin is registered in 0.2.0. The smoke currently prints that Stripe is 0.2.0.
+- Generate `CHANGELOG.md` with Changesets in Phase 10 instead of keeping the starter entry.
+- Revisit the offline install if a future runtime dependency is not already in the pnpm store.
