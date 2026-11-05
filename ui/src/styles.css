@@ -428,7 +428,6 @@ button:focus-visible {
   align-items: center;
   min-height: var(--control-height);
   padding: var(--space-2) var(--space-3);
-  border-left: var(--border-heavy) solid transparent;
   border-radius: var(--radius-sm);
   color: var(--color-text-muted);
   text-decoration: none;
@@ -441,7 +440,6 @@ button:focus-visible {
 }
 
 .nav-link[aria-current="page"] {
-  border-left-color: var(--color-accent);
   background: var(--color-surface-accent);
   color: var(--color-accent-strong);
   font-weight: 600;
@@ -598,7 +596,6 @@ button:focus-visible {
   background: var(--color-danger-surface);
   color: var(--color-danger-text);
   border: var(--border-width) solid var(--color-line);
-  border-left: var(--border-heavy) solid var(--color-accent-strong);
   border-radius: var(--radius-md);
 }
 
@@ -1000,7 +997,6 @@ button:focus-visible {
   margin-bottom: var(--space-6);
   background: var(--color-danger-surface);
   border: var(--border-width) solid var(--color-line);
-  border-left: var(--border-heavy) solid var(--color-accent-strong);
   border-radius: var(--radius-lg);
 }
 
@@ -1300,7 +1296,6 @@ button:focus-visible {
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface-muted);
-  border-left: var(--border-heavy) solid var(--color-accent);
   border-radius: var(--radius-md);
   font-size: var(--type-small);
   line-height: var(--type-small-line);
@@ -1310,7 +1305,6 @@ button:focus-visible {
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);
   background: var(--color-danger-surface);
-  border-left: var(--border-heavy) solid var(--color-accent-strong);
   border-radius: var(--radius-md);
   color: var(--color-danger-text);
   font-size: var(--type-small);
@@ -1433,7 +1427,6 @@ button:focus-visible {
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);
   background: var(--color-danger-surface);
-  border-left: var(--border-heavy) solid var(--color-accent-strong);
   border-radius: var(--radius-md);
   color: var(--color-danger-text);
   font-size: var(--type-small);
@@ -1454,7 +1447,6 @@ button:focus-visible {
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface-accent);
-  border-left: var(--border-heavy) solid var(--color-accent);
   border-radius: var(--radius-md);
   font-size: var(--type-small);
   line-height: var(--type-small-line);
@@ -1467,10 +1459,6 @@ button:focus-visible {
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-lg);
-}
-
-.failure-card-active {
-  border-left: var(--border-heavy) solid var(--color-accent);
 }
 
 .failure-card-header,
@@ -1792,7 +1780,6 @@ button:focus-visible {
   padding: var(--space-6);
   margin-bottom: var(--space-6);
   background: var(--color-surface-muted);
-  border-left: var(--border-heavy) solid var(--color-accent);
   border-radius: var(--radius-lg);
 }
 
@@ -1839,10 +1826,6 @@ button:focus-visible {
 .progress-state.done {
   color: var(--color-accent-strong);
   font-weight: 600;
-}
-
-.scenario-card-active {
-  border-left: var(--border-heavy) solid var(--color-accent);
 }
 
 .scenario-supported {
@@ -2037,7 +2020,6 @@ button:focus-visible {
 .safety-block {
   padding: var(--space-4);
   background: var(--color-danger-surface);
-  border-left: var(--border-heavy) solid var(--color-danger-strong);
   border-radius: var(--radius-md);
 }
 
@@ -2263,7 +2245,6 @@ button:focus-visible {
   margin-top: var(--space-2);
   padding: var(--space-2) var(--space-3);
   background: var(--color-danger-surface);
-  border-left: var(--border-heavy) solid var(--color-accent-strong);
   border-radius: var(--radius-md);
   color: var(--color-danger-text);
   font-size: var(--type-small);
@@ -2309,7 +2290,6 @@ button:focus-visible {
   }
 
   .nav-link {
-    border-left: 0;
     border-bottom: var(--border-heavy) solid transparent;
     border-radius: 0;
     white-space: nowrap;

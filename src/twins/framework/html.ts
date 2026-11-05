@@ -88,7 +88,7 @@ p { margin: var(--space-2) 0; }
 .label { color: var(--color-text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
 .amount { font-family: var(--font-mono); font-size: 2rem; font-weight: 600; margin: var(--space-1) 0; }
 .reference { font-family: var(--font-mono); overflow-wrap: anywhere; }
-.notice { border-left: 3px solid var(--color-accent-strong); background: var(--color-surface-accent); padding: var(--space-3) var(--space-4); margin: var(--space-4) 0; border-radius: var(--radius-md); }
+.notice { background: var(--color-surface-accent); padding: var(--space-3) var(--space-4); margin: var(--space-4) 0; border-radius: var(--radius-md); }
 .outcomes { display: grid; gap: var(--space-3); margin: var(--space-6) 0 var(--space-2); }
 button { font: inherit; cursor: pointer; border-radius: var(--radius-md); border: var(--border-width) solid var(--color-line-strong); background: var(--color-surface); color: var(--color-text); padding: var(--space-3) var(--space-4); text-align: left; }
 button:hover, button:focus-visible { background: var(--color-surface-accent); border-color: var(--color-accent); }

@@ -1446,7 +1446,7 @@ The dashboard was refreshed after a review of the first Home build. The goal is 
 
 - No shadows and no gradients anywhere. Borders are 1 px hairlines derived from the Ibeji palette.
 - The top bar is white with a hairline bottom border. Connection state uses a small dot plus text.
-- The left navigation uses a soft lavender active state and a purple left mark, not a solid dark fill.
+- The left navigation uses a soft lavender active state, not a solid dark fill.
 - Cards and panels use flat surfaces, 14 px corners and hairline borders. Empty states and the first-time guide use a soft lavender surface.
 - Status uses a coloured dot plus text, never colour alone.
 - Buttons are flat. The main action is purple; secondary actions are quiet outlined buttons.

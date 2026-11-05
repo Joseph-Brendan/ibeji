@@ -2030,3 +2030,26 @@ Built the full Playwright suite for the dashboard and the test checkout pages, a
 - Add a visual regression baseline for the 1280 px and 768 px screenshots once the UI text stabilises.
 - Add a cross-browser run if Firefox and WebKit become supported targets; the suite is Chromium-only by specification.
 - Add the Stripe journey driver when the Stripe twin is registered in 0.2.0.
+
+---
+
+## Phase 6: remove left accent strokes
+
+Date: 5 November 2026.
+
+Removed every coloured left border from the dashboard and the test checkout pages, at the user's request.
+
+### What changed
+
+- Removed the left stroke from the active navigation item, the connection banner, error panels, toasts, Data and page warnings, the scenario banner, active failure cards, the active scenario panel, active scenario cards, the Connect safety block and webhook notice lines.
+- Removed the left stroke from the checkout failure notice in the shared checkout stylesheet.
+- Kept the existing status text, badges, backgrounds and borders. No meaning depends on the removed strokes.
+- Updated UI-PLAN.md section 15 so the visual description no longer claims a purple left mark on the active navigation item.
+
+### Checks
+
+- `rg "border-left|border-inline-start" ui/src src/twins/framework/html.ts` returns no matches.
+- The full Playwright suite, including axe and the 1280 px and 768 px layout checks, still passes.
+- `pnpm test` passed: 726 tests across 72 files.
+- `pnpm test:ui` passed: 92 tests.
+- Coverage: 96.28% statements, 90.10% branches and 96.32% lines. The 100% thresholds for `src/core/` and `src/twins/framework/` still pass.
