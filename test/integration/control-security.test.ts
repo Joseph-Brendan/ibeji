@@ -208,6 +208,19 @@ describe("T6 control API security", () => {
     });
   });
 
+  it("D55 rejects the removed launchCode alias", async () => {
+    await withControlSession({}, async ({ session }) => {
+      const code = session.createLaunchCode();
+      const response = await fetch(apiUrl(session, "/auth/exchange"), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ launchCode: code }),
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: { code: "BAD_REQUEST" } });
+    });
+  });
+
   it("T6 rejects a made-up launch code and an expired launch code", async () => {
     await withControlSession({}, async ({ session, clock }) => {
       expect((await exchangeCode(session, "made-up-code")).status).toBe(401);

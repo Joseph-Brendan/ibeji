@@ -32,6 +32,12 @@ A developer copies a real `sk_live_...` key into a test `.env` file by mistake. 
 
 If the app had still pointed at the real Paystack address, the same mistake could have moved real money. The live-key warning catches the mistake while the app is pointed at Ibeji. It is a warning, not a guarantee: always check your app's base URL as well as its keys.
 
+## Customer data and webhook URLs
+
+Use fake customer data only. Events, records, exports and the dashboard keep the customer name, email and phone exactly as your app sent them. That is useful while testing, but it means real customer data would be stored and exported too.
+
+Never put a secret in a webhook URL. Ibeji shows the URL on the dashboard and includes it in an export, so anyone who sees the dashboard or the export can read that secret.
+
 ## Dashboard sign-in
 
 Ibeji does not use accounts or passwords:

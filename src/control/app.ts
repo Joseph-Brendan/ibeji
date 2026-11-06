@@ -449,7 +449,7 @@ export function createControlApp(deps: ControlDependencies): Hono {
 
   app.post(EXCHANGE_PATH, async (context) => {
     const body = await parseBody(context, exchangeBodySchema);
-    const code = body.code ?? body.launchCode;
+    const code = body.code;
     if (code === undefined) {
       throw new IbejiError("BAD_REQUEST");
     }

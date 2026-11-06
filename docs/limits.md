@@ -13,6 +13,18 @@ Ibeji version 0.1.0 builds the Paystack and Flutterwave twins. The Stripe twin i
 - A twin records state in memory for the life of the session. It is not a database, and it is not a production service.
 - The published package does not include the recorder or the fixtures folder. The recorder is a separate development tool. In version 0.1.0, `--service stripe` is refused because Stripe recording and the Stripe twin are part of version 0.2.0. When a test-key prefix is shared by more than one service, the recorder asks the person to type the service name before it sends anything.
 
+## Fees are illustrative
+
+Flutterwave's `app_fee`, `merchant_fee` and transfer `fee` are illustrative values, not that service's real fees. Real fees depend on each account's pricing. Where a fixture records a fee for the same amount and card, the twin returns that recorded value; otherwise it keeps a simple formula. They must not be used to test fee arithmetic. The failed-transfer message is a placeholder because Flutterwave does not document a complete failure story.
+
+## Official Node libraries
+
+| Twin | Can its official library point at a twin? | What to use |
+|---|---|---|
+| Paystack | Paystack: no official library can point at a twin; the official and common libraries hard-code Paystack's address. | Use `fetch` or another HTTP client. |
+| Flutterwave | Flutterwave: the official library can point at a twin for verify, verify by reference and refund. It has no hosted-payment method. | Use the library for the actions it has; use `fetch` for hosted payment creation. |
+| Stripe | Stripe: decided in version 0.2.0. | Use the library's local host, port and protocol support when the twin ships. |
+
 ## Paystack
 
 ### Supported actions

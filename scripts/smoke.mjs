@@ -17,7 +17,7 @@ const STEP_NAMES = [
   "npm init and install the packed file",
   "installed tree has no native code or payment libraries",
   "npx ibeji --help",
-  "start Ibeji on random free ports",
+  "start Ibeji on free ports",
   "dashboard and its sign-in refusal",
   "payments through every registered twin",
   "safe app ignores duplicate webhooks",
@@ -222,19 +222,7 @@ async function readSession() {
 }
 
 async function startIbeji() {
-  const args = [
-    "--no-install",
-    "ibeji",
-    "start",
-    "--no-open",
-    "--json",
-    "--port",
-    "0",
-    "--twin-port",
-    "paystack=0",
-    "--twin-port",
-    "flutterwave=0",
-  ];
+  const args = ["--no-install", "ibeji", "start", "--no-open", "--json", "--port", "0"];
   const processInfo = spawnOutput(NPX, args, {
     cwd: state.smokeDir,
     env: cliEnv(),
@@ -319,24 +307,24 @@ function twinEnv(twinId) {
     throw new Error(`the session has no address or credentials for ${twinId}`);
   }
   const prefix = `IBEJI_${twinId.toUpperCase()}`;
+  const roleSuffix = {
+    public: "PUBLIC_KEY",
+    secret: "SECRET_KEY",
+    webhook: "WEBHOOK_HASH",
+  };
   const env = {
     PAYMENT_PROVIDER: twinId,
     APP_MODE: "safe",
     PORT: "0",
     [`${prefix}_BASE_URL`]: address.url,
-    [`${prefix}_PUBLIC_KEY`]: credentials.public,
-    [`${prefix}_SECRET_KEY`]: credentials.secret,
   };
-  if (twinId === "flutterwave") {
-    env.IBEJI_FLUTTERWAVE_WEBHOOK_HASH = credentials.webhook;
+  for (const [role, value] of Object.entries(credentials)) {
+    env[`${prefix}_${roleSuffix[role] ?? role.toUpperCase()}`] = value;
   }
   return env;
 }
 
 async function startApp(twinId) {
-  if (twinId !== "paystack" && twinId !== "flutterwave") {
-    throw new Error(`the example app does not support ${twinId} in version 0.1.0`);
-  }
   const processInfo = spawnOutput(process.execPath, [join("school-fees-app", "server.js")], {
     cwd: state.smokeDir,
     env: { ...process.env, HOME: state.home, USERPROFILE: state.home, ...twinEnv(twinId) },
@@ -876,7 +864,7 @@ async function main() {
       }
     });
 
-    await step("start Ibeji on random free ports", async () => {
+    await step("start Ibeji on free ports", async () => {
       const startJson = await startIbeji();
       const twinIds = Object.keys(startJson.addresses?.twins ?? {});
       if (twinIds.length === 0) {
@@ -902,7 +890,6 @@ async function main() {
           await stopApp(app);
         }
       }
-      console.log("Stripe is version 0.2.0 and is not in this 0.1.0 smoke run.");
     });
 
     await step("safe app ignores duplicate webhooks", async () => {

@@ -80,7 +80,6 @@ describe("T10 CLI control client and output", () => {
       await client.reset();
       await client.exportSession();
       await client.launchLink();
-      expect(await client.placeholder()).toContain("path");
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
@@ -149,7 +148,6 @@ describe("T10 CLI control client and output", () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     const client = new ControlClient(sessionFile(address.port));
     await expect(client.request("/status")).rejects.toMatchObject({ code: "SESSION_STALE" });
-    await expect(client.placeholder()).rejects.toMatchObject({ code: "SESSION_STALE" });
   });
 
   it("T10: output helpers wrap text and format errors", () => {

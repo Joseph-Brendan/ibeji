@@ -284,18 +284,6 @@ export class ControlClient {
     });
   }
 
-  async placeholder(): Promise<string> {
-    let response: Response;
-    try {
-      response = await fetch(`${this.origin}/`, {
-        headers: { accept: "text/html" },
-      });
-    } catch (error) {
-      throw new IbejiError("SESSION_STALE", { cause: error });
-    }
-    return response.text();
-  }
-
   eventStreamUrl(scope?: string): string {
     const query = new URLSearchParams();
     if (scope !== undefined) {

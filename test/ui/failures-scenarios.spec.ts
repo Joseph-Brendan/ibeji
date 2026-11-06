@@ -1,13 +1,20 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
 import { expect, type Page, test } from "@playwright/test";
 
 import { loadScenarios } from "../../src/core/scenarios/loader.js";
-import type { TwinSummary } from "../../src/shared/control.js";
+import type { Rule, TwinSummary } from "../../src/shared/control.js";
+import { registry } from "../../src/twins/registry.js";
 import {
   apiUrl,
   authHeaders,
   type ControlSessionHarness,
   startControlSession,
 } from "../helpers/control.js";
+import { CLI, mcpEnvironment, ROOT, startStdioMcp, structuredOf } from "../helpers/mcp.js";
+
+const execFileAsync = promisify(execFile);
 
 async function startHarness(): Promise<ControlSessionHarness> {
   return startControlSession({ scenarios: await loadScenarios("scenarios") });
@@ -41,6 +48,25 @@ async function clearRules(harness: ControlSessionHarness): Promise<void> {
     method: "DELETE",
     headers: authHeaders(harness.session),
   });
+}
+
+async function listRules(harness: ControlSessionHarness): Promise<readonly Rule[]> {
+  const response = await fetch(apiUrl(harness.session, "/rules"), {
+    headers: authHeaders(harness.session),
+  });
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as { readonly rules: readonly Rule[] };
+  return body.rules;
+}
+
+function ruleFacts(rule: Rule): Record<string, unknown> {
+  return {
+    failureId: rule.failureId,
+    settings: rule.settings,
+    twins: rule.twins,
+    actions: rule.actions,
+    resolvedActions: rule.resolvedActions,
+  };
 }
 
 test("T8 Failures shows schema limits, defaults, validation and a working switch", async ({
@@ -253,6 +279,98 @@ test("T8 Scenarios disables a supported twin that is off", async ({ page }) => {
       bankOutage.getByText(/Flutterwave is off. Start it with ibeji start --twins flutterwave/u),
     ).toBeVisible();
   } finally {
+    await harness.cleanup();
+  }
+});
+
+test("T4 parity: the UI, CLI, MCP and control API produce the same rule", async ({ page }) => {
+  test.setTimeout(90_000);
+  const harness = await startHarness();
+  const mcp = await startStdioMcp(harness.home);
+  try {
+    const first = registry.list()[0];
+    if (first === undefined) {
+      throw new Error("the registry has no twins");
+    }
+    const cases: readonly {
+      readonly failureId: string;
+      readonly settings: Readonly<Record<string, number>>;
+    }[] = [
+      { failureId: "webhook-delayed", settings: { seconds: 12, jitterSeconds: 3 } },
+      { failureId: "server-error", settings: { times: 5, status: 503 } },
+      { failureId: "payment-declined", settings: { percent: 100 } },
+    ];
+
+    for (const testCase of cases) {
+      await clearRules(harness);
+      await openPage(page, harness, "Failures");
+      const card = page.getByTestId(`failure-${testCase.failureId}`);
+      for (const twin of registry.list().slice(1)) {
+        await card.getByRole("checkbox", { name: twin.displayName }).uncheck();
+      }
+      for (const [key, value] of Object.entries(testCase.settings)) {
+        await page.locator(`#failure-${testCase.failureId}-${key}`).fill(String(value));
+      }
+      await card.getByRole("switch", { name: /Switch on/u }).click();
+      await expect(card.locator(".status-pill")).toHaveText("On");
+      const uiRules = await listRules(harness);
+      expect(uiRules).toHaveLength(1);
+      const uiRule = uiRules[0];
+      if (uiRule === undefined) {
+        throw new Error(`the UI did not store the ${testCase.failureId} rule`);
+      }
+
+      await clearRules(harness);
+      const settingArgs = Object.entries(testCase.settings).flatMap(([key, value]) => [
+        `--${key}`,
+        String(value),
+      ]);
+      const { stdout } = await execFileAsync(
+        process.execPath,
+        [CLI, "fail", testCase.failureId, "--twin", first.id, "--json", ...settingArgs],
+        {
+          cwd: ROOT,
+          env: mcpEnvironment(harness.home),
+          encoding: "utf8",
+        },
+      );
+      const cliRule = (JSON.parse(stdout) as { readonly rule: Rule }).rule;
+
+      await clearRules(harness);
+      const mcpResult = await mcp.client.callTool({
+        name: "ibeji_enable_failure",
+        arguments: {
+          failureId: testCase.failureId,
+          twin: first.id,
+          settings: testCase.settings,
+        },
+      });
+      expect(mcpResult.isError).toBeFalsy();
+      const mcpRule = structuredOf<{ readonly rule: Rule }>(mcpResult).rule;
+
+      await clearRules(harness);
+      const controlResponse = await fetch(apiUrl(harness.session, "/rules"), {
+        method: "POST",
+        headers: {
+          ...authHeaders(harness.session),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          failureId: testCase.failureId,
+          twins: [first.id],
+          settings: testCase.settings,
+        }),
+      });
+      expect(controlResponse.status).toBe(200);
+      const controlRule = ((await controlResponse.json()) as { readonly rule: Rule }).rule;
+
+      expect(ruleFacts(cliRule)).toEqual(ruleFacts(uiRule));
+      expect(ruleFacts(mcpRule)).toEqual(ruleFacts(uiRule));
+      expect(ruleFacts(controlRule)).toEqual(ruleFacts(uiRule));
+    }
+  } finally {
+    await clearRules(harness);
+    await mcp.close();
     await harness.cleanup();
   }
 });

@@ -60,26 +60,11 @@ function waitForExit(child, timeoutMs) {
 }
 
 async function startSession(home) {
-  const child = spawn(
-    process.execPath,
-    [
-      CLI,
-      "start",
-      "--no-open",
-      "--json",
-      "--port",
-      "0",
-      "--twin-port",
-      "paystack=0",
-      "--twin-port",
-      "flutterwave=0",
-    ],
-    {
-      cwd: ROOT,
-      env: { ...process.env, HOME: home, USERPROFILE: home, NO_COLOR: "1" },
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
+  const child = spawn(process.execPath, [CLI, "start", "--no-open", "--json", "--port", "0"], {
+    cwd: ROOT,
+    env: { ...process.env, HOME: home, USERPROFILE: home, NO_COLOR: "1" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 
   const started = await new Promise((resolve, reject) => {
     const reader = createInterface({ input: child.stdout });
@@ -161,8 +146,10 @@ async function main() {
     });
     await page.goto(running.started.launchLink);
     await page.getByRole("heading", { name: "Home", level: 1 }).waitFor();
-    await page.getByTestId("twin-card-paystack").waitFor();
-    await page.getByTestId("twin-card-flutterwave").waitFor();
+    const twinIds = Object.keys(running.started.addresses.twins);
+    for (const twinId of twinIds) {
+      await page.getByTestId(`twin-card-${twinId}`).waitFor();
+    }
     await page.locator("[data-credential-value]").first().waitFor();
     await delay(500);
     await captureScreenshot(page, join(OUTPUT, "home.png"), {

@@ -10,22 +10,9 @@ export const idSchema = z.string().min(1);
 /** One twin id, always a plain string so a new twin needs no schema change. */
 export const twinIdSchema = idSchema;
 
-export const exchangeBodySchema = z
-  .strictObject({
-    code: twinIdSchema.optional(),
-    launchCode: twinIdSchema.optional(),
-  })
-  .superRefine((value, context) => {
-    const present = Number(value.code !== undefined) + Number(value.launchCode !== undefined);
-    if (present !== 1) {
-      context.addIssue({
-        code: "custom",
-        path: ["code"],
-        message: "Expected exactly one of code or launchCode.",
-        input: value,
-      });
-    }
-  });
+export const exchangeBodySchema = z.strictObject({
+  code: twinIdSchema,
+});
 
 export const optionalTwinsSchema = z.strictObject({
   twins: z.array(twinIdSchema).min(1).optional(),

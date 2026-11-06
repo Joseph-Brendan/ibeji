@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { describe, expect, it } from "vitest";
 
 import { fingerprint } from "../../src/core/redact.js";
@@ -144,10 +146,18 @@ describe("Flutterwave hosted payments and checkout", () => {
       const verified = (await (
         await verifyPaymentByReference(harness, "checkout-success")
       ).json()) as {
-        data: { status: string; amount: number; card: { token: string } };
+        data: {
+          status: string;
+          amount: number;
+          app_fee: number;
+          card: { token: string; first_6digits: string; last_4digits: string };
+        };
       };
       expect(verified.data.status).toBe("successful");
       expect(verified.data.amount).toBe(7500);
+      expect(verified.data.app_fee).toBe(105);
+      expect(verified.data.card.first_6digits).toBe("553188");
+      expect(verified.data.card.last_4digits).toBe("2950");
       expect(typeof verified.data.card.token).toBe("string");
       expect(harness.drafts).toHaveLength(1);
       const successDraft = harness.drafts[0];
@@ -204,6 +214,35 @@ describe("Flutterwave hosted payments and checkout", () => {
       expect(
         harness.drafts.every((draft) => (draft.data as { status: string }).status === "failed"),
       ).toBe(true);
+    });
+  });
+
+  it("D52 returns the recorded failed-payment fee and card", async () => {
+    const recorded = JSON.parse(
+      await readFile("fixtures/flutterwave/payment-verify-by-reference-failed.json", "utf8"),
+    ) as {
+      responseBody: {
+        data: {
+          app_fee: number;
+          card: { first_6digits: string; last_4digits: string };
+        };
+      };
+    };
+    await withHarness(async (harness) => {
+      await seedPayment(harness, "checkout-fee-failed", {
+        amount: "7500",
+        outcome: "failed",
+      });
+      const response = await verifyPaymentByReference(harness, "checkout-fee-failed");
+      const body = (await response.json()) as {
+        data: {
+          app_fee: number;
+          card: { first_6digits: string; last_4digits: string };
+        };
+      };
+      expect(body.data.app_fee).toBe(recorded.responseBody.data.app_fee);
+      expect(body.data.card.first_6digits).toBe(recorded.responseBody.data.card.first_6digits);
+      expect(body.data.card.last_4digits).toBe(recorded.responseBody.data.card.last_4digits);
     });
   });
 

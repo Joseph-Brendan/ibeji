@@ -245,6 +245,69 @@ function listItem(payment: FlutterwavePayment): Record<string, unknown> {
   };
 }
 
+type CardProfile = {
+  readonly first6: string;
+  readonly last4: string;
+  readonly issuer: string;
+  readonly country: string;
+  readonly type: string;
+  readonly expiry: string;
+};
+
+const SUCCESS_CARD: CardProfile = {
+  first6: "553188",
+  last4: "2950",
+  issuer: " CREDIT",
+  country: "NIGERIA NG",
+  type: "MASTERCARD",
+  expiry: "12/2099",
+};
+
+const FAILED_CARD: CardProfile = {
+  first6: "514301",
+  last4: "9965",
+  issuer: "JACK HENRY AND ASSOCIATES DEBITSTANDARD",
+  country: "UNITED STATES US",
+  type: "MASTERCARD",
+  expiry: "12/2099",
+};
+
+/**
+ * D52: fees are illustrative. These two recorded examples are the only
+ * fixtures that show a fee for the same amount and card as the twin's checkout.
+ */
+const RECORDED_APP_FEES = [
+  {
+    amount: 750_000,
+    first6: SUCCESS_CARD.first6,
+    last4: SUCCESS_CARD.last4,
+    status: "successful",
+    appFee: 10_500,
+  },
+  {
+    amount: 750_000,
+    first6: FAILED_CARD.first6,
+    last4: FAILED_CARD.last4,
+    status: "failed",
+    appFee: 28_500,
+  },
+] as const;
+
+function formulaAppFee(amount: number): number {
+  return Math.floor((amount * 14) / 1_000);
+}
+
+function appFeeFor(amount: number, card: CardProfile, status: "successful" | "failed"): number {
+  const recorded = RECORDED_APP_FEES.find(
+    (entry) =>
+      entry.amount === amount &&
+      entry.first6 === card.first6 &&
+      entry.last4 === card.last4 &&
+      entry.status === status,
+  );
+  return recorded?.appFee ?? formulaAppFee(amount);
+}
+
 function makePayment(
   context: ActionContext,
   txRef: string,
@@ -257,7 +320,7 @@ function makePayment(
 ): FlutterwavePayment {
   const now = isoTimestamp(context.clock);
   const transactionId = nextPaymentId();
-  const appFee = Math.floor((amount * 14) / 1_000);
+  const appFee = formulaAppFee(amount);
   return {
     id: txRef,
     transactionId,
@@ -281,12 +344,12 @@ function makePayment(
     deviceFingerprint: DEVICE_FINGERPRINT,
     checkoutInitAddress: customerPhone.length === 0 ? "N/A" : customerPhone,
     fingerprintScore: "0.5",
-    cardFirst6: "553188",
-    cardLast4: "2950",
-    cardIssuer: " CREDIT",
-    cardCountry: "NIGERIA NG",
-    cardType: "MASTERCARD",
-    cardExpiry: "12/2099",
+    cardFirst6: SUCCESS_CARD.first6,
+    cardLast4: SUCCESS_CARD.last4,
+    cardIssuer: SUCCESS_CARD.issuer,
+    cardCountry: SUCCESS_CARD.country,
+    cardType: SUCCESS_CARD.type,
+    cardExpiry: SUCCESS_CARD.expiry,
     cardToken: null,
   };
 }
@@ -320,12 +383,12 @@ export function placeholderPayment(
     deviceFingerprint: DEVICE_FINGERPRINT,
     checkoutInitAddress: "N/A",
     fingerprintScore: "0.5",
-    cardFirst6: "553188",
-    cardLast4: "2950",
-    cardIssuer: " CREDIT",
-    cardCountry: "NIGERIA NG",
-    cardType: "MASTERCARD",
-    cardExpiry: "12/2099",
+    cardFirst6: SUCCESS_CARD.first6,
+    cardLast4: SUCCESS_CARD.last4,
+    cardIssuer: SUCCESS_CARD.issuer,
+    cardCountry: SUCCESS_CARD.country,
+    cardType: SUCCESS_CARD.type,
+    cardExpiry: SUCCESS_CARD.expiry,
     cardToken: null,
   };
 }
@@ -338,15 +401,23 @@ export function applyCheckoutOutcome(
   const now = isoTimestamp(clock);
   const flwRef = `FLW-MOCK-ibeji-${payment.transactionId}`;
   if (outcome === "success") {
+    const appFee = appFeeFor(payment.amount, SUCCESS_CARD, "successful");
     return {
       ...payment,
       status: "successful",
       paidAt: now,
       updatedAt: now,
       flwRef,
-      amountSettled: Math.max(0, payment.amount - payment.appFee),
+      appFee,
+      amountSettled: Math.max(0, payment.amount - appFee),
       processorResponse: "successful",
       authModel: "PIN",
+      cardFirst6: SUCCESS_CARD.first6,
+      cardLast4: SUCCESS_CARD.last4,
+      cardIssuer: SUCCESS_CARD.issuer,
+      cardCountry: SUCCESS_CARD.country,
+      cardType: SUCCESS_CARD.type,
+      cardExpiry: SUCCESS_CARD.expiry,
       cardToken: `flw-t1nf-ibeji-${payment.transactionId}`,
     };
   }
@@ -356,9 +427,16 @@ export function applyCheckoutOutcome(
     paidAt: now,
     updatedAt: now,
     flwRef,
+    appFee: appFeeFor(payment.amount, FAILED_CARD, "failed"),
     amountSettled: 0,
     processorResponse: FAILED_PROCESSOR_RESPONSE,
     authModel: "AVS_VBVSECURECODE",
+    cardFirst6: FAILED_CARD.first6,
+    cardLast4: FAILED_CARD.last4,
+    cardIssuer: FAILED_CARD.issuer,
+    cardCountry: FAILED_CARD.country,
+    cardType: FAILED_CARD.type,
+    cardExpiry: FAILED_CARD.expiry,
     cardToken: null,
   };
 }

@@ -4,6 +4,8 @@ This page mirrors the **Connect your app** page in the Ibeji dashboard. The dash
 
 The dashboard calls the twin address **Base URL** on this page and **app address** on Home. They are the same value.
 
+Use fake customer data only. Events, records, exports and the dashboard keep the customer name, email and phone exactly as your app sent them. Never put a secret in a webhook URL, because Ibeji shows the URL and includes it in an export.
+
 Every guide ends with the same rule: **Never put a live key in test settings. Live keys must never be used with Ibeji.**
 
 For a short explanation of what a twin, a test key and a webhook are, see the [README](../README.md). For the safety rules, see [Safety](safety.md).

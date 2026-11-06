@@ -35,7 +35,7 @@ A few words used in this README:
 | **Flutterwave** | The other major African payment service, used across many African countries. | Built and registered. It imitates Flutterwave API v3. |
 | **Stripe** | The main service for international customers and teams outside Africa. | Not built yet. The Stripe twin is planned for version 0.2.0. |
 
-Ibeji is not affiliated with or endorsed by Paystack, Flutterwave, or Stripe.
+Ibeji is not affiliated with or endorsed by Paystack or Flutterwave.
 
 ## Quick start for non-technical users, about 2 minutes
 

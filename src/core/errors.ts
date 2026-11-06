@@ -45,19 +45,19 @@ export const ERROR_DEFINITIONS = {
     status: undefined,
     what: "The saved Ibeji session is no longer running.",
     why: "The session ended unexpectedly, or its process was stopped, but its session file is still present.",
-    fix: "Run ibeji stop to clean up the stale session, then start Ibeji again.",
+    fix: "Run ibeji status to confirm the stale session, then ibeji start to begin a new one.",
   },
   SESSION_ALREADY_RUNNING: {
     status: undefined,
     what: "An Ibeji session is already running.",
     why: "Only one session may run per user at a time.",
-    fix: "Use the running session, or stop it with ibeji stop before starting a new one.",
+    fix: "Run ibeji status to see the running session, or stop the process that started it, then start Ibeji again.",
   },
   UNAUTHORIZED: {
     status: 401,
     what: "The request is not authorized.",
     why: "The session token or sign-in cookie is missing, wrong, or expired.",
-    fix: "Sign in again or use the token printed by ibeji start.",
+    fix: "Run ibeji open for a fresh dashboard link, or send the session token from the session file.",
   },
   LAUNCH_CODE_INVALID: {
     status: 401,
@@ -87,7 +87,7 @@ export const ERROR_DEFINITIONS = {
     status: 404,
     what: "The requested twin is not known.",
     why: "The twin id does not match any twin in the registry.",
-    fix: "Use one of the twin ids shown by ibeji twins, or by the dashboard.",
+    fix: "Use one of the twin ids shown by ibeji status or the dashboard.",
   },
   UNKNOWN_ACTION: {
     status: 400,
@@ -135,7 +135,7 @@ export const ERROR_DEFINITIONS = {
     status: 400,
     what: "The webhook URL is not allowed.",
     why: "Ibeji refuses addresses that could reach an unsafe network or an unspecified host.",
-    fix: "Use an allowed http or https address shown by ibeji webhooks --help.",
+    fix: "Use an allowed http or https address shown by ibeji webhook-url --help.",
   },
   BODY_TOO_LARGE: {
     status: 413,
