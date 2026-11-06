@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   root: "ui",
-  base: "/",
+  base: "/_ibeji/",
   plugins: [react()],
   publicDir: ".ibeji-public",
   build: {

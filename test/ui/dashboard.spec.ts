@@ -44,7 +44,7 @@ test("T8 the launch code signs in, leaves the address bar, survives reload and a
 
   const second = await page.context().newPage();
   try {
-    await second.goto(harness.session.addresses.control.url);
+    await second.goto(`${harness.session.addresses.control.url}/_ibeji/`);
     await expect(second.getByRole("heading", { name: "Home" })).toBeVisible();
   } finally {
     await second.close();
@@ -54,7 +54,7 @@ test("T8 the launch code signs in, leaves the address bar, survives reload and a
 test("T8 a used or made-up launch code shows the invalid page without keeping the code", async ({
   page,
 }) => {
-  await page.goto(`${harness.session.addresses.control.url}/?launch=not-a-real-code`);
+  await page.goto(`${harness.session.addresses.control.url}/_ibeji/?launch=not-a-real-code`);
   await expect(page.getByRole("heading", { name: "This sign-in link has expired." })).toBeVisible();
   expect(new URL(page.url()).searchParams.has("launch")).toBe(false);
 });
@@ -62,7 +62,7 @@ test("T8 a used or made-up launch code shows the invalid page without keeping th
 test("T8 opening the dashboard with no cookie explains ibeji start and ibeji open", async ({
   page,
 }) => {
-  await page.goto(harness.session.addresses.control.url);
+  await page.goto(`${harness.session.addresses.control.url}/_ibeji/`);
   await expect(
     page.getByRole("heading", { name: "Start Ibeji from your terminal." }),
   ).toBeVisible();
@@ -84,7 +84,7 @@ test("T8 a stale cookie shows the restarted page and the exact live announcement
       url: harness.session.addresses.control.url,
     },
   ]);
-  await page.goto(harness.session.addresses.control.url);
+  await page.goto(`${harness.session.addresses.control.url}/_ibeji/`);
   await expect(page.getByRole("heading", { name: "Ibeji was restarted." })).toBeVisible();
   await expect(page.locator('.sign-in-card [role="status"]')).toHaveText(
     "Ibeji was restarted. Run ibeji open to get a new link.",

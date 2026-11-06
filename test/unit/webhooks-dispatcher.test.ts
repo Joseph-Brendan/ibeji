@@ -21,6 +21,7 @@ import {
 } from "../../src/core/failures/engine.js";
 import {
   C7_FALLBACK_RETRY_DELAYS_SECONDS,
+  probeWebhookUrl,
   type WebhookDelivery,
   WebhookDispatcher,
   webhookPort,
@@ -35,6 +36,7 @@ import type {
 
 type RecordedRequest = {
   readonly url: string;
+  readonly method: string | undefined;
   readonly headers: IncomingHttpHeaders;
   readonly body: string;
 };
@@ -84,6 +86,7 @@ async function startServer(options: ServerOptions = {}): Promise<TestServer> {
     request.on("end", () => {
       requests.push({
         url: request.url ?? "",
+        method: request.method,
         headers: request.headers,
         body: Buffer.concat(chunks).toString("utf8"),
       });
@@ -1110,5 +1113,37 @@ describe("T5 webhook timeout and lifecycle", () => {
     await invalidDispatcher.dispatchDue();
     expect(invalidDispatcher.get(invalid.id)?.status).toBe("unreachable");
     expect(invalidDispatcher.get(invalid.id)?.attempts[0]?.error).toContain("Invalid character");
+  });
+
+  it("D45 probes a local webhook with HEAD and reports private addresses as not contacted", async () => {
+    const server = await startServer({ status: 200 });
+    const answered = await probeWebhookUrl(server.url, {
+      allowPrivate: false,
+      allowPublic: false,
+    });
+    expect(answered.kind).toBe("answered");
+    if (answered.kind === "answered") {
+      expect(answered.status).toBe(200);
+      expect(answered.address.address).toBe("127.0.0.1");
+    }
+    await server.waitForRequests(1);
+    expect(server.requests[0]?.method).toBe("HEAD");
+    expect(server.requests[0]?.body).toBe("");
+
+    const notContacted = await probeWebhookUrl("http://192.168.1.10/hook", {
+      allowPrivate: true,
+      allowPublic: false,
+    });
+    expect(notContacted.kind).toBe("not-contacted");
+    if (notContacted.kind === "not-contacted") {
+      expect(notContacted.addresses[0]?.address).toBe("192.168.1.10");
+    }
+
+    const unreachable = await probeWebhookUrl(
+      "http://127.0.0.1:1/hook",
+      { allowPrivate: false, allowPublic: false },
+      { timeoutMs: 100 },
+    );
+    expect(unreachable.kind).toBe("unreachable");
   });
 });

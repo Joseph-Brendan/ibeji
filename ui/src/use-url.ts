@@ -1,11 +1,33 @@
 import { useEffect, useState } from "react";
 
+export const UI_BASE_PATH = "/_ibeji";
+
+export function pagePath(pathname: string): string {
+  if (pathname === UI_BASE_PATH || pathname === `${UI_BASE_PATH}/`) {
+    return "/";
+  }
+  if (pathname.startsWith(`${UI_BASE_PATH}/`)) {
+    return pathname.slice(UI_BASE_PATH.length);
+  }
+  return pathname;
+}
+
+export function hrefFor(path: string): string {
+  if (path === UI_BASE_PATH || path.startsWith(`${UI_BASE_PATH}/`)) {
+    return path;
+  }
+  if (path === "/") {
+    return `${UI_BASE_PATH}/`;
+  }
+  return `${UI_BASE_PATH}${path}`;
+}
+
 function currentUrl(): string {
-  return `${window.location.pathname}${window.location.search}`;
+  return `${pagePath(window.location.pathname)}${window.location.search}`;
 }
 
 export function navigate(to: string): void {
-  window.history.pushState(null, "", to);
+  window.history.pushState(null, "", hrefFor(to));
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 

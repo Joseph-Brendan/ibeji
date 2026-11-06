@@ -4,7 +4,7 @@ import type { RequestOptions as HttpsRequestOptions } from "node:https";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 
-import type { Clock } from "../clock.js";
+import { type Clock, realClock } from "../clock.js";
 import { IbejiError, isIbejiError } from "../errors.js";
 import type { RandomSource, WebhookPlan } from "../failures/engine.js";
 import {
@@ -14,6 +14,7 @@ import {
   type DnsResolver,
   defaultDnsResolver,
   dnsHostname,
+  isLoopbackWebhookAddress,
   parseWebhookUrl,
   resolveAllowedWebhookUrl,
 } from "./address.js";
@@ -642,10 +643,74 @@ type SendHttpOptions = {
   readonly clock: Clock;
   readonly url: URL;
   readonly address: DnsAddress;
-  readonly raw: RawWebhook;
+  readonly raw: RawWebhook | undefined;
   readonly headers: WebhookHeaders;
   readonly signal: AbortSignal | undefined;
+  readonly method?: "POST" | "HEAD";
+  readonly timeoutMs?: number;
 };
+
+export type WebhookProbe =
+  | {
+      readonly kind: "not-contacted";
+      readonly addresses: readonly DnsAddress[];
+    }
+  | {
+      readonly kind: "answered";
+      readonly status: number | undefined;
+      readonly address: DnsAddress;
+    }
+  | {
+      readonly kind: "unreachable";
+      readonly address: DnsAddress;
+      readonly error: string | undefined;
+    };
+
+export type WebhookProbeOptions = {
+  readonly resolver?: DnsResolver;
+  readonly timeoutMs?: number;
+};
+
+/**
+ * Doctor uses this. It follows the dispatcher's resolve-and-check path, then
+ * sends HEAD only when every resolved address is this computer. It never
+ * follows a redirect and always connects to the checked address.
+ */
+export async function probeWebhookUrl(
+  rawUrl: string,
+  policy: AddressPolicy,
+  options: WebhookProbeOptions = {},
+): Promise<WebhookProbe> {
+  const resolved = await resolveAllowedWebhookUrl(
+    rawUrl,
+    policy,
+    options.resolver ?? defaultDnsResolver,
+  );
+  if (
+    !resolved.addresses.every((address) =>
+      isLoopbackWebhookAddress(address.address, address.family),
+    )
+  ) {
+    return { kind: "not-contacted", addresses: resolved.addresses };
+  }
+
+  const address = resolved.addresses[0] as DnsAddress;
+  const result = await sendHttpRequest({
+    clock: realClock,
+    url: resolved.url,
+    address,
+    raw: undefined,
+    headers: {},
+    signal: undefined,
+    method: "HEAD",
+    ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+  });
+
+  if (result.outcome === "unreachable") {
+    return { kind: "unreachable", address, error: result.error };
+  }
+  return { kind: "answered", status: result.status, address };
+}
 
 function sendHttpRequest(options: SendHttpOptions): Promise<HttpResult> {
   return new Promise((resolve) => {
@@ -664,6 +729,7 @@ function sendHttpRequest(options: SendHttpOptions): Promise<HttpResult> {
       resolve(result);
     };
 
+    const timeoutMs = options.timeoutMs ?? WEBHOOK_TIMEOUT_MS;
     timer = options.clock.setTimeout(() => {
       request?.destroy();
       finish({
@@ -671,20 +737,22 @@ function sendHttpRequest(options: SendHttpOptions): Promise<HttpResult> {
         status: undefined,
         headers: {},
         body: "",
-        error: "The webhook receiver did not answer within 10 seconds.",
+        error: `The webhook receiver did not answer within ${Math.round(timeoutMs / 1_000)} seconds.`,
         errorCode: undefined,
         remoteAddress: options.address.address,
       });
-    }, WEBHOOK_TIMEOUT_MS);
+    }, timeoutMs);
 
-    const headers = {
+    const headers: Record<string, string> = {
       ...options.headers,
       Host: options.url.host,
-      "Content-Type": options.raw.contentType,
-      "Content-Length": String(Buffer.byteLength(options.raw.body)),
     };
+    if (options.raw !== undefined) {
+      headers["Content-Type"] = options.raw.contentType;
+      headers["Content-Length"] = String(Buffer.byteLength(options.raw.body));
+    }
     const httpOptions: HttpsRequestOptions = {
-      method: "POST",
+      method: options.method ?? "POST",
       hostname: options.address.address,
       family: options.address.family,
       port: webhookPort(options.url),
@@ -751,6 +819,6 @@ function sendHttpRequest(options: SendHttpOptions): Promise<HttpResult> {
       });
     });
 
-    request.end(options.raw.body);
+    request.end(options.raw?.body);
   });
 }

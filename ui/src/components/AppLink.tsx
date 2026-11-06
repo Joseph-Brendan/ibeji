@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from "react";
-import { navigate } from "../use-url";
+import { hrefFor, navigate } from "../use-url";
 
 type AppLinkProps = {
   readonly href: string;
@@ -17,7 +17,7 @@ function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
 export function AppLink(props: AppLinkProps): ReactNode {
   return (
     <a
-      href={props.href}
+      href={hrefFor(props.href)}
       className={props.className}
       aria-current={props.ariaCurrent}
       data-testid={props.testId}

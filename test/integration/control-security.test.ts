@@ -175,7 +175,7 @@ describe("T6 control API security", () => {
       expect(setCookie).toContain("ibeji_ui=");
       expect(setCookie).toContain("HttpOnly");
       expect(setCookie).toContain("SameSite=Strict");
-      expect(setCookie).toContain("Path=/");
+      expect(setCookie).toContain("Path=/_ibeji");
 
       const cookie = cookieFrom(response);
       const accepted = await fetch(apiUrl(session, "/status"), { headers: { cookie } });
@@ -356,7 +356,7 @@ describe("T6 control API security", () => {
 
   it("T6 sends no CORS headers and adds security headers to HTML", async () => {
     await withControlSession({}, async ({ session }) => {
-      const page = await fetch(session.addresses.control.url);
+      const page = await fetch(`${session.addresses.control.url}/_ibeji/`);
       expect(page.status).toBe(200);
       expect(await page.text()).toContain('<div id="root"></div>');
       expect(page.headers.get("content-security-policy")).toBe(
@@ -383,11 +383,25 @@ describe("T6 control API security", () => {
     });
   });
 
-  it("T6 serves the UI at / and leaves the launch code for the page", async () => {
+  it("D44 redirects / to /_ibeji/ and keeps the launch query", async () => {
+    await withControlSession({}, async ({ session }) => {
+      const root = await fetch(session.addresses.control.url, { redirect: "manual" });
+      expect(root.status).toBe(302);
+      expect(root.headers.get("location")).toBe("/_ibeji/");
+
+      const withQuery = await fetch(`${session.addresses.control.url}/?launch=example`, {
+        redirect: "manual",
+      });
+      expect(withQuery.status).toBe(302);
+      expect(withQuery.headers.get("location")).toBe("/_ibeji/?launch=example");
+    });
+  });
+
+  it("T6 serves the UI at /_ibeji/ and leaves the launch code for the page", async () => {
     await withControlSession({}, async ({ session }) => {
       const code = session.createLaunchCode();
       const page = await fetch(
-        `${session.addresses.control.url}/?launch=${encodeURIComponent(code)}`,
+        `${session.addresses.control.url}/_ibeji/?launch=${encodeURIComponent(code)}`,
       );
       expect(page.status).toBe(200);
       expect(page.headers.get("set-cookie")).toBeNull();
@@ -397,7 +411,7 @@ describe("T6 control API security", () => {
       expect(exchange.status).toBe(200);
       const cookie = cookieFrom(exchange);
 
-      const home = await fetch(session.addresses.control.url);
+      const home = await fetch(`${session.addresses.control.url}/_ibeji/`);
       expect(home.status).toBe(200);
       expect(await home.text()).toContain('<div id="root"></div>');
 

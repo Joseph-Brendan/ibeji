@@ -35,6 +35,7 @@ import {
 import { eventStreamResponse } from "./sse.js";
 import type { ControlDependencies } from "./types.js";
 
+export const UI_BASE_PATH = "/_ibeji";
 export const API_PREFIX = "/_ibeji/api/v1";
 const HEALTH_PATH = `${API_PREFIX}/health`;
 const EXCHANGE_PATH = `${API_PREFIX}/auth/exchange`;
@@ -429,6 +430,16 @@ export function createControlApp(deps: ControlDependencies): Hono {
     });
   });
 
+  app.get("/", (context) => {
+    const search = new URL(context.req.url).search;
+    return context.redirect(`${UI_BASE_PATH}/${search}`, 302);
+  });
+
+  app.get(UI_BASE_PATH, (context) => {
+    const search = new URL(context.req.url).search;
+    return context.redirect(`${UI_BASE_PATH}/${search}`, 302);
+  });
+
   app.get(HEALTH_PATH, () => jsonResponse({ ok: true, instance: deps.instanceId }));
 
   app.post(`${API_PREFIX}/auth/launch`, () => {
@@ -445,7 +456,7 @@ export function createControlApp(deps: ControlDependencies): Hono {
 
     const uiToken = deps.secrets.exchangeLaunchCode(code);
     return jsonResponse({ ok: true }, 200, {
-      "set-cookie": `${UI_COOKIE}=${uiToken}; HttpOnly; SameSite=Strict; Path=/`,
+      "set-cookie": `${UI_COOKIE}=${uiToken}; HttpOnly; SameSite=Strict; Path=${UI_BASE_PATH}`,
     });
   });
 
@@ -464,6 +475,10 @@ export function createControlApp(deps: ControlDependencies): Hono {
       })),
       rules: deps.rules.list(),
       scenario: deps.scenarios.activeScenarioId ?? null,
+      addressPolicy: {
+        allowPrivate: deps.addressPolicy.allowPrivate,
+        allowPublic: deps.addressPolicy.allowPublic,
+      },
     });
   });
 
@@ -757,20 +772,30 @@ export function createControlApp(deps: ControlDependencies): Hono {
       context.header("cache-control", "public, max-age=31536000, immutable");
     };
 
-    app.use("*", serveStatic({ root: uiRoot, onFound }));
+    app.use(
+      `${UI_BASE_PATH}/*`,
+      serveStatic({
+        root: uiRoot,
+        rewriteRequestPath: (path) => {
+          const withoutBase = path.slice(UI_BASE_PATH.length);
+          return withoutBase === "" ? "/" : withoutBase;
+        },
+        onFound,
+      }),
+    );
     const serveIndex = serveStatic({
       root: uiRoot,
       path: "/index.html",
       onFound,
     });
-    app.use("*", async (context, next) => {
+    app.use(`${UI_BASE_PATH}/*`, async (context, next) => {
       if (context.req.method !== "GET" && context.req.method !== "HEAD") {
         await next();
         return;
       }
       if (
         context.req.path.startsWith(API_PREFIX) ||
-        context.req.path.startsWith("/assets/") ||
+        context.req.path.startsWith(`${UI_BASE_PATH}/assets/`) ||
         /\.[^/]+$/u.test(context.req.path)
       ) {
         await next();

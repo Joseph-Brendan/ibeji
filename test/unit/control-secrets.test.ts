@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   constantTimeEqual,
+  LAUNCH_CODE_BYTES,
   LAUNCH_CODE_TTL_MS,
   SessionSecrets,
   TOKEN_BYTES,
@@ -28,6 +29,7 @@ describe("T6 session secrets and launch codes", () => {
 
     expect(launch.expiresAt).toBe(5_000 + LAUNCH_CODE_TTL_MS);
     expect(clock.now() + 120_000).toBe(launch.expiresAt);
+    expect(Buffer.from(launch.code, "base64url")).toHaveLength(LAUNCH_CODE_BYTES);
 
     const uiToken = secrets.exchangeLaunchCode(launch.code);
     expect(uiToken).not.toBe(secrets.token);
@@ -59,7 +61,7 @@ describe("T6 session secrets and launch codes", () => {
     const secrets = new SessionSecrets(new FakeClock());
     const link = secrets.createLaunchLink("http://127.0.0.1:4400");
 
-    expect(link.startsWith("http://127.0.0.1:4400/?launch=")).toBe(true);
+    expect(link.startsWith("http://127.0.0.1:4400/_ibeji/?launch=")).toBe(true);
     expect(link).not.toContain(secrets.token);
   });
 

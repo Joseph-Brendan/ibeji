@@ -115,7 +115,7 @@ describe("T10 CLI start", () => {
       expect(Object.keys(body.addresses.twins)).toEqual(["paystack"]);
       expect(Object.keys(body.credentials)).toEqual(["paystack"]);
       expect(Object.keys(body.webhookUrls)).toEqual(["paystack"]);
-      expect(body.launchLink).toContain("/?launch=");
+      expect(body.launchLink).toContain("/_ibeji/?launch=");
       expect(result.opened).toEqual([]);
     } finally {
       await stop(result?.session);
@@ -153,7 +153,7 @@ describe("T10 CLI start", () => {
       expect(result.stdout).toContain("ibeji open");
       expect(result.stdout).toContain("Stop with: Control and C");
       expect(result.opened).toHaveLength(1);
-      expect(result.opened[0]).toContain("/?launch=");
+      expect(result.opened[0]).toContain("/_ibeji/?launch=");
     } finally {
       await stop(result?.session);
       await rm(home, { recursive: true, force: true });

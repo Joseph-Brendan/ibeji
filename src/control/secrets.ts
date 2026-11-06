@@ -5,6 +5,12 @@ import { IbejiError } from "../core/errors.js";
 
 export const LAUNCH_CODE_TTL_MS = 120_000;
 export const TOKEN_BYTES = 32;
+/**
+ * Launch codes are short-lived and single use. 30 bytes is 240 bits of
+ * randomness, far beyond guessing, and keeps the printed dashboard link
+ * inside the CLI's 80-column output limit on a five-digit port.
+ */
+export const LAUNCH_CODE_BYTES = 30;
 
 export type ByteSource = (length: number) => Uint8Array;
 
@@ -31,8 +37,8 @@ export function constantTimeEqual(left: string, right: string): boolean {
   return timingSafeEqual(leftBytes, rightBytes);
 }
 
-function randomToken(bytes: ByteSource): string {
-  return Buffer.from(bytes(TOKEN_BYTES)).toString("base64url");
+function randomToken(bytes: ByteSource, length = TOKEN_BYTES): string {
+  return Buffer.from(bytes(length)).toString("base64url");
 }
 
 /**
@@ -55,7 +61,7 @@ export class SessionSecrets {
   }
 
   createLaunchCode(): LaunchCode {
-    const code = randomToken(this.bytes);
+    const code = randomToken(this.bytes, LAUNCH_CODE_BYTES);
     const expiresAt = this.clock.now() + LAUNCH_CODE_TTL_MS;
     this.launchCodes.set(code, expiresAt);
     return { code, expiresAt };
@@ -63,7 +69,7 @@ export class SessionSecrets {
 
   /** A fresh dashboard link for `ibeji open`, tied to the bound control port. */
   createLaunchLink(controlUrl: string): string {
-    return `${controlUrl}/?launch=${encodeURIComponent(this.createLaunchCode().code)}`;
+    return `${controlUrl}/_ibeji/?launch=${encodeURIComponent(this.createLaunchCode().code)}`;
   }
 
   /**

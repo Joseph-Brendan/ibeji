@@ -1,6 +1,16 @@
+import type { Stats } from "node:fs";
+import { chmod, stat } from "node:fs/promises";
+
 import { z } from "zod";
 
-import { readJsonFile, removePrivateFile, sessionPath, writePrivateJson } from "./paths.js";
+import { IbejiError } from "../core/errors.js";
+import {
+  isMissingFile,
+  readJsonFile,
+  removePrivateFile,
+  sessionPath,
+  writePrivateJson,
+} from "./paths.js";
 
 export const sessionFileSchema = z.strictObject({
   instanceId: z.string().min(1),
@@ -19,14 +29,79 @@ export type SessionFile = z.infer<typeof sessionFileSchema>;
 export type SessionFileRead =
   | { readonly kind: "missing" }
   | { readonly kind: "invalid" }
-  | { readonly kind: "ok"; readonly value: SessionFile };
+  | {
+      readonly kind: "ok";
+      readonly value: SessionFile;
+      readonly permissionsRepaired: boolean;
+    };
+
+function owningUserProblem(): IbejiError {
+  return new IbejiError("SESSION_STALE", {
+    what: "The saved session file belongs to another user.",
+    why: "Ibeji refuses to read a session file owned by a different user, because its token belongs to that user.",
+    fix: "Ask the file's owner to remove it, or remove it yourself only if you own the folder, then run ibeji start.",
+  });
+}
+
+function permissionRepairProblem(path: string, cause: unknown): IbejiError {
+  return new IbejiError("INTERNAL", {
+    what: "The session file permissions could not be repaired.",
+    why: `The file at ${path} is readable or writable by another user and Ibeji could not set mode 600.`,
+    fix: `Run chmod 600 ${path} and try again.`,
+    cause,
+  });
+}
+
+/**
+ * Every read checks the owner and mode on macOS and Linux. A user-owned file
+ * that other users can reach is put back to mode 600. A file owned by another
+ * user is refused rather than read.
+ */
+async function checkSessionPermissions(path: string): Promise<boolean> {
+  if (process.platform === "win32") {
+    return false;
+  }
+
+  let details: Stats;
+  try {
+    details = await stat(path);
+  } catch (error) {
+    if (isMissingFile(error)) {
+      return false;
+    }
+    throw new IbejiError("INTERNAL", {
+      what: "The session file permissions could not be checked.",
+      why: `The file at ${path} could not be inspected.`,
+      fix: "Check the file's permissions and try again.",
+      cause: error,
+    });
+  }
+
+  const userId = process.getuid?.();
+  if (userId !== undefined && details.uid !== userId) {
+    throw owningUserProblem();
+  }
+
+  if ((details.mode & 0o077) === 0) {
+    return false;
+  }
+
+  try {
+    await chmod(path, 0o600);
+  } catch (error) {
+    throw permissionRepairProblem(path, error);
+  }
+  return true;
+}
 
 export async function writeSessionFile(home: string, value: SessionFile): Promise<void> {
   await writePrivateJson(sessionPath(home), value);
 }
 
 export async function readSessionFile(home: string): Promise<SessionFileRead> {
-  const read = await readJsonFile(sessionPath(home));
+  const path = sessionPath(home);
+  const permissionsRepaired = await checkSessionPermissions(path);
+  const read = await readJsonFile(path);
   if (read.kind === "missing") {
     return { kind: "missing" };
   }
@@ -35,7 +110,9 @@ export async function readSessionFile(home: string): Promise<SessionFileRead> {
   }
 
   const parsed = sessionFileSchema.safeParse(read.value);
-  return parsed.success ? { kind: "ok", value: parsed.data } : { kind: "invalid" };
+  return parsed.success
+    ? { kind: "ok", value: parsed.data, permissionsRepaired }
+    : { kind: "invalid" };
 }
 
 export async function removeSessionFile(home: string): Promise<void> {

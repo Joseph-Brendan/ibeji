@@ -251,6 +251,10 @@ export async function startSession(options: StartSessionOptions): Promise<Runnin
 
   const existing = await readSessionFile(options.home);
   if (existing.kind === "ok") {
+    if (existing.permissionsRepaired) {
+      notes.push("Repaired the session file permissions to mode 600.");
+      logger.warn("The session file was readable by other users. Ibeji changed its mode to 600.");
+    }
     if (await sessionFileIsLive(existing.value, options.healthCheck)) {
       throw new IbejiError("SESSION_ALREADY_RUNNING");
     }
@@ -448,7 +452,7 @@ export async function startSession(options: StartSessionOptions): Promise<Runnin
     stopDispatch = startDispatchLoop(dispatcher, clock, logger);
 
     const sessionAddresses = addressesOf(runningTwins);
-    const launchLink = `${startedControl.address.url}/?launch=${encodeURIComponent(firstLaunch.code)}`;
+    const launchLink = `${startedControl.address.url}/_ibeji/?launch=${encodeURIComponent(firstLaunch.code)}`;
     const sessionTwins = new Map<string, SessionTwin>();
     for (const [twinId, running] of runningTwins) {
       const address = sessionAddresses[twinId];

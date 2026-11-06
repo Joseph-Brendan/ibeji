@@ -101,6 +101,11 @@ export type StatusTwin = {
   readonly labelColourToken: string;
 };
 
+export type AddressPolicySummary = {
+  readonly allowPrivate: boolean;
+  readonly allowPublic: boolean;
+};
+
 export type StatusResponse = {
   readonly version: string;
   readonly instance: string;
@@ -109,6 +114,7 @@ export type StatusResponse = {
   readonly twins: readonly StatusTwin[];
   readonly rules: readonly Rule[];
   readonly scenario: string | null;
+  readonly addressPolicy: AddressPolicySummary;
 };
 
 export type EventItem = {

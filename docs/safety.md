@@ -11,7 +11,7 @@ Ibeji is a local test tool. It is built to keep test payments away from real mon
 | **It never accepts a live key.** | A live key can move real money. Every twin recognises its service's live key formats, refuses the request, records only a fingerprint, and shows a red warning banner. |
 | **It never listens beyond your computer.** | Every server binds to `127.0.0.1`. Other computers on your network cannot reach the dashboard, the control API, a twin or a test checkout page. |
 | **It never sends fake webhooks to public servers by default.** | A fake "payment succeeded" message sent to a real public server could change a real order. Ibeji allows this computer by default and refuses public addresses unless you pass an explicit flag. |
-| **It never puts a session token or launch code in a URL after sign-in.** | The dashboard uses a single-use launch code, then an `HttpOnly`, `SameSite=Strict` cookie. The session token stays out of the browser. |
+| **It never puts a session token or launch code in a URL after sign-in.** | The dashboard lives under `/_ibeji/` and uses a single-use launch code, then an `HttpOnly`, `SameSite=Strict` cookie whose path is `/_ibeji`. The session token stays out of the browser. |
 | **It never loads code, fonts or images from the internet.** | The dashboard works offline and cannot be changed by a remote file. |
 
 ## The live-key rule
@@ -42,7 +42,17 @@ Ibeji does not use accounts or passwords:
 4. The browser stores no session token, UI token or launch code in local storage, session storage or IndexedDB.
 5. Every request that changes something also sends `X-Ibeji-Request: 1` and the correct `Origin`. Ibeji rejects a request without them.
 
-If the cookie is stale after a restart, the dashboard says so and asks you to use a new link from `ibeji open`.
+The cookie path is `/_ibeji`, not `/`. Browsers share cookies between every port on `127.0.0.1`, so this path is what keeps the cookie away from your own app and from other local servers. If the cookie is stale after a restart, the dashboard says so and asks you to use a new link from `ibeji open`.
+
+## What Ibeji protects against
+
+Ibeji is a local development tool. Its threat model has a clear line.
+
+**It protects against websites.** The control API and the twins check the `Host` header, reject cross-site changes, set no CORS headers, refuse to be framed, and keep the UI cookie under `/_ibeji`. A website you visit in the same browser cannot read your Ibeji data or change your Ibeji session. The security review tested this with cross-site requests and a separate browser origin.
+
+**It does not protect against a malicious program already running on your computer as you.** Such a program can read `~/.ibeji/session.json`, which holds the session token and the control port. It can also read your files, your browser data and your test keys. No cookie rule or local API check can stop code that already has your user account's permissions. That is the normal limit of local development tools. Ibeji makes the token and cookie handling safe against websites, not against spyware or another program with your account.
+
+The practical rule: keep your computer account and its software trustworthy, and stop Ibeji when you are not testing.
 
 ## Webhook addresses
 
@@ -56,6 +66,8 @@ A webhook URL is the address in your app that receives webhook messages. Ibeji c
 | Unspecified (`0.0.0.0`, `::`), link-local (`169.254.0.0/16`, `fe80::/10`), multicast and broadcast | Refused | Refused | Refused |
 
 Ibeji resolves the host name, checks every address it resolves to, and connects to a checked address. A name cannot change between the check and the connection. Redirects are never followed. Link-local addresses are always refused because they include cloud metadata services.
+
+`ibeji doctor` uses the same address checks. It reads the running session's address policy from `GET /status`, or the config file's policy when no session is running, and says which one it used. It sends a `HEAD` request only when every resolved address is this computer. A private or public webhook URL is reported as "not contacted".
 
 The public flag prints a warning at start and shows it in the dashboard. Use it only when you understand that a twin can send fake payment messages to a real server.
 
@@ -72,7 +84,7 @@ Each twin serves its own test checkout page on its own port. The page:
 ## Files and local data
 
 - `~/.ibeji` is readable only by your user. On macOS and Linux the folder uses mode `700` and the files use mode `600`. On Windows the folder inherits your user profile's access control.
-- The session file contains the session token, ports and process id. It is removed on clean shutdown.
+- The session file contains the session token, ports and process id. It is removed on clean shutdown. Every read checks its owner and mode. On macOS and Linux, if you own a file that other users can read, Ibeji changes it back to mode `600` and warns you. If another user owns the file, Ibeji refuses to use it and reports `SESSION_STALE`.
 - An export replaces the token, UI token, launch codes, credentials, live keys and authorization headers with fingerprints or removes them.
 - A live key never appears in full in a request field, an event, a log, an error, an export, a control API response, CLI output, an MCP result or the dashboard. When a live key arrives in a header, query value or body value, Ibeji replaces it with `[live key removed: <fingerprint>]` before the twin handles the request, records a warning, and scans every output again. Only the first eight hexadecimal characters of its SHA-256 hash are shown.
 

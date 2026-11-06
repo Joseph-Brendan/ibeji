@@ -61,7 +61,7 @@ Flutterwave
 
 Seed: 1651293942
 Dashboard link:
-  http://127.0.0.1:4400/?launch=...
+  http://127.0.0.1:4400/_ibeji/?launch=...
 
 Open a new dashboard link with: ibeji open
 Stop with: Control and C
@@ -348,7 +348,7 @@ The MCP client configuration is in the [README](../README.md). The keys returned
 
 ## `ibeji doctor`
 
-Checks Node, ports, the config file, the session file, credentials file permissions, the dashboard build and each webhook URL. Every problem prints what happened, why, and what to do.
+Checks Node, ports, the config file, the session file, the session and credentials file permissions, the dashboard build and each webhook URL. It uses the running session's webhook address policy from `GET /status`, or the config file's when no session runs, and says which it used. It sends a `HEAD` request only to a webhook URL that resolves to this computer. A private or public webhook URL is reported as "not contacted". Every problem prints what happened, why, and what to do.
 
 ```bash
 ibeji doctor --json
@@ -357,7 +357,7 @@ ibeji doctor --json
 Example output when everything passes:
 
 ```json
-{"ok":true,"checks":[{"name":"Node version","problems":[]},{"name":"Configuration","problems":[]},{"name":"Session file","problems":[]},{"name":"Ports","problems":[]},{"name":"Credentials file permissions","problems":[]},{"name":"Dashboard build","problems":[]},{"name":"Webhook URLs","problems":[]}]}
+{"ok":true,"checks":[{"name":"Node version","problems":[]},{"name":"Configuration","problems":[]},{"name":"Session file","problems":[]},{"name":"Session file permissions","problems":[]},{"name":"Ports","problems":[]},{"name":"Credentials file permissions","problems":[]},{"name":"Dashboard build","problems":[]},{"name":"Webhook URLs","problems":[],"notes":["Using the running session's address policy."]}]}
 ```
 
 Exit code `0` means every check passed. Exit code `1` means at least one check failed.

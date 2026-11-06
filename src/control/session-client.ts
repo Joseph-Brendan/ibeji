@@ -26,8 +26,15 @@ function stale(): IbejiError {
   });
 }
 
-/** Read the session file again on every call, so a restarted session is found. */
-export async function requireSession(home: string): Promise<ControlSession> {
+/**
+ * Read the session file again on every call, so a restarted session is found.
+ * A repaired file permission is reported through `warn` when a caller has an
+ * output stream.
+ */
+export async function requireSession(
+  home: string,
+  warn?: (message: string) => void,
+): Promise<ControlSession> {
   const read = await readSessionFile(home);
   if (read.kind === "missing") {
     throw notRunning();
@@ -36,6 +43,10 @@ export async function requireSession(home: string): Promise<ControlSession> {
   if (read.kind === "invalid") {
     await removeSessionFile(home);
     throw stale();
+  }
+
+  if (read.permissionsRepaired) {
+    warn?.("The session file was readable by other users. Ibeji changed its mode to 600.");
   }
 
   if (!(await sessionFileIsLive(read.value))) {

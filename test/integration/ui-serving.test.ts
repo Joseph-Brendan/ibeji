@@ -22,7 +22,7 @@ afterAll(async () => {
 
 describe("T8 control server UI serving", () => {
   it("T8: serves index.html with security and cache headers", async () => {
-    const response = await fetch(harness.session.addresses.control.url);
+    const response = await fetch(`${harness.session.addresses.control.url}/_ibeji/`);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(response.headers.get("cache-control")).toBe("no-store");
@@ -39,7 +39,7 @@ describe("T8 control server UI serving", () => {
   });
 
   it("T8: serves hashed assets with a long cache and the right content type", async () => {
-    const index = await fetch(harness.session.addresses.control.url);
+    const index = await fetch(`${harness.session.addresses.control.url}/_ibeji/`);
     const html = await index.text();
     const script = /src="([^"]+\.js)"/u.exec(html)?.[1];
     const style = /href="([^"]+\.css)"/u.exec(html)?.[1];
@@ -76,7 +76,7 @@ describe("T8 control server UI serving", () => {
     expect(existsSync(join(process.cwd(), "dist", "ui", "THIRD-PARTY-NOTICES.txt"))).toBe(true);
 
     const latin = await fetch(
-      `${harness.session.addresses.control.url}/assets/fonts/ibm-plex-sans-latin-400-normal.woff2`,
+      `${harness.session.addresses.control.url}/_ibeji/assets/fonts/ibm-plex-sans-latin-400-normal.woff2`,
     );
     expect(latin.status).toBe(200);
     expect(latin.headers.get("content-type")).toContain("font/woff2");
@@ -84,7 +84,9 @@ describe("T8 control server UI serving", () => {
   });
 
   it("T8: falls back to index.html for page routes and keeps API 404s JSON", async () => {
-    const page = await fetch(`${harness.session.addresses.control.url}/failures?twin=paystack`);
+    const page = await fetch(
+      `${harness.session.addresses.control.url}/_ibeji/failures?twin=paystack`,
+    );
     expect(page.status).toBe(200);
     expect(await page.text()).toContain('<div id="root"></div>');
 
@@ -95,7 +97,7 @@ describe("T8 control server UI serving", () => {
     expect(api.headers.get("content-type")).toContain("application/json");
     expect(await api.json()).toMatchObject({ error: { code: "NOT_FOUND" } });
 
-    const asset = await fetch(`${harness.session.addresses.control.url}/assets/missing.js`);
+    const asset = await fetch(`${harness.session.addresses.control.url}/_ibeji/assets/missing.js`);
     expect(asset.status).toBe(404);
     expect(await asset.text()).not.toContain('<div id="root"></div>');
   });

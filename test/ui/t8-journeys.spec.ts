@@ -40,7 +40,9 @@ async function returnToApp(
   title: string,
   twinId: string,
 ): Promise<void> {
-  await page.goto(`${ui.session.addresses.control.url}${path}?twin=${encodeURIComponent(twinId)}`);
+  await page.goto(
+    `${ui.session.addresses.control.url}/_ibeji${path}?twin=${encodeURIComponent(twinId)}`,
+  );
   await expect(page.getByRole("heading", { name: title, level: 1 })).toBeVisible({
     timeout: 15_000,
   });

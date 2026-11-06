@@ -75,6 +75,10 @@ export function isWebhookAddressAllowed(
   return addressKind(address, family, policy) === "allowed";
 }
 
+export function isLoopbackWebhookAddress(address: string, family: AddressFamily): boolean {
+  return isIP(address) === family && matches(LOOPBACK, address, family);
+}
+
 function addressKind(address: string, family: AddressFamily, policy: AddressPolicy): AddressKind {
   if (isIP(address) !== family) {
     return "invalid";

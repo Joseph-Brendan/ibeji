@@ -225,7 +225,7 @@ test("T8 a live-key warning names the service, hides the key and returns after a
     await expect(paystackBanner.locator("code")).toHaveText(/^[0-9a-f]{8}$/u);
     await expect(
       paystackBanner.getByRole("link", { name: "Read the safety guidance" }),
-    ).toHaveAttribute("href", "/connect#safety");
+    ).toHaveAttribute("href", "/_ibeji/connect#safety");
     expect(await page.locator("body").textContent()).not.toContain(firstKey);
     await expect(page.locator(".live-key-banners")).toHaveCSS(
       "background-color",

@@ -156,7 +156,9 @@ function printRule(writer: Writer, rule: Rule): void {
 export async function runStatus(args: readonly string[], runtime: CliRuntime): Promise<number> {
   const parsed = parseCli(args, STATUS_OPTIONS);
   noPositionals(parsed.positionals, "status");
-  const { client } = await requireSession(runtime.home);
+  const { client } = await requireSession(runtime.home, (message) =>
+    writeLine(runtime.stderr, message),
+  );
   const status = await client.status;
 
   if (booleanValue(parsed.values, "json")) {
@@ -188,7 +190,9 @@ export async function runStatus(args: readonly string[], runtime: CliRuntime): P
 export async function runOpen(args: readonly string[], runtime: CliRuntime): Promise<number> {
   const parsed = parseCli(args, OPEN_OPTIONS);
   noPositionals(parsed.positionals, "open");
-  const { client } = await requireSession(runtime.home);
+  const { client } = await requireSession(runtime.home, (message) =>
+    writeLine(runtime.stderr, message),
+  );
   const link = await client.launchLink();
 
   if (booleanValue(parsed.values, "json")) {
@@ -371,7 +375,9 @@ export async function runFail(args: readonly string[], runtime: CliRuntime): Pro
     });
   }
 
-  const { client } = await requireSession(runtime.home);
+  const { client } = await requireSession(runtime.home, (message) =>
+    writeLine(runtime.stderr, message),
+  );
   const [twinList, failureList] = await Promise.all([client.twins, client.failures]);
   const failure = failureList.failures.find((item) => item.id === failureId);
 
@@ -511,7 +517,9 @@ export async function runClear(args: readonly string[], runtime: CliRuntime): Pr
     }
   }
 
-  const { client } = await requireSession(runtime.home);
+  const { client } = await requireSession(runtime.home, (message) =>
+    writeLine(runtime.stderr, message),
+  );
   const twinId = stringValue(parsed.values, "twin");
   const twinList = await client.twins;
   if (twinId !== undefined) {
@@ -556,7 +564,9 @@ export async function runScenario(args: readonly string[], runtime: CliRuntime):
   if (subcommand === "list") {
     const parsed = parseCli(rest, SCENARIO_LIST_OPTIONS);
     noPositionals(parsed.positionals, "scenario list");
-    const { client } = await requireSession(runtime.home);
+    const { client } = await requireSession(runtime.home, (message) =>
+      writeLine(runtime.stderr, message),
+    );
     const result = await client.scenarios;
 
     if (booleanValue(parsed.values, "json")) {
@@ -587,7 +597,9 @@ export async function runScenario(args: readonly string[], runtime: CliRuntime):
       );
     }
     const scenarioId = parsed.positionals[0] as string;
-    const { client } = await requireSession(runtime.home);
+    const { client } = await requireSession(runtime.home, (message) =>
+      writeLine(runtime.stderr, message),
+    );
     const [scenarios, twinList] = await Promise.all([client.scenarios, client.twins]);
     const scenario = scenarios.scenarios.find((item) => item.id === scenarioId);
     if (scenario === undefined) {
@@ -637,7 +649,9 @@ export async function runScenario(args: readonly string[], runtime: CliRuntime):
   if (subcommand === "stop") {
     const parsed = parseCli(rest, SCENARIO_STOP_OPTIONS);
     noPositionals(parsed.positionals, "scenario stop");
-    const { client } = await requireSession(runtime.home);
+    const { client } = await requireSession(runtime.home, (message) =>
+      writeLine(runtime.stderr, message),
+    );
     const result = await client.stopScenario();
     if (booleanValue(parsed.values, "json")) {
       printJson(runtime.stdout, result);
@@ -679,7 +693,9 @@ export async function runWebhookUrl(args: readonly string[], runtime: CliRuntime
     );
   }
 
-  const { client } = await requireSession(runtime.home);
+  const { client } = await requireSession(runtime.home, (message) =>
+    writeLine(runtime.stderr, message),
+  );
   const twinList = await client.twins;
   const twin = requireTwin(twinList, twinId, false);
 
@@ -867,7 +883,9 @@ async function followEvents(
 export async function runEvents(args: readonly string[], runtime: CliRuntime): Promise<number> {
   const parsed = parseCli(args, EVENTS_OPTIONS);
   noPositionals(parsed.positionals, "events");
-  const { client } = await requireSession(runtime.home);
+  const { client } = await requireSession(runtime.home, (message) =>
+    writeLine(runtime.stderr, message),
+  );
   const twinId = stringValue(parsed.values, "twin");
   if (twinId !== undefined) {
     const twinList = await client.twins;
@@ -901,7 +919,9 @@ export async function runResend(args: readonly string[], runtime: CliRuntime): P
     );
   }
   const deliveryId = parsed.positionals[0] as string;
-  const { client } = await requireSession(runtime.home);
+  const { client } = await requireSession(runtime.home, (message) =>
+    writeLine(runtime.stderr, message),
+  );
   const result = await client.resend(deliveryId);
 
   if (booleanValue(parsed.values, "json")) {
@@ -927,7 +947,9 @@ export async function runReset(args: readonly string[], runtime: CliRuntime): Pr
   noPositionals(parsed.positionals, "reset");
   const twinId = stringValue(parsed.values, "twin");
   const json = booleanValue(parsed.values, "json");
-  const { client } = await requireSession(runtime.home);
+  const { client } = await requireSession(runtime.home, (message) =>
+    writeLine(runtime.stderr, message),
+  );
   const twinList = await client.twins;
   const twin = twinId === undefined ? undefined : requireTwin(twinList, twinId, true);
 
@@ -973,7 +995,9 @@ export async function runExport(args: readonly string[], runtime: CliRuntime): P
     );
   }
   const file = resolve(runtime.cwd, parsed.positionals[0] as string);
-  const { client } = await requireSession(runtime.home);
+  const { client } = await requireSession(runtime.home, (message) =>
+    writeLine(runtime.stderr, message),
+  );
   const value = await client.exportSession();
 
   try {

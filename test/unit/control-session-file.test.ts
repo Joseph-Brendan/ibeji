@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   ensureIbejiHome,
@@ -199,7 +199,79 @@ describe("T6 session file helpers", () => {
         version: "0.0.0",
       };
       await writeSessionFile(home, value);
-      expect(await readSessionFile(home)).toEqual({ kind: "ok", value });
+      const read = await readSessionFile(home);
+      expect(read).toMatchObject({ kind: "ok", value });
+      if (read.kind === "ok") {
+        expect(read.permissionsRepaired).toBe(false);
+      }
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("D46 repairs a user-owned session file readable by others to mode 600", async () => {
+    if (process.platform === "win32") {
+      return;
+    }
+    const home = await mkdtemp(join(tmpdir(), "ibeji-session-repair-"));
+    try {
+      const value = {
+        instanceId: "instance-1",
+        processId: process.pid,
+        ports: { control: 4400, twins: {} },
+        token: "token",
+        startTime: "2026-01-01T00:00:00.000Z",
+        version: "0.0.0",
+      };
+      await ensureIbejiHome(home);
+      await writeSessionFile(home, value);
+      await chmod(sessionPath(home), 0o644);
+
+      const read = await readSessionFile(home);
+      expect(read.kind).toBe("ok");
+      if (read.kind === "ok") {
+        expect(read.value).toEqual(value);
+        expect(read.permissionsRepaired).toBe(true);
+      }
+      expect((await stat(sessionPath(home))).mode & 0o777).toBe(0o600);
+
+      const again = await readSessionFile(home);
+      expect(again.kind).toBe("ok");
+      if (again.kind === "ok") {
+        expect(again.permissionsRepaired).toBe(false);
+      }
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("D46 refuses a session file owned by another user with SESSION_STALE", async () => {
+    if (process.platform === "win32") {
+      return;
+    }
+    const home = await mkdtemp(join(tmpdir(), "ibeji-session-owner-"));
+    const userId = process.getuid?.();
+    if (userId === undefined) {
+      await rm(home, { recursive: true, force: true });
+      return;
+    }
+    try {
+      await ensureIbejiHome(home);
+      await writeSessionFile(home, {
+        instanceId: "instance-1",
+        processId: process.pid,
+        ports: { control: 4400, twins: {} },
+        token: "token",
+        startTime: "2026-01-01T00:00:00.000Z",
+        version: "0.0.0",
+      });
+      const spy = vi.spyOn(process, "getuid").mockReturnValue(userId + 1);
+      try {
+        await expect(readSessionFile(home)).rejects.toMatchObject({ code: "SESSION_STALE" });
+      } finally {
+        spy.mockRestore();
+      }
+      expect((await stat(sessionPath(home))).mode & 0o777).toBe(0o600);
     } finally {
       await rm(home, { recursive: true, force: true });
     }

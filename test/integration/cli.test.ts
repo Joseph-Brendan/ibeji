@@ -379,7 +379,7 @@ describe("T10 CLI commands against a running session", () => {
         },
       });
       expect(open.code).toBe(0);
-      expect(json<{ url: string }>(open.stdout).url).toContain("/?launch=");
+      expect(json<{ url: string }>(open.stdout).url).toContain("/_ibeji/?launch=");
       expect(opened).toHaveLength(1);
 
       const failed = await run(
@@ -1013,9 +1013,10 @@ describe("T10 real CLI child process", () => {
       expect(output.stdout).toContain("ibeji open");
       expect(output.stderr).toContain("Warning: public webhook addresses are allowed.");
 
-      const dashboard = /Dashboard link:\n\s+(http:\/\/127\.0\.0\.1:\d+\/\?launch=\S+)/u.exec(
-        output.stdout,
-      )?.[1];
+      const dashboard =
+        /Dashboard link:\n\s+(http:\/\/127\.0\.0\.1:\d+\/_ibeji\/\?launch=\S+)/u.exec(
+          output.stdout,
+        )?.[1];
       expect(dashboard).toBeDefined();
       if (dashboard === undefined) {
         throw new Error("the dashboard link was not printed");

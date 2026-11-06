@@ -104,7 +104,7 @@ test.describe("T9 dashboard axe", () => {
     const invalid = await browser.newContext();
     try {
       const page = await invalid.newPage();
-      await page.goto(`${controlUrl}/?launch=not-a-real-code`);
+      await page.goto(`${controlUrl}/_ibeji/?launch=not-a-real-code`);
       await expect(
         page.getByRole("heading", { name: "This sign-in link has expired." }),
       ).toBeVisible();

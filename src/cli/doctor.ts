@@ -1,7 +1,7 @@
 import type { Stats } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer } from "node:net";
-import { credentialsPath } from "../control/paths.js";
+import { credentialsPath, sessionPath } from "../control/paths.js";
 import {
   readSessionFile,
   removeSessionFile,
@@ -10,7 +10,8 @@ import {
 } from "../control/session-file.js";
 import { createDefaultConfig, mergeConfig } from "../core/config.js";
 import { type ErrorCode, isIbejiError } from "../core/errors.js";
-import { type AddressPolicy, resolveAllowedWebhookUrl } from "../core/webhooks/address.js";
+import type { AddressPolicy, DnsResolver } from "../core/webhooks/address.js";
+import { probeWebhookUrl } from "../core/webhooks/dispatcher.js";
 import { ControlClient } from "./control-client.js";
 import { type Writer, writeLine, writeWrapped } from "./output.js";
 import { type ProjectInfo, readConfigFile } from "./project.js";
@@ -25,6 +26,7 @@ export type DoctorProblem = {
 export type DoctorCheck = {
   readonly name: string;
   readonly problems: readonly DoctorProblem[];
+  readonly notes?: readonly string[];
 };
 
 export type DoctorResult = {
@@ -37,6 +39,7 @@ export type DoctorOptions = {
   readonly cwd: string;
   readonly configPath: string | undefined;
   readonly project: ProjectInfo;
+  readonly dnsResolver?: DnsResolver;
 };
 
 function problem(code: ErrorCode, what: string, why: string, fix: string): DoctorProblem {
@@ -243,25 +246,15 @@ async function dashboardCheck(project: ProjectInfo): Promise<DoctorCheck> {
   };
 }
 
-async function webhookAnswer(url: string): Promise<boolean> {
-  try {
-    await fetch(url, {
-      method: "GET",
-      redirect: "manual",
-      signal: AbortSignal.timeout(3_000),
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function webhookCheck(
   configUrls: Readonly<Record<string, string>>,
   policy: AddressPolicy,
+  policySource: string,
   session: SessionFile | undefined,
+  dnsResolver: DnsResolver | undefined,
 ): Promise<DoctorCheck> {
   const problems: DoctorProblem[] = [];
+  const notes: string[] = [`Using ${policySource}.`];
   const urls: { twinId: string; url: string }[] = [];
 
   if (session !== undefined) {
@@ -284,24 +277,49 @@ async function webhookCheck(
 
   for (const item of urls) {
     try {
-      await resolveAllowedWebhookUrl(item.url, policy);
+      const result = await probeWebhookUrl(item.url, policy, {
+        ...(dnsResolver === undefined ? {} : { resolver: dnsResolver }),
+        timeoutMs: 3_000,
+      });
+      if (result.kind === "not-contacted") {
+        notes.push(
+          `The webhook URL for ${item.twinId} resolves to a private or public address. It was not contacted.`,
+        );
+        continue;
+      }
+      if (result.kind === "unreachable") {
+        problems.push(
+          problem(
+            "INTERNAL",
+            `The webhook URL for ${item.twinId} did not answer.`,
+            `Ibeji sent a HEAD request to ${item.url}, connected to ${result.address.address}, but got no answer: ${result.error}`,
+            "Start the app that receives webhooks, or change the webhook URL.",
+          ),
+        );
+      }
     } catch (error) {
       problems.push(problemFromError(error));
-      continue;
-    }
-    if (!(await webhookAnswer(item.url))) {
-      problems.push(
-        problem(
-          "INTERNAL",
-          `The webhook URL for ${item.twinId} did not answer.`,
-          `Ibeji sent a request to ${item.url} but got no answer.`,
-          "Start the app that receives webhooks, or change the webhook URL.",
-        ),
-      );
     }
   }
 
-  return { name: "Webhook URLs", problems };
+  return { name: "Webhook URLs", problems, notes };
+}
+
+function sessionPermissionsCheck(repaired: boolean, home: string): DoctorCheck {
+  if (!repaired) {
+    return { name: "Session file permissions", problems: [] };
+  }
+  return {
+    name: "Session file permissions",
+    problems: [
+      problem(
+        "INTERNAL",
+        "The session file was readable by other users.",
+        `Other users could read the session token in ${sessionPath(home)}. Ibeji changed the file mode to 600.`,
+        "No action is needed now. Check who could read the file before the repair, and start a new session if you think the token was exposed.",
+      ),
+    ],
+  };
 }
 
 function sessionProblem(): DoctorProblem {
@@ -327,19 +345,26 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   }
 
   let session: SessionFile | undefined;
-  const read = await readSessionFile(options.home);
-  if (read.kind === "missing") {
-    checks.push({ name: "Session file", problems: [] });
-  } else if (read.kind === "invalid") {
-    await removeSessionFile(options.home);
-    checks.push({ name: "Session file", problems: [sessionProblem()] });
-  } else if (await sessionFileIsLive(read.value)) {
-    session = read.value;
-    checks.push({ name: "Session file", problems: [] });
-  } else {
-    await removeSessionFile(options.home);
-    checks.push({ name: "Session file", problems: [sessionProblem()] });
+  let sessionPermissionsRepaired = false;
+  try {
+    const read = await readSessionFile(options.home);
+    if (read.kind === "missing") {
+      checks.push({ name: "Session file", problems: [] });
+    } else if (read.kind === "invalid") {
+      await removeSessionFile(options.home);
+      checks.push({ name: "Session file", problems: [sessionProblem()] });
+    } else if (await sessionFileIsLive(read.value)) {
+      session = read.value;
+      sessionPermissionsRepaired = read.permissionsRepaired;
+      checks.push({ name: "Session file", problems: [] });
+    } else {
+      await removeSessionFile(options.home);
+      checks.push({ name: "Session file", problems: [sessionProblem()] });
+    }
+  } catch (error) {
+    checks.push({ name: "Session file", problems: [problemFromError(error)] });
   }
+  checks.push(sessionPermissionsCheck(sessionPermissionsRepaired, options.home));
 
   const ports = { ...config.ports };
   if (session !== undefined) {
@@ -351,15 +376,27 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   checks.push(await portCheck(ports, session));
   checks.push(await credentialsCheck(options.home));
   checks.push(await dashboardCheck(options.project));
+
+  let policy: AddressPolicy = {
+    allowPrivate: config.allowPrivateWebhooks,
+    allowPublic: config.allowPublicWebhooks,
+  };
+  let policySource = "the config file's address policy, because no session is running";
+  if (session !== undefined) {
+    try {
+      const status = await new ControlClient(session).status;
+      policy = status.addressPolicy;
+      policySource = "the running session's address policy";
+    } catch (error) {
+      policySource = "the config file's address policy, because the running session did not answer";
+      checks.push({
+        name: "Address policy",
+        problems: [problemFromError(error)],
+      });
+    }
+  }
   checks.push(
-    await webhookCheck(
-      config.webhookUrls,
-      {
-        allowPrivate: config.allowPrivateWebhooks,
-        allowPublic: config.allowPublicWebhooks,
-      },
-      session,
-    ),
+    await webhookCheck(config.webhookUrls, policy, policySource, session, options.dnsResolver),
   );
 
   return {
@@ -372,18 +409,27 @@ export function printDoctor(result: DoctorResult, writer: Writer): void {
   const problems = result.checks.flatMap((check) =>
     check.problems.map((item) => ({ check: check.name, ...item })),
   );
+  const notes = result.checks.flatMap((check) =>
+    (check.notes ?? []).map((note) => ({ check: check.name, note })),
+  );
 
   if (problems.length === 0) {
     writeLine(writer, "All checks passed.");
-    return;
+  } else {
+    writeLine(
+      writer,
+      `Doctor found ${problems.length} problem${problems.length === 1 ? "" : "s"}.`,
+    );
+    for (const [index, item] of problems.entries()) {
+      writeLine(writer);
+      writeLine(writer, `${index + 1}. ${item.check}: ${item.what} (${item.code})`);
+      writeWrapped(writer, `Why: ${item.why}`, "   ");
+      writeWrapped(writer, `Fix: ${item.fix}`, "   ");
+    }
   }
 
-  writeLine(writer, `Doctor found ${problems.length} problem${problems.length === 1 ? "" : "s"}.`);
-  for (const [index, item] of problems.entries()) {
-    writeLine(writer);
-    writeLine(writer, `${index + 1}. ${item.check}: ${item.what} (${item.code})`);
-    writeWrapped(writer, `Why: ${item.why}`, "   ");
-    writeWrapped(writer, `Fix: ${item.fix}`, "   ");
+  for (const item of notes) {
+    writeLine(writer, `${item.check}: ${item.note}`);
   }
 }
 

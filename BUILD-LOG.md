@@ -2331,3 +2331,43 @@ Built the first fix from the Phase 9 security review and C21 D43/D51.
 ### Later
 
 - The remaining Phase 9 review problems are separate tasks: dashboard path and cookie, doctor address policy, session file repair, broadcast and embedded IPv4 addresses, recorder key formats, audit gate, and screenshot masking.
+
+## Phase 9: fix security review problems 2 to 4
+
+Built the dashboard path, doctor address policy, and session file permission fixes from the Phase 9 security review and C21 D44 to D46.
+
+### What was built
+
+- **Dashboard under `/_ibeji/`.** `GET /` now redirects to `/_ibeji/`, the launch link is `http://127.0.0.1:<port>/_ibeji/?launch=<code>`, and the UI cookie is set with `Path=/_ibeji`. The server serves the built UI and its assets under `/_ibeji/`, keeps unknown UI pages on `index.html`, and keeps unknown API routes as JSON. Vite now builds the UI with base `/_ibeji/`.
+- **UI route base.** The UI strips `/_ibeji` for its page checks and adds it to every internal link, including the live-key safety link. Direct visits to a page under `/_ibeji/`, reloads, and the launch exchange all keep working.
+- **Local threat model.** `docs/safety.md` has a new "What Ibeji protects against" section. It says Ibeji stops websites from reading or changing the session, but a malicious program running as the same computer user can read `~/.ibeji/session.json` and that is the normal limit of local development tools.
+- **Address policy in `GET /status`.** The response now includes `addressPolicy: { allowPrivate, allowPublic }`. The control client type and the UI type share it.
+- **Doctor uses the session policy.** `ibeji doctor` reads the running session policy from `GET /status`, or the config file policy when no session runs, and reports which one it used. It resolves and checks every webhook URL through the webhook dispatcher's own code, and sends `HEAD` only when every address is this computer. Private and public targets are reported as "not contacted" and produce no request.
+- **Session file permissions.** Every `readSessionFile` call checks owner and mode on macOS and Linux. A user-owned file that other users can read or write is repaired to mode 600 and the caller warns. A file owned by another user is refused with `SESSION_STALE` and is not read or deleted. `doctor` has a `Session file permissions` check, and the CLI warns on stderr when it performs a repair.
+- **Tests.** Added the direct root redirect and cookie path tests, a Playwright test that navigates from the dashboard to another loopback port and proves no cookie arrives, doctor tests for `HEAD`, private and public non-contact, session versus config policy, and the config policy when no session runs, and session file repair and owner refusal tests.
+
+### Decisions
+
+- **The UI base is one shared value in the UI.** `pagePath`, `hrefFor`, `useUrl`, and `AppLink` keep the browser path under `/_ibeji/` while page checks still use `/`, `/activity`, and the other page names. This avoids a second page table.
+- **The dashboard's static files and API share the `/_ibeji/` prefix.** API routes are registered before the static middleware, so `/_ibeji/api/v1/...` never falls through to `index.html`. Unknown API routes still return the JSON error shape.
+- **Doctor notes are visible.** A doctor check now carries optional notes. The human output prints them after "All checks passed." so the policy source and "not contacted" messages are visible. The JSON output includes them.
+- **The launch code stays separate from the 32-byte session token.** It uses 30 bytes (240 bits), which is far beyond guessing for a single-use code that expires after two minutes, and keeps the full dashboard link inside the existing 80-column CLI output check after the `/_ibeji/` path made the link longer.
+- **Session repair happens before the JSON is parsed.** A permissive file is repaired even if its contents are invalid or stale, while a file owned by another user is refused before any content is read.
+- **No test was skipped, weakened, or deleted.**
+
+### Gates
+
+- `pnpm install --frozen-lockfile` passed.
+- `pnpm typecheck` passed.
+- `pnpm lint` passed with zero warnings.
+- `pnpm build` passed.
+- `pnpm test` passed twice with 772 tests in 80 files.
+- Coverage was 96.15% statements, 90.21% branches, 97.16% functions and 96.18% lines. `src/core/` and `src/twins/framework/` stayed at 100% lines and branches.
+- `pnpm test:ui` passed twice with 95 tests.
+- `pnpm check:package` passed and matched SPEC.md C16.
+- `pnpm audit --prod` reported zero advisories.
+- `pnpm test:smoke` passed twice.
+
+### Later
+
+- The remaining Phase 9 review problems are separate tasks: broadcast and embedded IPv4 addresses, recorder key formats, the audit gate, and screenshot masking.

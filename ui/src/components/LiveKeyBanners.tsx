@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from "react";
+import { hrefFor } from "../use-url";
 
 export type LiveKeyWarning = {
   readonly eventId: number;
@@ -31,7 +32,7 @@ export function LiveKeyBanners(props: LiveKeyBannersProps): ReactNode {
             </p>
           </div>
           <div className="live-key-actions">
-            <a href="/connect#safety" className="live-key-link">
+            <a href={hrefFor("/connect#safety")} className="live-key-link">
               Read the safety guidance
             </a>
             <button

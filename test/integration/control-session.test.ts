@@ -346,7 +346,7 @@ describe("T6 session file, credentials and ports", () => {
         });
 
         const freshLink = session.createLaunchLink();
-        expect(freshLink).toContain("/?launch=");
+        expect(freshLink).toContain("/_ibeji/?launch=");
         expect(freshLink).not.toContain(session.token);
       } finally {
         await session.stop();

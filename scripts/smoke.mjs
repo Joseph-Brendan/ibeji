@@ -495,12 +495,22 @@ async function dashboardStep() {
   if (exchange.status !== 200 || cookieHeader === null) {
     throw new Error("the launch code could not be exchanged for a dashboard session");
   }
+  if (!cookieHeader.includes("Path=/_ibeji")) {
+    throw new Error("the dashboard session cookie does not use the /_ibeji path");
+  }
   const cookie = cookieHeader.split(";")[0];
   if (!cookie.startsWith("ibeji_ui=")) {
     throw new Error("the dashboard session cookie has the wrong name");
   }
 
-  const withCookie = await fetch(`${state.startJson.addresses.control.url}/`, {
+  const root = await fetch(`${state.startJson.addresses.control.url}/`, {
+    redirect: "manual",
+  });
+  if (root.status !== 302 || root.headers.get("location") !== "/_ibeji/") {
+    throw new Error("the control root did not redirect to /_ibeji/");
+  }
+
+  const withCookie = await fetch(`${state.startJson.addresses.control.url}/_ibeji/`, {
     headers: { cookie },
   });
   const withCookieHtml = await withCookie.text();
