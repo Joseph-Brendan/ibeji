@@ -1,10 +1,10 @@
-# Ibeji: Build Specification v1.4
+# Ibeji: Build Specification v1.5
 
 Owner: Joseph Brendan, Dev and Design HQ
 Build tool: Antigravity, on a personal Mac
 Status: ready to build
 Date: 27 October 2026
-Change from v1.3: version 0.1.0 ships the Paystack and Flutterwave twins; the Stripe twin follows in version 0.2.0 (C21 D42). Stripe's scope (C4c) and design stay in this file for 0.2.0. Change from v1.2: decisions from the Phase 2 research and twin design are applied (C21, D31 to D41): the Flutterwave and Stripe API versions, the per-twin failure table, Stripe version-header handling, how money is stored, and idempotency. Change from v1.1: decisions from the Step 1.1 kickoff review are applied throughout and listed in C21 (D1 to D30). The biggest changes: how the dashboard signs in (C8), exact failure settings and the order failures apply in (C5), the webhook address rules (C7, C13), the control API route table (C8), and the split of the "no native code" rule into a runtime rule and a development rule (C1).
+Change from v1.4: fixes from the Phase 9 security review (C21, D43 to D51): live keys are removed from every request field on arrival and from every output, the dashboard moves under /_ibeji/ so its cookie is not sent to other apps, `ibeji doctor` only contacts addresses on this computer, and the webhook address rules close two gaps. Change from v1.3: version 0.1.0 ships the Paystack and Flutterwave twins; the Stripe twin follows in version 0.2.0 (C21 D42). Stripe's scope (C4c) and design stay in this file for 0.2.0. Change from v1.2: decisions from the Phase 2 research and twin design are applied (C21, D31 to D41): the Flutterwave and Stripe API versions, the per-twin failure table, Stripe version-header handling, how money is stored, and idempotency. Change from v1.1: decisions from the Step 1.1 kickoff review are applied throughout and listed in C21 (D1 to D30). The biggest changes: how the dashboard signs in (C8), exact failure settings and the order failures apply in (C5), the webhook address rules (C7, C13), the control API route table (C8), and the split of the "no native code" rule into a runtime rule and a development rule (C1).
 
 This file is the single source of truth for the project. The coding agent reads it before every task. If the code and this file disagree, the agent stops and asks.
 
@@ -362,9 +362,10 @@ A small HTTP API on the control port (default 4400), under `/_ibeji/api/v1/`. It
 
 1. Each session creates a random session token of 32 bytes from a secure random source.
 2. The CLI and MCP server read the token from the session file and send it as `Authorization: Bearer <token>`.
-3. The browser never sees the token. `ibeji start` (and `ibeji open`) opens `http://127.0.0.1:<port>/?launch=<code>`. The launch code is single-use and expires after 2 minutes. The page sends it to `POST /_ibeji/api/v1/auth/exchange`. The server answers by setting a cookie, `ibeji_ui`, that is `HttpOnly` and `SameSite=Strict`, and holds a separate random UI token tied to this session. The page then removes the code from the address bar. Reloading or opening a second tab keeps working through the cookie. When the session ends, the cookie stops working, and the UI says: "Ibeji was restarted. Run `ibeji open` to get a new link."
+3. The browser never sees the token. The dashboard lives under `/_ibeji/` (C21 D44): `ibeji start` (and `ibeji open`) opens `http://127.0.0.1:<port>/_ibeji/?launch=<code>`, and `/` redirects to `/_ibeji/`. The launch code is single-use and expires after 2 minutes. The page sends it to `POST /_ibeji/api/v1/auth/exchange`. The server answers by setting a cookie, `ibeji_ui`, that is `HttpOnly`, `SameSite=Strict`, and `Path=/_ibeji`, and holds a separate random UI token tied to this session. Browsers share cookies between all ports of `127.0.0.1`, so the path keeps the cookie away from the person's own app and other local servers, which never use `/_ibeji/` paths. The page then removes the code from the address bar. Reloading or opening a second tab keeps working through the cookie. When the session ends, the cookie stops working, and the UI says: "Ibeji was restarted. Run `ibeji open` to get a new link."
 4. A request is accepted if it carries a valid bearer token, or a valid `ibeji_ui` cookie. Requests that change something (POST, PUT, DELETE) using the cookie must also carry the header `X-Ibeji-Request: 1` and an `Origin` header equal to the control server's own origin. A cross-site page cannot add that header without the browser first asking permission, and the server never gives it.
 5. Tokens are compared in constant time. The token, UI token, and launch codes never appear in logs, events, errors, exports, or the UI.
+6. **What this protects against** (C21 D44). These rules stop websites from reading or changing Ibeji, which the security review confirmed. They do not stop a malicious program already running on the computer as the same user: such a program can read `~/.ibeji/session.json` directly. That is the normal limit of local development tools, and `docs/safety.md` says so in plain words.
 
 **Other protections, on the control server, every twin server, and every checkout page:**
 
@@ -421,11 +422,11 @@ Rules for any route that names a twin: an unknown twin gives `UNKNOWN_TWIN`; a t
 
 **Rules.** Every command has `--help` with a real example. Every command that prints data supports `--json`. Exit codes: 0 success, 1 error, 2 bad usage. A command checks all its input before changing anything, and changes nothing if any part is invalid. Human errors print what, why, and fix on separate lines to stderr. With `--json`, errors print the C12 JSON shape to stdout. Commands other than `start`, `keys`, `mcp`, and `doctor` need a running session; if none is running, they say so and show `ibeji start`. If the browser cannot be opened, the link is printed and the command still succeeds.
 
-**Session file.** `~/.ibeji/session.json` holds the instance id, process id, ports, token, start time, and version. The `~/.ibeji` folder is created readable only by the user (mode 700 on macOS and Linux; the user's own home folder on Windows). The file is written to a temporary name and then renamed, so it is never half-written, with mode 600. It is removed on clean shutdown. At start, if a session file exists: when its process is alive and `/health` returns the same instance id, start refuses with `SESSION_ALREADY_RUNNING`; otherwise the file is stale, is removed, and start continues with a note. Other commands that find a stale file report `SESSION_STALE` and remove it.
+**Session file.** `~/.ibeji/session.json` holds the instance id, process id, ports, token, start time, and version. The `~/.ibeji` folder is created readable only by the user (mode 700 on macOS and Linux; the user's own home folder on Windows). The file is written to a temporary name and then renamed, so it is never half-written, with mode 600. It is removed on clean shutdown. Every read of the session file checks its permissions (C21 D46): on macOS and Linux, a file the user owns that is readable by others is set back to mode 600 with a warning; a file owned by another user is refused with `SESSION_STALE` and a fix. At start, if a session file exists: when its process is alive and `/health` returns the same instance id, start refuses with `SESSION_ALREADY_RUNNING`; otherwise the file is stale, is removed, and start continues with a note. Other commands that find a stale file report `SESSION_STALE` and remove it.
 
 **Export contents.** Version, seed, start time, twins and ports, rules, scenario, webhook URLs, twin records, deliveries, and up to the last 5,000 events. Removed: the token, UI token, launch codes, every credential (replaced by its fingerprint), any live key (fingerprint only), and authorization and signature headers. The file is written with mode 600.
 
-**doctor checks.** Node version against `engines`; every configured port free or used by this Ibeji session; the config file parses; the session file is valid or stale; the credentials file permissions; the built UI is present; each twin's webhook URL is allowed by C13 rule 5 and answers. Each problem prints what, why, and fix. Exit 0 when all is well, 1 otherwise.
+**doctor checks.** Node version against `engines`; every configured port free or used by this Ibeji session; the config file parses; the session file is valid or stale, and the session and credentials file permissions; the built UI is present; each twin's webhook URL is allowed by C13 rule 5, using the running session's address policy from `GET /status`, or the config file's when no session runs, saying which it used. Doctor contacts a webhook URL only when it resolves to this computer, through the same resolve-and-connect path as webhook deliveries, and sends `HEAD`. For private and public addresses it reports "not contacted" (C21 D45). Each problem prints what, why, and fix. Exit 0 when all is well, 1 otherwise.
 
 ### C10. Web dashboard (UI)
 
@@ -547,12 +548,15 @@ Rules for all code:
 4. No `console.log` in `src/`. All logging goes through a logger that writes to stderr only.
 5. Secrets in output:
    - The session token, UI token, and launch codes never appear anywhere except the session file and the launch link.
-   - A live key never appears, not even in part. Only its fingerprint: the first 8 hexadecimal characters of its SHA-256 hash.
+   - A live key never appears, not even in part. Only its fingerprint: the first 8 hexadecimal characters of its SHA-256 hash. This applies wherever the key appears, including inside a longer value such as an email field (C21 D43). Two layers enforce it:
+     - **On arrival.** Before a twin stores or uses any request, the framework scans every header, query value, and body value for live-key patterns. Each live key found inside a value is replaced with `[live key removed: <fingerprint>]`, a live-key warning event is recorded, and the dashboard banner appears. The twin then handles the cleaned request, so the key never reaches state, events, or webhook bodies. Live keys sent as credentials are still refused (C4).
+     - **On the way out.** Every output passes the same scan as a second safety net: control API responses (including state, webhooks, events, and export), the export file, CLI output, MCP results, logs, and error messages.
+     - **Patterns.** Every twin folder declares its service's live-key patterns, and the registry collects them, including patterns from services whose twin is not released yet (Stripe's `sk_live_`, `pk_live_`, and `rk_live_` in 0.1.0). The core never hard-codes a pattern.
    - Ibeji test credentials appear in full only where a person needs to copy them: `ibeji keys`, `ibeji start`, the Home and Connect your app pages, and the two MCP credential tools. Everywhere else, including logs, events, errors, and exports, they appear as their documented test prefix plus fingerprint.
 
 ### C13. Safety
 
-1. Twins never make network requests to any real payment service. T7 blocks every outbound connection except to this computer during the full test suite. At runtime, the only outbound connections Ibeji makes are webhook deliveries, checked by rule 5.
+1. Twins never make network requests to any real payment service. T7 blocks every outbound connection except to this computer during the full test suite. At runtime, the only outbound connections Ibeji makes are webhook deliveries and `ibeji doctor`'s check of webhook URLs on this computer, both checked by rule 5.
 2. Live keys are rejected by every twin and refused by the recorder (C4, C15).
 3. Servers listen on 127.0.0.1 only (C3).
 4. The control API is protected by the session token or UI cookie, Host checks, and Origin checks (C8).
@@ -560,7 +564,8 @@ Rules for all code:
    - Allowed by default: this computer only (`127.0.0.0/8`, `::1`, and `localhost`).
    - With `--allow-private-webhooks` (or the config field): also private network addresses (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) and `host.docker.internal`.
    - With `--allow-public-webhooks`: also public addresses, with a warning printed at start and shown in the UI, because a twin sending fake "payment succeeded" messages to a real public server could cause harm.
-   - Always refused: unspecified addresses (`0.0.0.0`, `::`), link-local addresses (`169.254.0.0/16`, `fe80::/10`, which include cloud metadata services), multicast, and broadcast.
+   - Always refused: unspecified addresses (`0.0.0.0`, `::`), link-local addresses (`169.254.0.0/16`, `fe80::/10`, which include cloud metadata services), multicast, and broadcast. Broadcast means `255.255.255.255` and the broadcast address of every network this computer is on, read from its network interfaces (C21 D47).
+   - IPv6 addresses that carry an IPv4 address inside them (IPv4-mapped `::ffff:0:0/96`, NAT64 `64:ff9b::/96`, and 6to4 `2002::/16`) are judged by the IPv4 address they carry (C21 D47).
    - For every attempt, the host name is resolved, every address it resolves to is checked, and the connection is made to a checked address, so a name cannot change between the check and the connection.
    - Redirects are never followed.
 6. The recorder (C15) is the only code that talks to the real services. It refuses live keys for every service and is not part of the published package.
@@ -678,7 +683,7 @@ Not committed: `node_modules`, `dist`, `coverage`, test reports.
 | T3 | Contract | Every twin response matches the shape of its recorded fixture: same fields, same types, same status codes, for every twin. Skipped fixtures are not used. |
 | T4 | Failure behaviour | Every failure does exactly what C5 says on every twin that supports it, tested through the control API, including the order of application. A parity test turns on three failures (`webhook-delayed`, `server-error`, `payment-declined`) through the CLI, the MCP server, and the UI, and proves each produces the same rule. |
 | T5 | Webhooks | Each twin's signing matches its service's method; statuses, retries, duplicates, delays, ordering, resends, and address rules behave as specified |
-| T6 | Security | Bearer token, UI cookie, launch codes (single use, expiry), the `X-Ibeji-Request` and Origin checks, Host checks on every server, no CORS headers, frame and referrer headers, body limits, live keys rejected by every twin, every server bound to 127.0.0.1 |
+| T6 | Security | Bearer token, UI cookie with `Path=/_ibeji`, launch codes (single use, expiry), the `X-Ibeji-Request` and Origin checks, Host checks on every server, no CORS headers, frame and referrer headers, body limits, live keys rejected by every twin as credentials, live keys inside request fields removed on arrival and absent from every output surface for every known service pattern, session file permission repair, every server bound to 127.0.0.1 |
 | T7 | No outside network | The whole suite passes with every outbound connection blocked except to this computer, and with proxy environment variables removed |
 | T8 | UI | Playwright tests for every page, the twin switcher, and every checkout page |
 | T9 | Accessibility | axe checks on every page and checkout page report zero serious and zero critical problems; every page works with keyboard only |
@@ -714,7 +719,7 @@ pnpm check:package
 pnpm test:smoke
 ```
 
-`test:ui` exists from Phase 6. Before it runs for the first time on a computer, and in every CI job, the test browser is installed with `pnpm exec playwright install chromium` (CI adds `--with-deps` on Linux). `check:package` and `test:smoke` exist from Phase 8: `check:package` runs publint and checks the packed file list against C16. Before each gate exists, its script prints that it is not added yet and exits 0. CI runs all gates on Windows, macOS, and Linux, with the latest Node 22 and the latest Node 24.
+`test:ui` exists from Phase 6. Before it runs for the first time on a computer, and in every CI job, the test browser is installed with `pnpm exec playwright install chromium` (CI adds `--with-deps` on Linux). `check:package` and `test:smoke` exist from Phase 8: `check:package` runs publint, checks the packed file list against C16, and runs `pnpm audit --prod`, which must report zero advisories. Advisories in development dependencies are reviewed at each release and recorded in C21 if accepted (D49). Before each gate exists, its script prints that it is not added yet and exits 0. CI runs all gates on Windows, macOS, and Linux, with the latest Node 22 and the latest Node 24.
 
 TypeScript settings must include `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, and `"types": ["node"]` for server code (the MCP SDK's types need Node's types, and new TypeScript versions no longer include them automatically). The UI's own tsconfig adds the DOM library instead.
 
@@ -798,6 +803,20 @@ Every decision made during the build that changes or clarifies this spec is reco
 | Id | Decision | Reason | Sections |
 |---|---|---|---|
 | D42 | Version 0.1.0 ships the Paystack and Flutterwave twins. The Stripe twin is built and released in version 0.2.0, in build guide Phase 12. Stripe's research, its design in TWIN-DESIGN.md, its scope in C4c, and its decisions (D34, D37, D41) stay approved for 0.2.0. Until then, the registry holds two twins, failures that only Stripe supports are hidden (C5), the README's not-affiliated line names two services, and no 0.1.0 test, smoke run, example or doc requires Stripe. Paystack transfer create, fetch, and verify are built from documentation, because the test account cannot make transfers ("You cannot initiate third party payouts as a starter business"). | Joseph has Paystack and Flutterwave test keys, not a Stripe account. Part F open question 1 already allowed this split. | B2, B5, C2, C4c, C5, C19, Part F |
+
+**6 November 2026: fixes from the Phase 9 security review.** Item numbers refer to SECURITY-REVIEW.md.
+
+| Id | Decision | Reason | Sections |
+|---|---|---|---|
+| D43 | Live keys are removed on arrival from every request field, and every output is scanned again. Patterns come from every twin folder, including unreleased services. | Problem 1: a live key typed into an email field was copied in full into events, state, webhooks, the export, the dashboard, and MCP results. Only whole-value keys were caught. | C12 |
+| D44 | The dashboard and API live under `/_ibeji/`. The UI cookie has `Path=/_ibeji`. `docs/safety.md` states the local threat model: Ibeji protects against websites, not against malicious programs already running as the same user. | Problem 2: browsers send `127.0.0.1` cookies to every port, so the person's own app received the cookie after a checkout redirect. A path keeps it away from other apps. Programs running as the same user can read the session file anyway, so further cookie hardening would add complexity without real protection. | C8, C10 |
+| D45 | `ibeji doctor` contacts only webhook URLs on this computer, through the dispatcher's resolve-and-connect path, with `HEAD`, using the running session's address policy. `GET /status` reports that policy. | Problem 3: doctor made an unpinned request, possibly to a public address, using the config's policy instead of the session's. | C9, C8, C13 |
+| D46 | Every session file read checks and repairs permissions. Doctor checks the session file too. | Problem 4. | C9 |
+| D47 | Directed broadcast addresses of local networks are refused. NAT64, 6to4, and IPv4-mapped addresses are judged by the IPv4 address inside. | Problems 5 and 8. | C13 |
+| D48 | The recorder checks each service's full test-key format from its research file, not only the shared `sk_test_` prefix, so a Paystack key is refused under the Stripe name and the reverse. | Problem 6. | C15 |
+| D49 | Development-dependency advisories are accepted for 0.1.0: they come from `flutterwave-node-v3` (used only by the T15 compatibility tests) and lint tools, none are in the published package, and `pnpm audit --prod` is clean. `check:package` now fails on any production advisory. Revisit at every release. | Problem 7. | C18 |
+| D50 | Documentation screenshots are taken with every credential masked. | Problem 9: even fake keys should not be published. | C19 |
+| D51 | `docs/safety.md:77` is rewritten to match D43 and is checked by a test that searches every output surface for a planted live key. | The safety page made a promise the code did not keep. A test now holds the page to it. | C19, T6 |
 
 Still open, decided in Step 4.7 and recorded here then: which official Node libraries can be pointed at a twin (review item 109).
 ---
