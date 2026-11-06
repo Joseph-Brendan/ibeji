@@ -5,6 +5,7 @@ import { checkoutActions, flutterwaveCheckout } from "./checkout.js";
 import { flutterwaveCredentialSpecs } from "./credentials.js";
 import { flutterwaveFailures } from "./failures.js";
 import { flutterwaveConnectionGuide } from "./guide.js";
+import { flutterwaveLiveKeyPatterns } from "./live-keys.js";
 import { flutterwaveMoney } from "./money.js";
 import { paymentActions } from "./payments.js";
 import { refundActions } from "./refunds.js";
@@ -29,6 +30,7 @@ export const flutterwaveTwin: TwinDefinition = {
   actions,
   state: flutterwaveState,
   auth: flutterwaveAuth,
+  liveKeys: flutterwaveLiveKeyPatterns,
   idempotency: { mode: "none" },
   routes: (router) => {
     for (const action of actions) {

@@ -6,6 +6,7 @@ import type { ScenarioRunner } from "../core/scenarios/runner.js";
 import type { Scenario } from "../core/scenarios/schema.js";
 import type { AddressPolicy } from "../core/webhooks/address.js";
 import type { WebhookDispatcher } from "../core/webhooks/dispatcher.js";
+import type { LiveKeyPattern } from "../shared/live-key-scanner.js";
 import type { RunningTwin } from "../twins/framework/server.js";
 import type { FrameworkStateStore } from "../twins/framework/state.js";
 import type { TwinDefinition } from "../twins/framework/types.js";
@@ -37,6 +38,7 @@ export type ControlDependencies = {
   readonly webhookUrls: Map<string, string>;
   readonly secrets: SessionSecrets;
   readonly addressPolicy: AddressPolicy;
+  readonly liveKeyPatterns: readonly LiveKeyPattern[];
   readonly logger: Logger;
   readonly controlPort: { value: number };
   readonly uiRoot?: string;

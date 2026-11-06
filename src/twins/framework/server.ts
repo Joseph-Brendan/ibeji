@@ -20,6 +20,11 @@ import type { RuleStore } from "../../core/failures/rules.js";
 import { SeededRandom } from "../../core/random.js";
 import { fingerprint } from "../../core/redact.js";
 import type { WebhookDispatcher, WebhookTwin } from "../../core/webhooks/dispatcher.js";
+import {
+  createLiveKeyScanner,
+  type LiveKeyMatch,
+  type LiveKeyPattern,
+} from "../../shared/live-key-scanner.js";
 import { CHECKOUT_STYLES, renderCheckoutPage, renderCheckoutResult } from "./html.js";
 import {
   applyCheckoutSecurityHeaders,
@@ -29,6 +34,7 @@ import {
   isAllowedOrigin,
   MAX_BODY_BYTES,
 } from "./http-security.js";
+import { createTwinLiveKeyScanner } from "./live-keys.js";
 import { FrameworkStateStore, MemoryIdempotencyStore } from "./state.js";
 import type {
   ActionContext,
@@ -69,6 +75,7 @@ export type StartTwinOptions = {
   readonly dispatcher?: WebhookDispatcher;
   readonly onWebhookDraft?: (draft: TwinWebhookDraft) => void;
   readonly fontsDir?: string;
+  readonly liveKeyPatterns?: readonly LiveKeyPattern[];
 };
 
 const CHECKOUT_FONT_FILES = new Set([
@@ -400,6 +407,9 @@ export async function startTwin(
   const idempotencyStore = options.idempotencyStore ?? new MemoryIdempotencyStore();
   const portRef = { value: 0 };
   const webhookTwins = options.webhookTwins;
+  const liveKeyPatterns = options.liveKeyPatterns ?? definition.liveKeys ?? [];
+  const scanRequest = createTwinLiveKeyScanner(liveKeyPatterns);
+  const outputScanner = createLiveKeyScanner(liveKeyPatterns);
 
   const app = new Hono<{ Bindings: HttpBindings; Variables: TwinVariables }>();
 
@@ -474,6 +484,31 @@ export async function startTwin(
       onError: () => ibejiErrorResponse("BODY_TOO_LARGE"),
     }),
   );
+
+  app.use("*", async (context, next) => {
+    await next();
+    const response = context.res;
+    const type = (response.headers.get("content-type") ?? "").toLowerCase();
+    if (
+      type.includes("text/event-stream") ||
+      (!type.includes("application/json") &&
+        !type.includes("text/html") &&
+        !type.includes("text/plain"))
+    ) {
+      return;
+    }
+    const text = await response.clone().text();
+    const scanned = outputScanner.scanText(text);
+    if (scanned.value === text) {
+      return;
+    }
+    const headers = new Headers(response.headers);
+    headers.delete("content-length");
+    context.res = new Response(scanned.value, {
+      status: response.status,
+      headers,
+    });
+  });
 
   app.get("/_ibeji/checkout.css", () => {
     return new Response(CHECKOUT_STYLES, {
@@ -561,6 +596,31 @@ export async function startTwin(
     }
   };
 
+  const recordFieldWarnings = (
+    matches: readonly LiveKeyMatch[],
+    actionId: string,
+    skipKey?: string,
+  ): void => {
+    for (const match of matches) {
+      if (match.key === skipKey) {
+        continue;
+      }
+      const services = match.services.join(" and ");
+      events.publish({
+        type: "warning",
+        scope: definition.id,
+        summary: `A live key was found in a request field for the ${definition.displayName} twin. It matches the ${services} live-key pattern${
+          match.services.length === 1 ? "" : "s"
+        }. Live keys must never be used with Ibeji. Remove it from your app's test settings.`,
+        details: {
+          fingerprint: match.fingerprint,
+          services: match.services,
+          actionId,
+        },
+      });
+    }
+  };
+
   const handleCheckout = async (context: TwinContext, request: TwinRequest): Promise<Response> => {
     const activeRules = options.rules?.activeRules() ?? [];
     const checkoutActions = definition.actions.filter((item) => item.kind === "checkout");
@@ -634,12 +694,17 @@ export async function startTwin(
     action: ActionDefinition,
     request: TwinRequest,
   ): Promise<Response> => {
-    context.set("request", request);
     if (action.kind === "checkout") {
-      return handleCheckout(context, request);
+      const scannedCheckout = scanRequest(request);
+      context.set("request", scannedCheckout.request);
+      recordFieldWarnings(scannedCheckout.matches, action.id);
+      return handleCheckout(context, scannedCheckout.request);
     }
 
     const key = definition.auth.readKey(request);
+    const scanned = scanRequest(request);
+    context.set("request", scanned.request);
+    recordFieldWarnings(scanned.matches, action.id, key ?? undefined);
     if (key !== null && definition.auth.isLiveKey(key)) {
       events.publish({
         type: "warning",
@@ -659,7 +724,7 @@ export async function startTwin(
       return twinResponseOf(definition.auth.unauthorized(auth));
     }
 
-    const idempotency = runIdempotency(definition.idempotency, request, action);
+    const idempotency = runIdempotency(definition.idempotency, scanned.request, action);
     if (idempotency.kind === "replay" || idempotency.kind === "error") {
       return twinResponseOf(idempotency.response);
     }
@@ -706,7 +771,7 @@ export async function startTwin(
     const effects = effectsFromPlan(definition, action.id, plan.effect);
     const actionContext: ActionContext = {
       action,
-      request,
+      request: scanned.request,
       state,
       failures: effects,
       credentials: credentials(),

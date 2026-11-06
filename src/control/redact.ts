@@ -1,4 +1,9 @@
 import { fingerprint } from "../core/redact.js";
+import {
+  createLiveKeyScanner,
+  type LiveKeyPattern,
+  type LiveKeyScanner,
+} from "../shared/live-key-scanner.js";
 import type { TwinDefinition } from "../twins/framework/types.js";
 
 const SENSITIVE_HEADER_NAMES = new Set(["authorization", "proxy-authorization", "cookie"]);
@@ -26,16 +31,23 @@ export type RedactionEntry = {
 export class SecretRedactor {
   private readonly entries: readonly RedactionEntry[];
   private readonly definitions: readonly TwinDefinition[];
+  private readonly scanner: LiveKeyScanner;
 
-  constructor(entries: readonly RedactionEntry[], definitions: readonly TwinDefinition[]) {
+  constructor(
+    entries: readonly RedactionEntry[],
+    definitions: readonly TwinDefinition[],
+    liveKeyPatterns: readonly LiveKeyPattern[] = [],
+  ) {
     this.entries = [...entries].sort((left, right) => right.value.length - left.value.length);
     this.definitions = definitions;
+    this.scanner = createLiveKeyScanner(liveKeyPatterns);
   }
 
   static forSecrets(
     secretValues: readonly string[],
     credentialValues: readonly string[],
     definitions: readonly TwinDefinition[],
+    liveKeyPatterns: readonly LiveKeyPattern[] = [],
   ): SecretRedactor {
     return new SecretRedactor(
       [
@@ -43,6 +55,7 @@ export class SecretRedactor {
         ...credentialValues.map((value) => ({ value, replacement: fingerprint(value) })),
       ],
       definitions,
+      liveKeyPatterns,
     );
   }
 
@@ -51,7 +64,7 @@ export class SecretRedactor {
     for (const entry of this.entries) {
       result = result.split(entry.value).join(entry.replacement);
     }
-    return result;
+    return this.scanner.scanText(result).value;
   }
 
   redactValue(value: unknown): unknown {

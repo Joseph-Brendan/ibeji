@@ -9,6 +9,7 @@ export type EventStreamOptions = {
   readonly scope: string | undefined;
   readonly lastEventId: number | undefined;
   readonly signal: AbortSignal;
+  readonly sanitize?: (text: string) => string;
 };
 
 /**
@@ -60,7 +61,11 @@ export function eventStreamResponse(options: EventStreamOptions): Response {
           return;
         }
         sent.add(event.id);
-        write(`id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`);
+        const data =
+          options.sanitize === undefined
+            ? JSON.stringify(event)
+            : options.sanitize(JSON.stringify(event));
+        write(`id: ${event.id}\ndata: ${data}\n\n`);
       };
 
       const heartbeat = (): void => {

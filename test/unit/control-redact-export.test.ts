@@ -6,6 +6,7 @@ import { EventLog } from "../../src/core/events.js";
 import { fingerprint } from "../../src/core/redact.js";
 import { flutterwaveTwin } from "../../src/twins/flutterwave/definition.js";
 import { paystackTwin } from "../../src/twins/paystack/definition.js";
+import { liveKeyPatterns } from "../../src/twins/registry.js";
 
 const definitions = [paystackTwin, flutterwaveTwin];
 const token = "session-token-value";
@@ -15,7 +16,12 @@ const credential = "sk_test_ibeji_export_test_0001";
 const liveKey = ["sk", "live", "ibeji_export_test_0001"].join("_");
 
 function redactor(): SecretRedactor {
-  return SecretRedactor.forSecrets([token, uiToken, launchCode], [credential], definitions);
+  return SecretRedactor.forSecrets(
+    [token, uiToken, launchCode],
+    [credential],
+    definitions,
+    liveKeyPatterns(),
+  );
 }
 
 describe("T6 export and event redaction", () => {
@@ -38,7 +44,7 @@ describe("T6 export and event redaction", () => {
         ui: "[redacted]",
         code: "[redacted]",
         credential: fingerprint(credential),
-        liveKey: fingerprint(liveKey),
+        liveKey: `[live key removed: ${fingerprint(liveKey)}]`,
         keep: "ordinary",
       },
       list: ["[redacted]", fingerprint(credential)],
@@ -67,6 +73,9 @@ describe("T6 export and event redaction", () => {
   it("T6 scrubs text used in an error message", () => {
     expect(redactor().redactText(`Bad token ${token} and key ${credential}`)).toBe(
       `Bad token [redacted] and key ${fingerprint(credential)}`,
+    );
+    expect(redactor().redactText(`Bad field prefix ${liveKey} suffix`)).toBe(
+      `Bad field prefix [live key removed: ${fingerprint(liveKey)}] suffix`,
     );
   });
 

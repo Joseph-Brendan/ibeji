@@ -2296,3 +2296,38 @@ The twin stop still lets an in-flight response finish, but it now calls `server.
 - Decide whether to add a Stripe guide page to the dashboard for 0.2.0. The documentation already includes the planned guide.
 - Decide whether to include `docs/` in the published package in a later release. C16 currently excludes it.
 - Add a screenshot for the Connect your app page when the Stripe twin exists.
+
+## Phase 9: fix security review problem 1, live keys
+
+Built the first fix from the Phase 9 security review and C21 D43/D51.
+
+### What was built
+
+- **Patterns per twin.** `src/twins/paystack/live-keys.ts`, `src/twins/flutterwave/live-keys.ts` and `src/twins/stripe/live-keys.ts` declare each service's live-key patterns from the research files. The Stripe file exists, but the Stripe twin is not registered in 0.1.0. `src/twins/registry.ts` exports every pattern from the registered twins plus the Stripe file. No live-key pattern lives in the core.
+- **Arrival scanner.** `src/shared/live-key-scanner.ts` finds live keys at any depth and inside longer strings. `src/twins/framework/live-keys.ts` scans headers, query values and JSON, form or text bodies. The framework replaces each key with `[live key removed: <fingerprint>]` before the handler sees it, records one warning event per key with the matched service names, and leaves live credential keys to the existing authentication refusal path.
+- **Output scanner.** The same scanner is applied at the control API response boundary, the twin response boundary, the SSE event data, CLI stdout and stderr, MCP tool results, logger messages and details, and the export redactor. This covers state, webhooks, events, status, export, error bodies, CLI output and MCP results even if an upstream path missed something.
+- **Safety page.** `docs/safety.md` now states the exact D43 promise: request fields, events, logs, errors, exports, control API responses, CLI output, MCP results and the dashboard show only the fingerprint.
+- **Tests.** Added scanner unit tests for all documented live formats and all body shapes. Added an integration test that plants seven live-format keys in the Paystack email, the Flutterwave customer email, nested metadata, a header and a query value, completes checkout, and searches events, state, webhooks, export API, export file, CLI events, CLI status, MCP list events, MCP list webhooks and logger output for any 12-character piece of each key. Added a Playwright test for the Live activity and Data pages. Added a docs test that fails if the safety page promise changes, and a logger sanitizer test.
+
+### Decisions
+
+- **Patterns are service-owned.** Paystack and Stripe both use `sk_live_`, so a matching key can name both services in its warning. The warning event lists every matched service rather than guessing one.
+- **Arrival cleaning comes before the handler.** The original request is still used for credential authentication, so a live bearer key is refused exactly as before. The cleaned request is used for idempotency and the handler.
+- **The output scanner is a safety net, not the primary fix.** Arrival cleaning removes the key before state and webhooks are built. The output scanner also protects old paths, error messages, MCP results, logs and injected test data.
+- **Stripe stays unregistered.** Only its patterns are used in 0.1.0. Registry tests assert that `registry.has("stripe")` is false.
+
+### Gates
+
+- `pnpm typecheck` passed.
+- `pnpm lint` passed with zero warnings.
+- `pnpm build` passed.
+- `pnpm test` passed with 763 tests in 79 files twice.
+- Coverage was 96.49% statements, 90.20% branches, 98.15% functions and 96.53% lines. `src/core/` and `src/twins/framework/` met their 100% thresholds.
+- `pnpm test:ui` passed twice with 94 tests.
+- `pnpm check:package` passed and matched SPEC.md C16.
+- `pnpm audit --prod` reported zero advisories.
+- `pnpm test:smoke` passed twice.
+
+### Later
+
+- The remaining Phase 9 review problems are separate tasks: dashboard path and cookie, doctor address policy, session file repair, broadcast and embedded IPv4 addresses, recorder key formats, audit gate, and screenshot masking.

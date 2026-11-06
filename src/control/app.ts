@@ -9,6 +9,7 @@ import { IbejiError, isIbejiError, zodProblemsToError } from "../core/errors.js"
 import { IBEJI_SCOPE } from "../core/events.js";
 import { FAILURE_CATALOG } from "../core/failures/catalog.js";
 import { resolveAllowedWebhookUrl } from "../core/webhooks/address.js";
+import { createLiveKeyScanner } from "../shared/live-key-scanner.js";
 import {
   applyHtmlSecurityHeaders,
   errorResponseFrom,
@@ -284,6 +285,7 @@ function currentRedactor(deps: ControlDependencies): SecretRedactor {
     deps.secrets.secretValues(),
     deps.credentials.secretValues(),
     deps.definitions,
+    deps.liveKeyPatterns,
   );
 }
 
@@ -352,6 +354,7 @@ function failureCatalog(deps: ControlDependencies): readonly unknown[] {
 
 export function createControlApp(deps: ControlDependencies): Hono {
   const app = new Hono();
+  const outputScanner = createLiveKeyScanner(deps.liveKeyPatterns);
 
   app.use("*", async (context, next) => {
     if (!isAllowedHost(context.req.header("host"), deps.controlPort.value)) {
@@ -401,6 +404,29 @@ export function createControlApp(deps: ControlDependencies): Hono {
     }
 
     await next();
+  });
+
+  app.use(`${API_PREFIX}/*`, async (context, next) => {
+    await next();
+    const response = context.res;
+    if (response === undefined) {
+      return;
+    }
+    const type = (response.headers.get("content-type") ?? "").toLowerCase();
+    if (type.includes("text/event-stream")) {
+      return;
+    }
+    const text = await response.clone().text();
+    const scanned = outputScanner.scanText(text);
+    if (scanned.value === text) {
+      return;
+    }
+    const headers = new Headers(response.headers);
+    headers.delete("content-length");
+    context.res = new Response(scanned.value, {
+      status: response.status,
+      headers,
+    });
   });
 
   app.get(HEALTH_PATH, () => jsonResponse({ ok: true, instance: deps.instanceId }));
@@ -683,6 +709,7 @@ export function createControlApp(deps: ControlDependencies): Hono {
       scope,
       lastEventId,
       signal: context.req.raw.signal,
+      sanitize: (text) => outputScanner.scanText(text).value,
     });
   });
 

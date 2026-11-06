@@ -5,6 +5,7 @@ import { paystackCheckout } from "./checkout.js";
 import { paystackCredentialSpecs } from "./credentials.js";
 import { paystackFailures } from "./failures.js";
 import { paystackConnectionGuide } from "./guide.js";
+import { paystackLiveKeyPatterns } from "./live-keys.js";
 import { paystackMoney } from "./money.js";
 import { recipientActions } from "./recipients.js";
 import { refundActions } from "./refunds.js";
@@ -30,6 +31,7 @@ export const paystackTwin: TwinDefinition = {
   actions,
   state: paystackState,
   auth: paystackAuth,
+  liveKeys: paystackLiveKeyPatterns,
   idempotency: { mode: "none" },
   routes: (router) => {
     for (const action of actions) {

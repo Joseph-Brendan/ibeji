@@ -8,16 +8,17 @@ import { DEFAULT_CONTROL_PORT, MAX_SEED } from "../core/config.js";
 import { IbejiError, isIbejiError } from "../core/errors.js";
 import { EventLog } from "../core/events.js";
 import { RuleStore } from "../core/failures/rules.js";
-import { logger as defaultLogger, type Logger } from "../core/logger.js";
+import { Logger } from "../core/logger.js";
 import { SeededRandom } from "../core/random.js";
 import { ScenarioRunner } from "../core/scenarios/runner.js";
 import type { Scenario } from "../core/scenarios/schema.js";
 import { type AddressPolicy, resolveAllowedWebhookUrl } from "../core/webhooks/address.js";
 import { WebhookDispatcher } from "../core/webhooks/dispatcher.js";
+import { createLiveKeyScanner } from "../shared/live-key-scanner.js";
 import { type RunningTwin, startTwin } from "../twins/framework/server.js";
 import { FrameworkStateStore } from "../twins/framework/state.js";
 import type { TwinDefinition } from "../twins/framework/types.js";
-import { registry } from "../twins/registry.js";
+import { liveKeyPatterns, registry } from "../twins/registry.js";
 import { CredentialsStore } from "./credentials.js";
 import { isMissingFile, sessionPath } from "./paths.js";
 import { type ByteSource, SessionSecrets } from "./secrets.js";
@@ -236,7 +237,13 @@ function startDispatchLoop(
  */
 export async function startSession(options: StartSessionOptions): Promise<RunningSession> {
   const clock = options.clock ?? realClock;
-  const logger = options.logger ?? defaultLogger;
+  const patterns = liveKeyPatterns();
+  const patternScanner = createLiveKeyScanner(patterns);
+  const logger =
+    options.logger ??
+    new Logger({
+      sanitize: (value) => patternScanner.scanValue(value).value,
+    });
   const version = options.version ?? IBEJI_VERSION;
   const definitions = registry.list();
   const definitionsById = new Map(definitions.map((definition) => [definition.id, definition]));
@@ -388,6 +395,7 @@ export async function startSession(options: StartSessionOptions): Promise<Runnin
         state,
         dispatcher,
         webhookUrl: () => webhookUrls.get(definition.id),
+        liveKeyPatterns: patterns,
         ...(fontsDir === undefined ? {} : { fontsDir }),
       });
       states.set(definition.id, state);
@@ -413,6 +421,7 @@ export async function startSession(options: StartSessionOptions): Promise<Runnin
       webhookUrls,
       secrets,
       addressPolicy,
+      liveKeyPatterns: patterns,
       logger,
       controlPort: controlPortRef,
       ...(options.uiRoot === undefined ? {} : { uiRoot: options.uiRoot }),

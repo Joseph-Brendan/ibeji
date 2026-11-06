@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Logger } from "../../src/core/logger.js";
+import { createLiveKeyScanner } from "../../src/shared/live-key-scanner.js";
+import { liveKeyPatterns } from "../../src/twins/registry.js";
 
 describe("C12 logger", () => {
   afterEach(() => {
@@ -46,6 +48,25 @@ describe("C12 logger", () => {
     logger.info("shown");
 
     expect(lines).toEqual(["info: shown"]);
+  });
+
+  it("C12/D43 sanitizes the message and details at the logger boundary", () => {
+    const lines: string[] = [];
+    const key = "sk_live_LOGGER_REVIEW_1234567890";
+    const scanner = createLiveKeyScanner(liveKeyPatterns());
+    const logger = new Logger({
+      level: "debug",
+      write: (line) => lines.push(line),
+      sanitize: (value) => scanner.scanValue(value).value,
+    });
+
+    logger.info("plain");
+    logger.warn(`found ${key}`, { nested: { value: key } });
+
+    expect(lines[0]).toBe("info: plain");
+    expect(lines[1]).toContain("found [live key removed:");
+    expect(lines[1]).toContain('"nested":{"value":"[live key removed:');
+    expect(lines[1]).not.toContain(key);
   });
 
   it("C12: defaults to info and stderr", () => {

@@ -74,7 +74,7 @@ Each twin serves its own test checkout page on its own port. The page:
 - `~/.ibeji` is readable only by your user. On macOS and Linux the folder uses mode `700` and the files use mode `600`. On Windows the folder inherits your user profile's access control.
 - The session file contains the session token, ports and process id. It is removed on clean shutdown.
 - An export replaces the token, UI token, launch codes, credentials, live keys and authorization headers with fingerprints or removes them.
-- A live key never appears in an event, a log, an error, an export or the dashboard.
+- A live key never appears in full in a request field, an event, a log, an error, an export, a control API response, CLI output, an MCP result or the dashboard. When a live key arrives in a header, query value or body value, Ibeji replaces it with `[live key removed: <fingerprint>]` before the twin handles the request, records a warning, and scans every output again. Only the first eight hexadecimal characters of its SHA-256 hash are shown.
 
 ## What Ibeji cannot protect you from
 

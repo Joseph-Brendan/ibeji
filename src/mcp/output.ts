@@ -1,31 +1,31 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { IbejiError } from "../core/errors.js";
 import type { CredentialView, EventItem, Rule, WebhookDelivery } from "../shared/control.js";
+import { createLiveKeyScanner } from "../shared/live-key-scanner.js";
+import { liveKeyPatterns } from "../twins/registry.js";
+
+const outputScanner = createLiveKeyScanner(liveKeyPatterns());
 
 export function toolResult(text: string, data: Record<string, unknown>): CallToolResult {
   return {
-    content: [{ type: "text", text }],
-    structuredContent: data,
+    content: [{ type: "text", text: outputScanner.scanText(text).value }],
+    structuredContent: outputScanner.scanValue(data).value,
   };
 }
 
 export function toolError(error: IbejiError): CallToolResult {
+  const text = `${error.what}\nWhy: ${error.why}\nFix: ${error.fix}`;
   return {
     isError: true,
-    content: [
-      {
-        type: "text",
-        text: `${error.what}\nWhy: ${error.why}\nFix: ${error.fix}`,
-      },
-    ],
-    structuredContent: {
+    content: [{ type: "text", text: outputScanner.scanText(text).value }],
+    structuredContent: outputScanner.scanValue({
       error: {
         code: error.code,
         what: error.what,
         why: error.why,
         fix: error.fix,
       },
-    },
+    }).value,
   };
 }
 

@@ -9,6 +9,7 @@ import type {
   WebhookSignOptions,
 } from "../../core/webhooks/types.js";
 import type { ConnectionGuideInfo } from "../../shared/control.js";
+import type { LiveKeyPattern } from "../../shared/live-key-scanner.js";
 
 export type TwinId = string;
 export type ActionId = string;
@@ -339,6 +340,7 @@ export type TwinDefinition = {
   readonly actions: readonly ActionDefinition[];
   readonly state: TwinStateDefinition;
   readonly auth: AuthAdapter;
+  readonly liveKeys?: readonly LiveKeyPattern[];
   readonly idempotency: IdempotencyAdapter;
   readonly routes: RouteRegistrar;
   readonly responses: ResponseBuilder;

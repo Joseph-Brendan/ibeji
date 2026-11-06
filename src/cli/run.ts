@@ -2,6 +2,8 @@ import open from "open";
 
 import type { RunningSession } from "../control/session.js";
 import type { IbejiError } from "../core/errors.js";
+import { createLiveKeyScanner } from "../shared/live-key-scanner.js";
+import { liveKeyPatterns } from "../twins/registry.js";
 import { booleanValue, CliUsageError, firstPositional, parseCli, stringValue } from "./args.js";
 import {
   type CliRuntime,
@@ -68,8 +70,11 @@ export async function runCli(
   argv: readonly string[],
   options: RunCliOptions = {},
 ): Promise<number> {
-  const stdout = options.stdout ?? ((text) => process.stdout.write(text));
-  const stderr = options.stderr ?? ((text) => process.stderr.write(text));
+  const outputScanner = createLiveKeyScanner(liveKeyPatterns());
+  const baseStdout = options.stdout ?? ((text: string) => process.stdout.write(text));
+  const baseStderr = options.stderr ?? ((text: string) => process.stderr.write(text));
+  const stdout = (text: string) => baseStdout(outputScanner.scanText(text).value);
+  const stderr = (text: string) => baseStderr(outputScanner.scanText(text).value);
   const home = options.home ?? cliHome();
   const cwd = options.cwd ?? process.cwd();
   const openBrowser = options.openBrowser ?? ((url: string) => open(url));

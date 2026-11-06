@@ -1,3 +1,4 @@
+import { matchesLiveKey } from "../../shared/live-key-scanner.js";
 import type {
   AuthAdapter,
   AuthFailure,
@@ -6,6 +7,7 @@ import type {
   TwinRequest,
   TwinResponse,
 } from "../framework/types.js";
+import { flutterwaveLiveKeyPatterns } from "./live-keys.js";
 import { unauthorizedResponse } from "./responses.js";
 
 function readBearer(request: TwinRequest): string | null {
@@ -18,7 +20,7 @@ function readBearer(request: TwinRequest): string | null {
 }
 
 function isLiveKey(key: string): boolean {
-  return key.startsWith("FLWPUBK-") || key.startsWith("FLWSECK-");
+  return matchesLiveKey(key, flutterwaveLiveKeyPatterns);
 }
 
 function classify(key: string | null, credentials: TwinCredentials): AuthResult {

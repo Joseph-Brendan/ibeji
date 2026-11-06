@@ -12,6 +12,7 @@ export type LogWriter = (line: string) => void;
 export type LoggerOptions = {
   readonly level?: LogLevel;
   readonly write?: LogWriter;
+  readonly sanitize?: (value: unknown) => unknown;
 };
 
 /**
@@ -21,9 +22,11 @@ export type LoggerOptions = {
 export class Logger {
   private readonly level: LogLevel;
   private readonly write: LogWriter;
+  private readonly sanitize: ((value: unknown) => unknown) | undefined;
 
   constructor(options: LoggerOptions = {}) {
     this.level = options.level ?? "info";
+    this.sanitize = options.sanitize;
     this.write =
       options.write ??
       ((line) => {
@@ -52,8 +55,12 @@ export class Logger {
       return;
     }
 
-    const suffix = details === undefined ? "" : ` ${JSON.stringify(details)}`;
-    this.write(`${level}: ${message}${suffix}`);
+    const sanitize = this.sanitize;
+    const safeMessage = sanitize === undefined ? message : String(sanitize(message));
+    const safeDetails =
+      details === undefined || sanitize === undefined ? details : sanitize(details);
+    const suffix = safeDetails === undefined ? "" : ` ${JSON.stringify(safeDetails)}`;
+    this.write(`${level}: ${safeMessage}${suffix}`);
   }
 }
 

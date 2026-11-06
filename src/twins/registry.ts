@@ -1,7 +1,9 @@
 import { IbejiError } from "../core/errors.js";
+import type { LiveKeyPattern } from "../shared/live-key-scanner.js";
 import { flutterwaveTwin } from "./flutterwave/definition.js";
 import type { TwinDefinition } from "./framework/types.js";
 import { paystackTwin } from "./paystack/definition.js";
+import { stripeLiveKeyPatterns } from "./stripe/live-keys.js";
 
 export type TwinRegistry = {
   readonly list: () => readonly TwinDefinition[];
@@ -49,6 +51,20 @@ export const TWIN_DEFINITIONS: readonly TwinDefinition[] = Object.freeze([
   paystackTwin,
   flutterwaveTwin,
 ]);
+
+/**
+ * Every live-key pattern Ibeji knows, whether or not the service has a
+ * registered twin. Stripe is version 0.2.0, but its patterns are scanned in
+ * 0.1.0 so a Stripe key cannot enter a Paystack or Flutterwave request.
+ */
+export const LIVE_KEY_PATTERNS: readonly LiveKeyPattern[] = Object.freeze([
+  ...TWIN_DEFINITIONS.flatMap((definition) => definition.liveKeys ?? []),
+  ...stripeLiveKeyPatterns,
+]);
+
+export function liveKeyPatterns(): readonly LiveKeyPattern[] {
+  return LIVE_KEY_PATTERNS;
+}
 
 export const registry: TwinRegistry = buildRegistry(TWIN_DEFINITIONS);
 

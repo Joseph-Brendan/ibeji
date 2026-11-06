@@ -8,7 +8,8 @@ import {
 } from "../../src/control/session.js";
 import { FakeClock } from "../../src/core/clock.js";
 import { Logger } from "../../src/core/logger.js";
-import { registry } from "../../src/twins/registry.js";
+import { createLiveKeyScanner } from "../../src/shared/live-key-scanner.js";
+import { liveKeyPatterns, registry } from "../../src/twins/registry.js";
 
 export type ControlSessionHarness = {
   readonly session: RunningSession;
@@ -40,7 +41,12 @@ export async function startControlSession(
   const home = await mkdtemp(join(tmpdir(), "ibeji-control-"));
   const clock = options.clock ?? new FakeClock(1_700_000_000_000);
   const logs: string[] = [];
-  const logger = new Logger({ level: "debug", write: (line) => logs.push(line) });
+  const outputScanner = createLiveKeyScanner(liveKeyPatterns());
+  const logger = new Logger({
+    level: "debug",
+    write: (line) => logs.push(line),
+    sanitize: (value) => outputScanner.scanValue(value).value,
+  });
 
   try {
     const session = await startSession({
