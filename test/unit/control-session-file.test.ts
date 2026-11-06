@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/pro
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   ensureIbejiHome,
@@ -210,10 +210,17 @@ describe("T6 session file helpers", () => {
   });
 
   it("D46 repairs a user-owned session file readable by others to mode 600", async () => {
-    if (process.platform === "win32") {
-      return;
-    }
     const home = await mkdtemp(join(tmpdir(), "ibeji-session-repair-"));
+    const realPlatform = process.platform;
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+    if (realPlatform === "win32") {
+      Object.defineProperty(process, "platform", {
+        value: "darwin",
+        configurable: true,
+        enumerable: true,
+        writable: false,
+      });
+    }
     try {
       const value = {
         instanceId: "instance-1",
@@ -233,27 +240,35 @@ describe("T6 session file helpers", () => {
         expect(read.value).toEqual(value);
         expect(read.permissionsRepaired).toBe(true);
       }
-      expect((await stat(sessionPath(home))).mode & 0o777).toBe(0o600);
+      if (realPlatform !== "win32") {
+        expect((await stat(sessionPath(home))).mode & 0o777).toBe(0o600);
 
-      const again = await readSessionFile(home);
-      expect(again.kind).toBe("ok");
-      if (again.kind === "ok") {
-        expect(again.permissionsRepaired).toBe(false);
+        const again = await readSessionFile(home);
+        expect(again.kind).toBe("ok");
+        if (again.kind === "ok") {
+          expect(again.permissionsRepaired).toBe(false);
+        }
       }
     } finally {
+      if (platformDescriptor !== undefined) {
+        Object.defineProperty(process, "platform", platformDescriptor);
+      }
       await rm(home, { recursive: true, force: true });
     }
   });
 
   it("D46 refuses a session file owned by another user with SESSION_STALE", async () => {
-    if (process.platform === "win32") {
-      return;
-    }
     const home = await mkdtemp(join(tmpdir(), "ibeji-session-owner-"));
-    const userId = process.getuid?.();
-    if (userId === undefined) {
-      await rm(home, { recursive: true, force: true });
-      return;
+    const realPlatform = process.platform;
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+    const uidDescriptor = Object.getOwnPropertyDescriptor(process, "getuid");
+    if (realPlatform === "win32") {
+      Object.defineProperty(process, "platform", {
+        value: "darwin",
+        configurable: true,
+        enumerable: true,
+        writable: false,
+      });
     }
     try {
       await ensureIbejiHome(home);
@@ -265,14 +280,27 @@ describe("T6 session file helpers", () => {
         startTime: "2026-01-01T00:00:00.000Z",
         version: "0.0.0",
       });
-      const spy = vi.spyOn(process, "getuid").mockReturnValue(userId + 1);
+      const fileUid = (await stat(sessionPath(home))).uid;
+      Object.defineProperty(process, "getuid", {
+        value: () => fileUid + 1,
+        configurable: true,
+      });
       try {
         await expect(readSessionFile(home)).rejects.toMatchObject({ code: "SESSION_STALE" });
       } finally {
-        spy.mockRestore();
+        if (uidDescriptor === undefined) {
+          Reflect.deleteProperty(process, "getuid");
+        } else {
+          Object.defineProperty(process, "getuid", uidDescriptor);
+        }
       }
-      expect((await stat(sessionPath(home))).mode & 0o777).toBe(0o600);
+      if (realPlatform !== "win32") {
+        expect((await stat(sessionPath(home))).mode & 0o777).toBe(0o600);
+      }
     } finally {
+      if (platformDescriptor !== undefined) {
+        Object.defineProperty(process, "platform", platformDescriptor);
+      }
       await rm(home, { recursive: true, force: true });
     }
   });
