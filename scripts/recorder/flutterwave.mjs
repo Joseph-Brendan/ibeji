@@ -13,6 +13,7 @@ export const meta = {
   baseUrl: "https://api.flutterwave.com",
   requestFormat: "json",
   auth: "bearer",
+  testKeyPrefix: "FLWSECK_TEST-",
   testKey: /^FLWSECK_TEST-[A-Za-z0-9._~+/=-]+$/,
   liveKeys: [/^FLWSECK-(?!TEST-)[A-Za-z0-9._~+/=-]+$/, /^FLWPUBK-[A-Za-z0-9._~+/=-]+$/],
   keyPatterns: [/\bFLW(?:PUBK|SECK)(?:_TEST)?-[A-Za-z0-9._~+/=-]+\b/g],

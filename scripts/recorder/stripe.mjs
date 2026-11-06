@@ -10,6 +10,7 @@ export const meta = {
   baseUrl: "https://api.stripe.com",
   requestFormat: "form",
   auth: "basic",
+  testKeyPrefix: "sk_test_",
   testKey: /^sk_test_[A-Za-z0-9._~+/=-]+$/,
   liveKeys: [/^(?:pk|sk|rk)_live_[A-Za-z0-9._~+/=-]+$/],
   keyPatterns: [

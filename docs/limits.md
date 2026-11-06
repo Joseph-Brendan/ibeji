@@ -11,7 +11,7 @@ Ibeji version 0.1.0 builds the Paystack and Flutterwave twins. The Stripe twin i
 - No twin uses a service's logo, colours or fonts.
 - Webhooks go only to this computer by default. Private and public addresses need extra start flags.
 - A twin records state in memory for the life of the session. It is not a database, and it is not a production service.
-- The published package does not include the recorder or the fixtures folder. The recorder is a separate development tool.
+- The published package does not include the recorder or the fixtures folder. The recorder is a separate development tool. In version 0.1.0, `--service stripe` is refused because Stripe recording and the Stripe twin are part of version 0.2.0. When a test-key prefix is shared by more than one service, the recorder asks the person to type the service name before it sends anything.
 
 ## Paystack
 

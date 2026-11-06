@@ -2371,3 +2371,42 @@ Built the dashboard path, doctor address policy, and session file permission fix
 ### Later
 
 - The remaining Phase 9 review problems are separate tasks: broadcast and embedded IPv4 addresses, recorder key formats, the audit gate, and screenshot masking.
+
+## Phase 9: fix security review problems 5 to 9
+
+Built the remaining address, recorder, package-audit and screenshot fixes from the Phase 9 security review and C21 D47 to D50.
+
+### What was built
+
+- **D47 broadcast addresses.** `src/core/webhooks/address.ts` now takes a network-interface list, defaulting to `os.networkInterfaces()`, and refuses `255.255.255.255` plus the directed broadcast address of every IPv4 network on the computer. The list is a parameter, so tests use a fake `/24` without depending on the test machine.
+- **D47 embedded IPv4 addresses.** IPv4-mapped (`::ffff:0:0/96`), NAT64 (`64:ff9b::/96`) and 6to4 (`2002::/16`) addresses are converted to the IPv4 address inside and judged by the same rules. `64:ff9b::a9fe:a9fe` and `2002:a9fe:a9fe::` are refused as link-local.
+- **D48 revised recorder rule.** No key length or character rule was invented. In 0.1.0, `--service stripe` is refused before the environment variable is read, with the exact message `Stripe recording is part of version 0.2.0 (SPEC.md C21 D42)` and exit code 2. When a documented test prefix is shared, the recorder says so and asks the person to type the service name. The shared `sk_test_` prefix is used by Paystack and Stripe. A wrong or empty answer stops with exit code 1 before any request. The Flutterwave `FLWSECK_TEST-` prefix is unique, so it asks nothing.
+- **D48 tests.** A Proxy proves the Stripe environment variable is never read. A fake loopback HTTP server proves wrong and empty answers send nothing. A correct answer reaches the fake fetch. A Flutterwave key asks nothing. The Stripe module keeps its documented preflight shape for 0.2.0.
+- **D49 audit gate.** `scripts/check-package.mjs` now runs `pnpm audit --prod --json` and fails on any production advisory or audit failure. It prints a separate pass line when production is clean.
+- **D49 dependency check.** The latest `flutterwave-node-v3` is still `1.4.1`, and it still depends on `joi` `17.8.3`. There is no newer version to test, so no upgrade was made and T15 is unchanged. `pnpm audit --prod` reports zero advisories. The seven development advisories remain accepted under C21 D49.
+- **D50 screenshot masking.** Each credential value in the Home page now carries `data-credential-value`. `scripts/screenshots.mjs` replaces every such value with `[credential masked]` through `maskCredentials`, and `captureScreenshot` always masks before taking the image. The script only runs itself when executed directly, so tests can import it.
+- **D50 tests and images.** A Playwright test proves all API credential values are visible before masking and absent after masking. A unit test proves the capture helper masks before the screenshot and both documentation images use that path. `docs/images/home.png` and `docs/images/failures.png` were regenerated. OCR finds `[credential masked]` five times on Home and no key-like value on either image.
+
+### Decisions
+
+- **The interface list is explicit.** Production calls default to `os.networkInterfaces()`, while tests pass the exact interface list they want.
+- **Broadcast is always refused.** The check runs before loopback, private and public handling, so a `/8` loopback interface's `127.255.255.255` is refused even though the rest of `127.0.0.0/8` is allowed.
+- **No key rules were invented.** The revised D48 confirms that research does not publish full Paystack or Stripe key bodies. The recorder therefore confirms the service by asking the person, and refuses Stripe entirely until 0.2.0.
+- **The audit gate uses the production tree.** Development advisories from `flutterwave-node-v3` and lint tools are still reported by plain `pnpm audit`, but `check:package` runs `pnpm audit --prod` as C18 requires.
+- **Credentials are masked in the DOM before capture.** The API and copy buttons still work normally; only the visual text is replaced for the screenshot.
+
+### Gates
+
+- `pnpm install --frozen-lockfile` passed.
+- `pnpm typecheck` passed.
+- `pnpm lint` passed with zero warnings.
+- `pnpm build` passed.
+- `pnpm test` passed twice with 779 tests in 81 files.
+- Coverage was 96.19% statements, 90.33% branches, 97.18% functions and 96.22% lines. `src/core/` and `src/twins/framework/` stayed at 100% lines and branches.
+- `pnpm test:ui` passed twice with 96 tests.
+- `pnpm check:package` passed, ran `pnpm audit --prod` and matched SPEC.md C16.
+- `pnpm test:smoke` passed twice.
+
+### Later
+
+- Phase 12 restores Stripe recording when the Stripe twin ships in 0.2.0.

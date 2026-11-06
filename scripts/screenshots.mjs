@@ -4,13 +4,33 @@ import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { chromium } from "@playwright/test";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const CLI = join(ROOT, "dist", "cli.js");
 const OUTPUT = join(ROOT, "docs", "images");
+export const CREDENTIAL_MASK = "[credential masked]";
+
+/**
+ * Replace every credential value in the live page before a screenshot. The
+ * original values stay in the API and in the page's copy buttons, but they
+ * never reach the image.
+ */
+export async function maskCredentials(page) {
+  await page.locator("[data-credential-value]").evaluateAll((nodes, mask) => {
+    for (const node of nodes) {
+      node.textContent = mask;
+    }
+  }, CREDENTIAL_MASK);
+}
+
+/** Mask credentials first, then take one image. */
+export async function captureScreenshot(page, path, options = {}) {
+  await maskCredentials(page);
+  await page.screenshot({ path, ...options });
+}
 
 async function exists(path) {
   try {
@@ -143,9 +163,9 @@ async function main() {
     await page.getByRole("heading", { name: "Home", level: 1 }).waitFor();
     await page.getByTestId("twin-card-paystack").waitFor();
     await page.getByTestId("twin-card-flutterwave").waitFor();
+    await page.locator("[data-credential-value]").first().waitFor();
     await delay(500);
-    await page.screenshot({
-      path: join(OUTPUT, "home.png"),
+    await captureScreenshot(page, join(OUTPUT, "home.png"), {
       fullPage: true,
       animations: "disabled",
     });
@@ -154,8 +174,7 @@ async function main() {
     await page.getByRole("heading", { name: "Failures", level: 1 }).waitFor();
     await page.setViewportSize({ width: 1280, height: 1400 });
     await delay(500);
-    await page.screenshot({
-      path: join(OUTPUT, "failures.png"),
+    await captureScreenshot(page, join(OUTPUT, "failures.png"), {
       fullPage: false,
       animations: "disabled",
     });
@@ -172,4 +191,6 @@ async function main() {
   }
 }
 
-await main();
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}

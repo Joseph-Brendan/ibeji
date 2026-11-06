@@ -142,6 +142,54 @@ async function main() {
     problems.push("publint reported a problem");
   }
 
+  try {
+    let output;
+    try {
+      output = runPnpm(["audit", "--prod", "--json"], {
+        cwd: ROOT,
+        encoding: "utf8",
+      });
+    } catch (error) {
+      if (
+        error !== null &&
+        typeof error === "object" &&
+        "stdout" in error &&
+        error.stdout !== null &&
+        error.stdout !== undefined
+      ) {
+        output = String(error.stdout);
+      } else {
+        throw error;
+      }
+    }
+    const report = JSON.parse(output);
+    const vulnerabilities = report?.metadata?.vulnerabilities;
+    if (
+      vulnerabilities === null ||
+      typeof vulnerabilities !== "object" ||
+      Array.isArray(vulnerabilities)
+    ) {
+      throw new Error("the audit output has no vulnerability counts");
+    }
+    const total = Object.values(vulnerabilities).reduce(
+      (sum, value) => sum + (typeof value === "number" ? value : 0),
+      0,
+    );
+    if (total > 0) {
+      problems.push(
+        `pnpm audit --prod found ${total} production advisor${
+          total === 1 ? "y" : "ies"
+        }: ${JSON.stringify(vulnerabilities)}`,
+      );
+    } else {
+      console.log("PASS: pnpm audit --prod found no advisories.");
+    }
+  } catch (error) {
+    problems.push(
+      `pnpm audit --prod failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
   let packed;
   try {
     const output = runPnpm(["pack", "--json"], {

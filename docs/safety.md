@@ -65,7 +65,7 @@ A webhook URL is the address in your app that receives webhook messages. Ibeji c
 | Public internet addresses | Refused | Refused | Allowed, with a warning |
 | Unspecified (`0.0.0.0`, `::`), link-local (`169.254.0.0/16`, `fe80::/10`), multicast and broadcast | Refused | Refused | Refused |
 
-Ibeji resolves the host name, checks every address it resolves to, and connects to a checked address. A name cannot change between the check and the connection. Redirects are never followed. Link-local addresses are always refused because they include cloud metadata services.
+Ibeji resolves the host name, checks every address it resolves to, and connects to a checked address. A name cannot change between the check and the connection. Redirects are never followed. Link-local addresses are always refused because they include cloud metadata services. Broadcast means `255.255.255.255` and the directed broadcast address of every IPv4 network this computer is on. IPv4-mapped, NAT64 and 6to4 IPv6 addresses are judged by the IPv4 address inside them.
 
 `ibeji doctor` uses the same address checks. It reads the running session's address policy from `GET /status`, or the config file's policy when no session is running, and says which one it used. It sends a `HEAD` request only when every resolved address is this computer. A private or public webhook URL is reported as "not contacted".
 

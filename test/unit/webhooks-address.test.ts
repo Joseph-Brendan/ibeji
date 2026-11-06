@@ -18,6 +18,11 @@ const loopbackOnly: AddressPolicy = { allowPrivate: false, allowPublic: false };
 const privateAllowed: AddressPolicy = { allowPrivate: true, allowPublic: false };
 const publicAllowed: AddressPolicy = { allowPrivate: false, allowPublic: true };
 const allAllowed: AddressPolicy = { allowPrivate: true, allowPublic: true };
+const noInterfaces = {};
+
+function resolve(url: string, policy: AddressPolicy, resolver: DnsResolver): Promise<unknown> {
+  return resolveAllowedWebhookUrl(url, policy, resolver, noInterfaces);
+}
 
 function resolverFor(table: Readonly<Record<string, readonly DnsAddress[]>>): DnsResolver {
   return async (hostname) => table[hostname] ?? [];
@@ -34,6 +39,9 @@ function addressCases(): readonly {
     { address: "127.255.255.255", family: 4, policy: loopbackOnly, allowed: true },
     { address: "::1", family: 6, policy: loopbackOnly, allowed: true },
     { address: "::ffff:127.0.0.1", family: 6, policy: loopbackOnly, allowed: true },
+    { address: "::ffff:8.8.8.8", family: 6, policy: loopbackOnly, allowed: false },
+    { address: "64:ff9b::8.8.8.8", family: 6, policy: publicAllowed, allowed: true },
+    { address: "2002:7f00:1::", family: 6, policy: loopbackOnly, allowed: true },
 
     { address: "10.0.0.1", family: 4, policy: loopbackOnly, allowed: false },
     { address: "172.16.0.1", family: 4, policy: loopbackOnly, allowed: false },
@@ -58,6 +66,12 @@ function addressCases(): readonly {
       policy: publicAllowed,
       allowed: true,
     },
+    {
+      address: "2606:4700:4700:0:0:0:0:1111",
+      family: 6,
+      policy: publicAllowed,
+      allowed: true,
+    },
     { address: "10.0.0.1", family: 4, policy: publicAllowed, allowed: false },
     { address: "192.168.1.1", family: 4, policy: publicAllowed, allowed: false },
 
@@ -74,6 +88,9 @@ function addressCases(): readonly {
     { address: "fe80::1", family: 6, policy: allAllowed, allowed: false },
     { address: "ff02::1", family: 6, policy: allAllowed, allowed: false },
     { address: "::ffff:169.254.169.254", family: 6, policy: allAllowed, allowed: false },
+    { address: "::ffff:a9fe:a9fe", family: 6, policy: allAllowed, allowed: false },
+    { address: "64:ff9b::a9fe:a9fe", family: 6, policy: allAllowed, allowed: false },
+    { address: "2002:a9fe:a9fe::", family: 6, policy: allAllowed, allowed: false },
   ];
 }
 
@@ -98,20 +115,43 @@ describe("C13 webhook address rules", () => {
   it("C13: allows and refuses every address family range for each option", () => {
     for (const entry of addressCases()) {
       expect(
-        isWebhookAddressAllowed(entry.address, entry.family, entry.policy),
+        isWebhookAddressAllowed(entry.address, entry.family, entry.policy, noInterfaces),
         `${entry.address} with ${JSON.stringify(entry.policy)}`,
       ).toBe(entry.allowed);
     }
   });
 
+  it("C13: refuses the broadcast address of every interface and always refuses 255.255.255.255", async () => {
+    const interfaces = {
+      eth0: [
+        { address: "192.168.1.10", netmask: "255.255.255.0", family: "IPv4" as const },
+        { address: "10.20.30.40", netmask: "255.255.255.128", family: "IPv4" as const },
+      ],
+      lo0: [{ address: "127.0.0.1", netmask: "255.0.0.0", family: "IPv4" as const }],
+      bad: [
+        { address: "not-an-ip", netmask: "255.255.255.0", family: "IPv4" as const },
+        { address: "192.168.1.10", netmask: "not-a-mask", family: "IPv4" as const },
+        { address: "192.168.1.10", netmask: "255.255.255.255", family: "IPv4" as const },
+      ],
+      empty: undefined,
+    };
+    expect(isWebhookAddressAllowed("192.168.1.255", 4, privateAllowed, interfaces)).toBe(false);
+    expect(isWebhookAddressAllowed("10.20.30.127", 4, privateAllowed, interfaces)).toBe(false);
+    expect(isWebhookAddressAllowed("127.255.255.255", 4, loopbackOnly, interfaces)).toBe(false);
+    expect(isWebhookAddressAllowed("255.255.255.255", 4, allAllowed, interfaces)).toBe(false);
+    expect(isWebhookAddressAllowed("192.168.1.254", 4, privateAllowed, interfaces)).toBe(true);
+    expect(isWebhookAddressAllowed("10.20.30.126", 4, privateAllowed, interfaces)).toBe(true);
+    expect(isWebhookAddressAllowed("64:ff9b::c0a8:1ff", 6, privateAllowed, interfaces)).toBe(false);
+  });
+
   it("C13: accepts only http and https URLs", async () => {
     const resolver = resolverFor({});
     await expectNotAllowed(
-      () => resolveAllowedWebhookUrl("ftp://127.0.0.1/webhook", loopbackOnly, resolver),
+      () => resolve("ftp://127.0.0.1/webhook", loopbackOnly, resolver),
       "http or https",
     );
     await expect(
-      resolveAllowedWebhookUrl(
+      resolve(
         "http://127.0.0.1:3000/webhook",
         loopbackOnly,
         resolverFor({
@@ -120,7 +160,7 @@ describe("C13 webhook address rules", () => {
       ),
     ).resolves.toMatchObject({ url: { protocol: "http:" } });
     await expect(
-      resolveAllowedWebhookUrl(
+      resolve(
         "https://127.0.0.1:3000/webhook",
         loopbackOnly,
         resolverFor({
@@ -133,7 +173,7 @@ describe("C13 webhook address rules", () => {
   it("C13: names the private flag in the fix", async () => {
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://app.internal:3000/webhook",
           loopbackOnly,
           resolverFor({ "app.internal": [{ address: "10.1.2.3", family: 4 }] }),
@@ -145,7 +185,7 @@ describe("C13 webhook address rules", () => {
   it("C13: names the public flag in the fix", async () => {
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://app.example.com/webhook",
           loopbackOnly,
           resolverFor({ "app.example.com": [{ address: "8.8.8.8", family: 4 }] }),
@@ -157,7 +197,7 @@ describe("C13 webhook address rules", () => {
   it("C13: always-refused addresses name no enabling flag", async () => {
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://metadata.example.com/latest",
           allAllowed,
           resolverFor({
@@ -168,7 +208,7 @@ describe("C13 webhook address rules", () => {
     );
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://broadcast.example.com/",
           allAllowed,
           resolverFor({
@@ -182,7 +222,7 @@ describe("C13 webhook address rules", () => {
   it("C13: rejects a name that resolves to both an allowed and a refused address", async () => {
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://mixed.example.com/webhook",
           loopbackOnly,
           resolverFor({
@@ -196,7 +236,7 @@ describe("C13 webhook address rules", () => {
     );
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://mixed-public.example.com/webhook",
           loopbackOnly,
           resolverFor({
@@ -212,7 +252,7 @@ describe("C13 webhook address rules", () => {
 
   it("C13: tricky host names are judged by their resolved addresses", async () => {
     await expect(
-      resolveAllowedWebhookUrl(
+      resolve(
         "http://localhost.example.com/webhook",
         loopbackOnly,
         resolverFor({
@@ -222,7 +262,7 @@ describe("C13 webhook address rules", () => {
     ).resolves.toBeDefined();
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://localhost.example.com/webhook",
           loopbackOnly,
           resolverFor({
@@ -233,7 +273,7 @@ describe("C13 webhook address rules", () => {
     );
 
     await expect(
-      resolveAllowedWebhookUrl(
+      resolve(
         "http://127.0.0.1.nip.io/webhook",
         loopbackOnly,
         resolverFor({
@@ -243,7 +283,7 @@ describe("C13 webhook address rules", () => {
     ).resolves.toBeDefined();
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://127.0.0.1.nip.io/webhook",
           loopbackOnly,
           resolverFor({
@@ -256,7 +296,7 @@ describe("C13 webhook address rules", () => {
 
   it("C13: host.docker.internal needs the private option unless it resolves publicly", async () => {
     await expect(
-      resolveAllowedWebhookUrl(
+      resolve(
         "http://host.docker.internal:3000/webhook",
         privateAllowed,
         resolverFor({
@@ -266,7 +306,7 @@ describe("C13 webhook address rules", () => {
     ).resolves.toBeDefined();
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://host.docker.internal:3000/webhook",
           loopbackOnly,
           resolverFor({
@@ -277,7 +317,7 @@ describe("C13 webhook address rules", () => {
     );
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://host.docker.internal:3000/webhook",
           privateAllowed,
           resolverFor({
@@ -290,8 +330,7 @@ describe("C13 webhook address rules", () => {
 
   it("C13: an empty DNS result is refused", async () => {
     await expectNotAllowed(
-      () =>
-        resolveAllowedWebhookUrl("http://empty.example.com/webhook", loopbackOnly, resolverFor({})),
+      () => resolve("http://empty.example.com/webhook", loopbackOnly, resolverFor({})),
       "resolves to at least one address",
     );
   });
@@ -299,7 +338,7 @@ describe("C13 webhook address rules", () => {
   it("C13: a DNS failure is refused as an address error", async () => {
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl("http://broken.example.com/webhook", loopbackOnly, async () => {
+        resolve("http://broken.example.com/webhook", loopbackOnly, async () => {
           throw Object.assign(new Error("no such host"), { code: "ENOTFOUND" });
         }),
       "host name that resolves",
@@ -310,7 +349,7 @@ describe("C13 webhook address rules", () => {
     expect(isWebhookAddressAllowed("not-an-ip", 4, loopbackOnly)).toBe(false);
     await expectNotAllowed(
       () =>
-        resolveAllowedWebhookUrl(
+        resolve(
           "http://invalid.example.com/webhook",
           loopbackOnly,
           resolverFor({
@@ -320,7 +359,7 @@ describe("C13 webhook address rules", () => {
       "valid IPv4 or IPv6",
     );
     await expectNotAllowed(
-      () => resolveAllowedWebhookUrl("not a URL", loopbackOnly, resolverFor({})),
+      () => resolve("not a URL", loopbackOnly, resolverFor({})),
       "http or https",
     );
   });

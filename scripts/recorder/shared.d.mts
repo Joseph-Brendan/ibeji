@@ -7,6 +7,7 @@ export type ServiceMeta = {
   readonly baseUrl: string;
   readonly requestFormat: "json" | "form";
   readonly auth: "bearer" | "basic";
+  readonly testKeyPrefix: string;
   readonly testKey: RegExp;
   readonly liveKeys: readonly RegExp[];
   readonly keyPatterns: readonly RegExp[];

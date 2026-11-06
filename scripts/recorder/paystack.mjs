@@ -14,6 +14,7 @@ export const meta = {
   baseUrl: "https://api.paystack.co",
   requestFormat: "json",
   auth: "bearer",
+  testKeyPrefix: "sk_test_",
   testKey: /^sk_test_[A-Za-z0-9._~+/=-]+$/,
   liveKeys: [/^(?:pk|sk)_live_[A-Za-z0-9._~+/=-]+$/],
   keyPatterns: [/\b(?:pk|sk)_(?:test|live)_[A-Za-z0-9._~+/=-]+\b/g],

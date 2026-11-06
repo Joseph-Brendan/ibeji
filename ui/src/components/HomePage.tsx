@@ -315,7 +315,7 @@ export function HomePage(props: HomePageProps): ReactNode {
                             <span className="credential-help">
                               {credentialHelp(credential.role)}
                             </span>
-                            <code>{credential.value}</code>
+                            <code data-credential-value={credential.id}>{credential.value}</code>
                             <CopyButton
                               value={credential.value}
                               label={`${credential.label} for ${twin.displayName}`}

@@ -19,6 +19,45 @@ const SERVICES = {
 const USAGE =
   "Usage: node scripts/record-fixtures.mjs --service <paystack|flutterwave|stripe> [--only <action>]";
 
+const UNAVAILABLE_SERVICES = new Map([
+  ["stripe", "Stripe recording is part of version 0.2.0 (SPEC.md C21 D42)"],
+]);
+
+export function sharedPrefixServices(meta) {
+  return Object.values(SERVICES)
+    .map((service) => service.meta)
+    .filter((candidate) => candidate.testKeyPrefix === meta.testKeyPrefix);
+}
+
+export async function confirmSharedTestPrefix(meta, prompt) {
+  const shared = sharedPrefixServices(meta);
+  if (shared.length < 2) {
+    return true;
+  }
+
+  const names = shared.map((service) => service.displayName);
+  console.log(
+    `The test-key prefix ${meta.testKeyPrefix} is shared by ${names.join(" and ")} in the research files.`,
+  );
+  console.log(
+    "The prefix alone cannot prove which service the key belongs to, so the recorder must ask before any request.",
+  );
+  const answer = await prompt.ask(
+    `Type ${meta.id} to confirm this is the ${meta.displayName} test key: `,
+  );
+  if (answer.trim().toLowerCase() === meta.id) {
+    return true;
+  }
+
+  console.error(
+    `The ${meta.displayName} key was not confirmed. ` +
+      `What: the recorder did not receive the service name. ` +
+      `Why: the ${meta.testKeyPrefix} test-key prefix is shared by ${names.join(" and ")}, so the recorder cannot tell which service the key belongs to. ` +
+      `Fix: run the recorder again and type ${meta.id}. No request was made.`,
+  );
+  return false;
+}
+
 export function parseArgs(args) {
   let service;
   let only;
@@ -119,6 +158,11 @@ export async function runCli(args, env = process.env, deps = {}) {
     printUsage();
     return 2;
   }
+  const unavailable = UNAVAILABLE_SERVICES.get(parsed.service);
+  if (unavailable !== undefined) {
+    console.error(unavailable);
+    return 2;
+  }
   const only =
     parsed.only === undefined
       ? undefined
@@ -144,6 +188,11 @@ export async function runCli(args, env = process.env, deps = {}) {
   const key = keyResult.key;
 
   const prompt = deps.prompt ?? createPrompt();
+  if (!(await confirmSharedTestPrefix(meta, prompt))) {
+    prompt.close();
+    return 1;
+  }
+
   const keyPatterns = [
     ...paystack.meta.keyPatterns,
     ...flutterwave.meta.keyPatterns,

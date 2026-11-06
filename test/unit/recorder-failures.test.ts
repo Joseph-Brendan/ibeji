@@ -207,13 +207,23 @@ async function startPaystackFlowServer(verifyStatuses: readonly string[]) {
 }
 
 function makePrompt() {
-  return { ask: vi.fn(async () => ""), close: vi.fn() };
+  return {
+    ask: vi.fn(async (question: unknown) =>
+      String(question).includes("to confirm") ? "paystack" : "",
+    ),
+    close: vi.fn(),
+  };
 }
 
 function makeScriptedPrompt(answers: readonly string[]) {
   const queue = [...answers];
   return {
-    ask: vi.fn(async () => queue.shift() ?? "q"),
+    ask: vi.fn(async (question: unknown) => {
+      if (String(question).includes("to confirm")) {
+        return "paystack";
+      }
+      return queue.shift() ?? "q";
+    }),
     close: vi.fn(),
   };
 }
@@ -266,41 +276,15 @@ describe("C15 recorder preflight key check", () => {
     }
   });
 
-  it("uses Stripe's smallest documented list page size and stops on a 403", async () => {
-    const server = await startServer((request) => {
-      if (request.method === "GET" && request.url.startsWith("/v1/payment_intents?")) {
-        return {
-          status: 403,
-          body: {
-            error: { type: "invalid_request_error", message: "The key lacks permission." },
-          },
-        };
-      }
-      return { status: 500, body: { error: { message: "unexpected request" } } };
-    });
-    const cwd = await makeTempDir();
-    const output = captureConsole();
-    const stripeKey = "sk_test_fake_recorder_key_456";
-    try {
-      const code = await runCli(
-        ["--service", "stripe"],
-        { STRIPE_TEST_SECRET_KEY: stripeKey },
-        { baseUrl: server.baseUrl, cwd, prompt: makePrompt() },
-      );
-
-      expect(code).toBe(1);
-      expect(server.requests).toHaveLength(1);
-      const preflightUrl = new URL(server.requests[0]?.url ?? "", server.baseUrl);
-      expect(preflightUrl.pathname).toBe("/v1/payment_intents");
-      expect(preflightUrl.searchParams.get("limit")).toBe("1");
-      expect(output.errors.join("\n")).toContain("The key lacks permission.");
-      expect(output.errors.join("\n")).not.toContain(stripeKey);
-      await expect(readdir(join(cwd, "fixtures"))).rejects.toThrow();
-    } finally {
-      output.restore();
-      await server.close();
-      await rm(cwd, { recursive: true, force: true });
-    }
+  it("keeps Stripe's documented preflight shape for version 0.2.0", () => {
+    expect(stripe.preflight.method).toBe("GET");
+    expect(stripe.preflight.path).toBe("/v1/payment_intents");
+    expect(stripe.preflight.query).toEqual({ limit: 1 });
+    expect(
+      stripe.isKeyError(403, {
+        error: { type: "invalid_request_error", code: "secret_key_required" },
+      }),
+    ).toBe(true);
   });
 });
 
