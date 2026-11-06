@@ -1,7 +1,7 @@
 # Ibeji security review
 
 Original review: 6 November 2026, commit `3139b33`, version 0.1.0
-Remediation update: 6 November 2026, verified at commit `f483f7c`, version 0.1.0
+Remediation update: 6 November 2026, verified at commit `f483f7c`, recorded in commit `5106016`, version 0.1.0
 Reviewer: independent review. The original review changed no product code.
 
 ## Release recommendation

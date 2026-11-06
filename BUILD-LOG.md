@@ -2410,3 +2410,54 @@ Built the remaining address, recorder, package-audit and screenshot fixes from t
 ### Later
 
 - Phase 12 restores Stripe recording when the Stripe twin ships in 0.2.0.
+
+## Phase 9: fix the spec compliance review findings
+
+Built the eight groups of fixes from `SPEC-COMPLIANCE.md` under the approved C21 D52 to D62 decisions. Security findings D43 to D51 were verified and their review statuses were updated first.
+
+### What was built
+
+1. **D52 fees.** A failed Flutterwave payment for 7,500 NGN now returns the recorded `app_fee: 285` and the recorded failed card `514301/9965`; a successful payment keeps the recorded `app_fee: 105` and card `553188/2950`. Other amounts keep the illustrative 1.4% formula. `docs/limits.md` says every fee field is illustrative, must not be used to test fee arithmetic, and that the failed-transfer message is a placeholder.
+2. **D53 customer data.** `docs/safety.md` and `docs/connect-your-app.md` now say to use fake customer data only and never to put a secret in a webhook URL, because events, records, exports and the dashboard keep what the app sends and show the URL.
+3. **D54 and D55 API details.** Checkout pages keep `Referrer-Policy: same-origin`; C8 records the reason. The launch route, `port`, `connectionGuide` and the "Replace test keys" button are approved as built. The `launchCode` alias was removed from `/auth/exchange`; only `code` is accepted.
+4. **D56 and D57 dependencies and release.** C21 D56 approves `@modelcontextprotocol/client` for T11 and the prebuilt `esbuild` install script. C21 D57 makes package versioning, `private` removal, `CHANGELOG.md` generation and `scripts/publish-release.mjs` Phase 10 work.
+5. **D58 T4 parity.** A Playwright test switches on `webhook-delayed`, `server-error` and `payment-declined` through the Failures page and proves the resulting rule matches the CLI, MCP and control API.
+6. **D59 twin-list scripts.** `scripts/smoke.mjs` no longer passes fixed `--twin-port` values, switches on a service id, or prints a Stripe-only line. It maps credential roles generically. `scripts/screenshots.mjs` waits for every twin card named by the running session. A source test checks both scripts.
+7. **D60 T2, T3 and T15.** A fast-check property test signs and verifies 1,000 random bodies per twin. Paystack rejects every changed body; Flutterwave's documented shared `verif-hash` checks canonical JSON and the secret. Form encoding stays with Stripe 0.2.0. T3 and T15 accept the documentation-only actions and library limits listed in `docs/limits.md`.
+8. **D61 and D62 docs, errors and clean-up.** The five default fix texts now name `ibeji status`, `ibeji start`, `ibeji open` or `ibeji webhook-url`; a test checks every named command exists. The README not-affiliated line names only Paystack and Flutterwave. `src/core/placeholder.ts`, its test and `ControlClient.placeholder()` were deleted. `docs/limits.md` now has the official-library table that closes the D62 question.
+
+### Decisions
+
+- **D52 uses a recorded-value table, not a new fee formula.** The only two fixtures with the same amount and card are the success and failed 7,500 NGN cases. Other amounts keep the formula and are labelled illustrative.
+- **D55 removes the alias rather than keeping compatibility.** Version 0.1.0 has no old clients, and C8 now names only the `code` field.
+- **D59 starts the smoke session on free control and default twin ports.** The twin list comes from the running session. This keeps the smoke test free of twin ids while still exercising every registered twin.
+- **D60 tests Flutterwave's real verification method.** A shared `verif-hash` cannot reject a changed canonical body; the test proves the documented check, wrong-secret rejection and non-canonical rejection instead. Paystack rejects every changed body.
+- **D61 tests commands, not strings.** The C12 test extracts every `ibeji <command>` from default fix text and asks the CLI help for it.
+
+### Tests
+
+- `pnpm test`: 790 tests in 84 files passed twice.
+- Coverage: 96.17% statements, 90.36% branches, 97.11% functions, 96.20% lines. `src/core/` and `src/twins/framework/` kept their 100% thresholds.
+- `pnpm test:ui`: 97 tests passed twice, including the new T4 parity test.
+- `pnpm test:smoke`: passed after each group.
+- Focused before/after runs: D52 fee test 105 -> 285; D55 alias test 200 -> 400; D61 tests failed before the fixes and passed after; D59 source test failed before and passed after.
+- No test was skipped or weakened. `test/unit/placeholder.test.ts` and the two `ControlClient.placeholder()` assertions were removed with the dead module and method they covered, as D61 requires; no other test changed.
+
+### Gates
+
+Run in C18 order after each group:
+
+- `pnpm install --frozen-lockfile`: passed.
+- `pnpm typecheck`: passed.
+- `pnpm lint`: passed with zero warnings.
+- `pnpm build`: passed.
+- `pnpm test`: passed twice with 790 tests in 84 files.
+- `pnpm test:ui`: passed twice with 97 tests.
+- `pnpm check:package`: passed, ran `pnpm audit --prod` and matched C16.
+- `pnpm test:smoke`: passed.
+
+### Later
+
+- Version 0.1.0 packaging, `CHANGELOG.md` and `scripts/publish-release.mjs` remain Phase 10 work (C21 D57).
+- The Stripe twin and its C4c tests remain version 0.2.0 (C21 D42).
+- Customer data and webhook URL secrets are documented risks under D53.
