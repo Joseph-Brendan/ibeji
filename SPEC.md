@@ -1,10 +1,10 @@
-# Ibeji: Build Specification v1.6
+# Ibeji: Build Specification v1.7
 
 Owner: Joseph Brendan, Dev and Design HQ
 Build tool: Antigravity, on a personal Mac
 Status: ready to build
 Date: 27 October 2026
-Change from v1.5: decisions from the Phase 9 spec compliance review (C21, D52 to D62): fee values are labelled illustrative, checkout pages keep `Referrer-Policy: same-origin`, three implemented API details are approved, and the T2, T4, T15 and twin-list rules are made precise. Change from v1.4: fixes from the Phase 9 security review (C21, D43 to D51): live keys are removed from every request field on arrival and from every output, the dashboard moves under /_ibeji/ so its cookie is not sent to other apps, `ibeji doctor` only contacts addresses on this computer, and the webhook address rules close two gaps. Change from v1.3: version 0.1.0 ships the Paystack and Flutterwave twins; the Stripe twin follows in version 0.2.0 (C21 D42). Stripe's scope (C4c) and design stay in this file for 0.2.0. Change from v1.2: decisions from the Phase 2 research and twin design are applied (C21, D31 to D41): the Flutterwave and Stripe API versions, the per-twin failure table, Stripe version-header handling, how money is stored, and idempotency. Change from v1.1: decisions from the Step 1.1 kickoff review are applied throughout and listed in C21 (D1 to D30). The biggest changes: how the dashboard signs in (C8), exact failure settings and the order failures apply in (C5), the webhook address rules (C7, C13), the control API route table (C8), and the split of the "no native code" rule into a runtime rule and a development rule (C1).
+Change from v1.6: T2 wording fixed for services that mark webhooks with a shared secret instead of signing the body, and the smoke test must start every twin on port 0 (C21 D63, D64). Change from v1.5: decisions from the Phase 9 spec compliance review (C21, D52 to D62): fee values are labelled illustrative, checkout pages keep `Referrer-Policy: same-origin`, three implemented API details are approved, and the T2, T4, T15 and twin-list rules are made precise. Change from v1.4: fixes from the Phase 9 security review (C21, D43 to D51): live keys are removed from every request field on arrival and from every output, the dashboard moves under /_ibeji/ so its cookie is not sent to other apps, `ibeji doctor` only contacts addresses on this computer, and the webhook address rules close two gaps. Change from v1.3: version 0.1.0 ships the Paystack and Flutterwave twins; the Stripe twin follows in version 0.2.0 (C21 D42). Stripe's scope (C4c) and design stay in this file for 0.2.0. Change from v1.2: decisions from the Phase 2 research and twin design are applied (C21, D31 to D41): the Flutterwave and Stripe API versions, the per-twin failure table, Stripe version-header handling, how money is stored, and idempotency. Change from v1.1: decisions from the Step 1.1 kickoff review are applied throughout and listed in C21 (D1 to D30). The biggest changes: how the dashboard signs in (C8), exact failure settings and the order failures apply in (C5), the webhook address rules (C7, C13), the control API route table (C8), and the split of the "no native code" rule into a runtime rule and a development rule (C1).
 
 This file is the single source of truth for the project. The coding agent reads it before every task. If the code and this file disagree, the agent stops and asks.
 
@@ -683,7 +683,7 @@ Not committed: `node_modules`, `dist`, `coverage`, test reports.
 | Id | Test group | What it proves |
 |---|---|---|
 | T1 | Unit | Each module works alone |
-| T2 | Property | The failure engine, money formatting, redaction, and every twin's webhook signer and verifier (sign then verify passes; any changed byte fails) hold for thousands of random inputs. Form encoding is tested here when the Stripe twin arrives in 0.2.0. |
+| T2 | Property | The failure engine, money formatting, redaction, and every twin's webhook signer and verifier. For a service that signs the body (Paystack, Stripe): sign then verify passes, and changing any byte of the body or signature fails. For a service that marks webhooks with a shared secret instead (Flutterwave's `verif-hash`): the correct value passes for any body, and any change to the value fails (C21 D63) hold for thousands of random inputs. Form encoding is tested here when the Stripe twin arrives in 0.2.0. |
 | T3 | Contract | Every twin response matches the shape of its recorded fixture: same fields, same types, same status codes, for every twin. Skipped fixtures are not used. |
 | T4 | Failure behaviour | Every failure does exactly what C5 says on every twin that supports it, tested through the control API, including the order of application. A parity test turns on three failures (`webhook-delayed`, `server-error`, `payment-declined`) through the CLI, the MCP server, and the UI, and proves each produces the same rule. |
 | T5 | Webhooks | Each twin's signing matches its service's method; statuses, retries, duplicates, delays, ordering, resends, and address rules behave as specified |
@@ -839,6 +839,13 @@ Every decision made during the build that changes or clarifies this spec is reco
 | D62 | Closed: which official libraries can be pointed at a twin. Paystack: none can (`docs/limits.md`). Flutterwave: the official library can, for the actions it has methods for. Stripe: decided in 0.2.0. | Third-list item 7. | C17, T15 |
 
 Coverage counts differing by one branch between runs (third-list item 3) need no change: both runs pass the floor.
+
+**8 November 2026: decisions from the second compliance review.**
+
+| Id | Decision | Reason | Sections |
+|---|---|---|---|
+| D63 | T2's signature property depends on the service's method. Body-signing services: any changed byte fails. Shared-secret services such as Flutterwave v3: any changed secret value fails; body changes are not detected, because the real service does not detect them either. `docs/safety.md` tells Flutterwave users that `verif-hash` proves who sent a webhook, not that its body is unchanged. | My D60 wording assumed every service signs the body. Flutterwave v3 does not, and making the twin stricter than Flutterwave would be a false service claim. | C17 |
+| D64 | The smoke test and the screenshot script start every twin on port 0. They read the registered twin ids from `ibeji keys --json`, which works before any session exists, and pass `--twin-port <id>=0` for each. | The smoke test used the default twin ports 4401 and 4402, so it would fail on a computer already running Ibeji, and it broke the C17 port-0 rule. | C17, C3 |
 ---
 
 ## Part E. Rules for the coding agent
