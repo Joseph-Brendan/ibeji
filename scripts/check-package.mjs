@@ -65,8 +65,11 @@ async function main() {
   const packageFile = join(ROOT, "package.json");
   const pkg = JSON.parse(await readFile(packageFile, "utf8"));
 
-  if (pkg.private !== true) {
-    problems.push("package.json private must stay true until Phase 10");
+  if (pkg.private === true) {
+    problems.push("package.json private must be removed for a release");
+  }
+  if (pkg.version !== "0.1.0") {
+    problems.push("package.json version must be 0.1.0");
   }
   if (pkg.name !== "ibeji") {
     problems.push("package.json name must be ibeji");

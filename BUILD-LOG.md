@@ -2516,3 +2516,64 @@ The default session was stopped afterwards; no listener remained on 4400, 4401 o
 ### Later
 
 - No follow-up is needed for D63 or D64.
+
+## Release 0.1.0 preparation
+
+Prepared the 0.1.0 package without publishing.
+
+### What was built
+
+- Removed `"private": true` from `package.json`.
+- Ran `pnpm changeset version`: the package is now `0.1.0`, the changeset was consumed, and `CHANGELOG.md` starts with:
+  - `## 0.1.0`
+  - `### Minor Changes`
+  - the 0.1.0 release summary from `.changeset/version-0-1-0.md`.
+- Added `scripts/publish-release.mjs` and `pnpm release:publish`.
+- The script checks `npm whoami` for `devanddesignhq`; otherwise it prints exactly `You are not signed in to npm. Run: npm login` and stops.
+- It checks `npm view ibeji@<version>` and refuses an already-published version.
+- It builds, removes and recreates `~/ibeji-release`, packs with `pnpm pack --json`, checks the packed name/version, and refuses a missing tarball.
+- It prints the package, tarball path and full packed file list, then waits for a fresh `yes`. Input before the question is discarded. Any other answer prints `Received: "<answer>"` and stops.
+- It publishes the tarball from `~/ibeji-release`, so the project folder and its settings are not the working directory, and leaves stdio inherited so npm can ask for an OTP or browser approval.
+- It polls `npm view ibeji@<version>` every 10 seconds for up to 5 minutes, prints `Confirmed: ibeji@<version> is on npm.` and exits 0.
+- It never prints a token or npm auth output.
+- Added `test/unit/publish-release.test.ts` and `test/helpers/fake-npm.mjs`. Tests cover wrong whoami, already-published version, wrong tarball version, a non-yes answer, a fresh answer after pre-typed input, a five-minute timeout, and the success path including publish working directory.
+
+### Release check
+
+`pnpm release:publish` on this machine stopped at the sign-in check, as expected because the npm account is not logged in:
+
+```text
+> ibeji@0.1.0 release:publish
+> node scripts/publish-release.mjs
+
+You are not signed in to npm. Run: npm login
+```
+
+No package was published.
+
+### Packed tarball and dry run
+
+Built and packed to `~/ibeji-release/ibeji-0.1.0.tgz`, then ran:
+
+```text
+npm publish --dry-run ./ibeji-0.1.0.tgz
+```
+
+The tarball is `ibeji@0.1.0`, 24 files, 339.8 kB. The full list is in the release output above. It contains only `CHANGELOG.md`, `LICENSE`, `README.md`, `THIRD-PARTY-NOTICES`, `dist/`, `package.json` and `scenarios/`. No recorder, tests, `STORIES.md`, `research/`, fixtures, `TWIN-DESIGN.md`, `BUILD-LOG.md`, `UI-PLAN.md`, review files, `.env` files or keys are present.
+
+### Gates
+
+- `pnpm install --frozen-lockfile`: passed.
+- `pnpm typecheck`: passed.
+- `pnpm lint`: passed with zero warnings.
+- `pnpm build`: passed.
+- `pnpm test`: 798 tests in 85 files passed twice.
+- Coverage: 96.17% statements, 90.36% branches, 97.11% functions, 96.20% lines.
+- `pnpm test:ui`: 97 tests passed twice.
+- `pnpm check:package`: passed, ran `pnpm audit --prod`, matched C16.
+- `pnpm test:smoke`: passed three times.
+- `pnpm audit --prod`: zero advisories; the seven development advisories remain accepted by D49.
+
+### Later
+
+- Log in as `devanddesignhq` and run `pnpm release:publish` when ready to publish 0.1.0.

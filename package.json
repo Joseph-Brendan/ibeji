@@ -1,8 +1,7 @@
 {
   "name": "ibeji",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Local twins of payment services for safe payment, webhook and AI-agent testing.",
-  "private": true,
   "license": "MIT",
   "author": "Joseph Brendan",
   "repository": {
@@ -51,6 +50,7 @@
     "test:ui": "playwright test",
     "screenshots": "node scripts/screenshots.mjs",
     "check:package": "node scripts/check-package.mjs",
+    "release:publish": "node scripts/publish-release.mjs",
     "test:smoke": "node scripts/smoke.mjs",
     "example:paystack:naive": "node examples/school-fees-app/run.js paystack naive",
     "example:paystack:safe": "node examples/school-fees-app/run.js paystack safe",
