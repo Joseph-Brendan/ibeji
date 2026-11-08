@@ -1,14 +1,14 @@
 # Ibeji SPEC compliance review
 
-Date: 6 November 2026
+Date: 8 November 2026
 Version reviewed: 0.1.0
-Code reviewed after fixes: `5b72a9c`
-Spec reviewed: `SPEC.md` v1.6 at `f483f7c`, including C21 D52 to D62
-Reviewer: strict outside review. The first pass changed no product code; this update records the fixes made afterward.
+Commit reviewed: `f915e0a`
+Spec reviewed: `SPEC.md` v1.6 at `f483f7c`, including C21 D1 to D62
+Reviewer: strict outside review. No product code was changed in this task.
 
 ## Scope and method
 
-I read `AGENTS.md`, all of `SPEC.md`, all of `BUILD-LOG.md`, and all of `SECURITY-REVIEW.md`. I then inspected the source, tests, scripts, fixtures, docs, package metadata and CI configuration. I ran every C18 gate after each fix group, the UI suite twice per group, the smoke test in every group, and both audit views.
+I read `AGENTS.md`, all of `SPEC.md`, all of `BUILD-LOG.md`, and all of `SECURITY-REVIEW.md`. I then inspected the source, tests, scripts, fixtures, docs, package metadata and CI configuration. I ran every C18 gate, the UI suite twice, the smoke test three times, and both audit views.
 
 Status meanings:
 
@@ -97,7 +97,7 @@ Status meanings:
 | C15, recorder and fixtures | met | `scripts/record-fixtures.mjs`; `scripts/recorder/*`; `test/unit/recorder-keys.test.ts`; `test/unit/recorder-failures.test.ts`; `test/unit/fixture-privacy.test.ts`; `fixtures/`. | Stripe is refused, shared `sk_test_` prefix asks for service confirmation, wrong/empty answers send nothing, Flutterwave does not ask, fixtures are redacted and T13 passes. |
 | C16, repository layout and published files | met | `ls scripts`; `package.json:36-43`; `pnpm check:package`; `README.md`; `CHANGELOG.md`; C21 D57 and D61. | The packed list matches C16 and the required folders and scripts exist. D57 makes version 0.1.0, `private` removal, `CHANGELOG.md` generation and `publish-release.mjs` Phase 10 work. D61 removes the dead placeholder module. |
 | C17 T1, Unit | met | 790 Vitest tests in 84 files; `test/unit/`. | Every module group has unit tests and the suite passes twice. |
-| C17 T2, Property | met | `test/unit/failures-engine.test.ts`; `test/unit/flutterwave-money.test.ts`; `test/unit/ui-money.test.ts`; `test/unit/core-redact.test.ts`; `test/unit/webhook-signature-property.test.ts`. | D60 adds 1,000 random sign/verify cases per twin. Paystack rejects every changed body; Flutterwave checks its shared `verif-hash` and canonical JSON, matching v3. Form encoding moves to Stripe 0.2.0. |
+| C17 T2, Property | partly met | `test/unit/failures-engine.test.ts`; `test/unit/flutterwave-money.test.ts`; `test/unit/ui-money.test.ts`; `test/unit/core-redact.test.ts`; `test/unit/webhook-signature-property.test.ts`; `src/twins/flutterwave/webhooks.ts:46-60`. | D60 adds 1,000 random sign/verify cases per twin. Paystack rejects every changed body. Flutterwave v3 uses a shared `verif-hash`, not a body HMAC, so a changed canonical body with the correct header still verifies. The test proves the real v3 method, but C17 literal "any changed byte fails" is not met for Flutterwave. This needs a C21 clarification, not an invented signature. |
 | C17 T3, Contract | met | `test/contract/*`; `test/conformance/paystack-conformance.test.ts`; `test/conformance/flutterwave-conformance.test.ts`; `fixtures/paystack`; `fixtures/flutterwave`; `docs/limits.md`. | Recorded fixtures cover the shipped twins; skipped transfer fixtures are not used. D60 accepts the documentation-only actions listed in `docs/limits.md`; Stripe fixtures remain 0.2.0. |
 | C17 T4, Failure behaviour | met | `test/unit/failures-engine.test.ts`; `test/integration/paystack.test.ts`; `test/integration/flutterwave.test.ts`; `test/integration/twin-webhook-failures.test.ts`; `test/integration/mcp.test.ts:798`; `test/ui/failures-scenarios.spec.ts`. | Every failure, its order and the control API path are tested. D58 adds the UI leg; the three parity failures produce the same rule through UI, CLI, MCP and control API. |
 | C17 T5, Webhooks | met | `test/unit/paystack-webhooks.test.ts`; `test/unit/flutterwave-webhooks.test.ts`; `test/unit/webhooks-dispatcher.test.ts`; `test/integration/twin-webhook-failures.test.ts`; `test/integration/control-routes.test.ts:587`. | Signing, verification, eight statuses, retries, duplicates, delays, ordering, resends, 4 KB cap, redirect refusal and address rules are covered. |
@@ -107,12 +107,13 @@ Status meanings:
 | C17 T9, Accessibility | met | `test/ui/t9-accessibility.spec.ts`; axe tests; keyboard tests. | Zero serious or critical axe findings and keyboard coverage passed twice. |
 | C17 T10, CLI | met | `test/integration/cli.test.ts`; `test/unit/cli-*.test.ts`. | Help, success, JSON, errors, exit codes, no-session and stale-session paths are covered. |
 | C17 T11, MCP | met | `test/integration/mcp.test.ts`; `test/unit/mcp-output.test.ts`. | Every tool over stdio and in process, annotations, no-session errors, restart, parity and stdout discipline are covered. |
-| C17 T12, Smoke | met | `pnpm test:smoke` run after each fix group. | The packed install, path with a space and non-English letter, native scan, every registered twin, duplicate webhooks, MCP stdout and cleanup pass. D59 reads twins from the session. |
+| C17 T12, Smoke | met | `pnpm test:smoke` run three times. | The packed install, path with a space and non-English letter, native scan, every registered twin, duplicate webhooks, MCP stdout and cleanup pass. The C17 port rule is recorded separately below. |
 | C17 T13, Fixture privacy | met | `test/unit/fixture-privacy.test.ts`; `fixtures/`. | The test scans bodies, headers, paths and queries and rejects non-fake private values. |
 | C17 T14, Twin conformance | met | `test/conformance/paystack-conformance.test.ts`; `test/conformance/flutterwave-conformance.test.ts`; `test/conformance/twin-conformance.test.ts`; `test/integration/twin-framework.test.ts`. | Every registered twin passes the shared suite; Stripe is not registered by C21 D42. |
 | C17 T15, Official library compatibility | met | `test/compat/flutterwave-official-library.test.ts:102`; `docs/limits.md` official-library table. | The Flutterwave library performs verify and refund; hosted create uses plain HTTP because the library has no method, exactly as C17 and D60 allow. Paystack cannot be pointed at a twin and Stripe is 0.2.0; both are documented. |
+| C17 test rules | partly met | `scripts/smoke.mjs:225`, `:867`; `test/setup/t7-network.ts`; UI and integration helpers. | Unit, UI and integration servers use port 0. The smoke test starts the control server on port 0 but starts the twins on their default 4401/4402 ports, so it violates C17's "Every test that starts a server uses port 0". A busy default port makes the smoke test fail before it reaches its checks. |
 | C18, quality gates | met | Gate output below; CI matrix `.github/workflows/ci.yml`. | All gates pass. The audit gate is now part of `check:package`. |
-| C19, documentation | met | `README.md:38`; `docs/*.md`; `test/unit/generated-docs.test.ts`; `test/unit/documentation-dashes.test.ts`; `test/unit/compliance-d52-d62.test.ts`. | The README not-affiliated line names only Paystack and Flutterwave. D53 warns about fake customer data and webhook secrets; D52 labels fees illustrative; the library table is present. |
+| C19, documentation | met | `README.md:38`; `docs/*.md`; `test/unit/generated-docs.test.ts`; `test/unit/documentation-dashes.test.ts`; `test/unit/compliance-d52-d62.test.ts`. | The README not-affiliated line names only Paystack and Flutterwave. D53 warns about fake customer data and webhook secrets; D52 labels fees illustrative; the library table is present. `docs/stripe-and-ibeji.md` is already present but explicitly marked as a planned 0.2.0 page (recorded as extra scope below). |
 | C20, branding and legal | met | `research/paystack.md:1`; `research/flutterwave.md:1`; `research/stripe.md:1`; `ui/src/styles.css`; `test/unit/ui-tokens.test.ts`; `test/unit/framework-html.test.ts`. | Trademark lines exist, no service branding or colours are used, checkout pages say they are Ibeji and no real money moves, and no real-story source is used. |
 | C21, decisions log | met | `SPEC.md` C21 D1-D62; `src/control/app.ts`; `src/twins/framework/types.ts:353`; `src/twins/framework/http-security.ts:55-58`. | D52 to D62 are approved and implemented: fee labels, customer-data docs, checkout same-origin, API approvals, dependency approvals, Phase 10 deferral, UI parity, twin-list scripts, test wording, fix texts and library limits. |
 | Part E, coding-agent rules | met | `AGENTS.md`; lint/typecheck; test scan. | No `any`, `@ts-ignore`, non-null assertions, empty catches or skipped tests were found. |
@@ -355,13 +356,13 @@ The permitted/expected exceptions are:
 - `examples/school-fees-app/`: the example app, its server, providers and README are intentionally provider-specific.
 - `scenarios/*.json`: every scenario has `"twins": ["paystack", "flutterwave"]`. This is scenario data required by C6, not a registry substitute.
 - `package.json:17-19`, `55-58`, `83`: package keywords, example-app scripts, and the Flutterwave compatibility devDependency. `CITATION.cff:5,16-18`, `.changeset/version-0-1-0.md:5`, and `pnpm-lock.yaml` also name services. These are metadata, docs or the T15 library, not twin logic.
-- `research/`, `fixtures/`, `docs/`, `README.md`, `SPEC.md`, `BUILD-LOG.md`, `SECURITY-REVIEW.md`, `AGENTS.md`, `TWIN-DESIGN.md`, `UI-PLAN.md`: service-specific facts and documentation.
+- `research/`, `fixtures/`, `docs/`, `README.md`, `SPEC.md`, `BUILD-LOG.md`, `SECURITY-REVIEW.md`, `SPEC-COMPLIANCE.md`, `AGENTS.md`, `TWIN-DESIGN.md`, `UI-PLAN.md`: service-specific facts and documentation.
 - `test/`: service-specific tests, fixtures and contract/conformance checks.
 
 The development scripts contain the following service names:
 
-- `scripts/smoke.mjs` reads `addresses.twins` from the running session, maps each credential role to the example app's environment, and lists banned payment libraries. It no longer passes fixed `--twin-port` values or switches on a service id.
-- `scripts/screenshots.mjs` reads `addresses.twins` from the running session and waits for each `twin-card-<id>`.
+- `scripts/smoke.mjs` reads `addresses.twins` from the running session, maps each credential role to the example app's environment, and lists banned payment libraries. It no longer passes fixed `--twin-port` values or switches on a service id, but it starts twins on their default ports (see C17 test rules).
+- `scripts/screenshots.mjs` reads `addresses.twins` from the running session and waits for each `twin-card-<id>`. It also starts twins on their default ports (see the P3 list).
 - `scripts/check-package.mjs` names paystack, flutterwave and stripe in its expected keywords and banned-library list.
 - `scripts/generate-docs.mjs` names the Paystack and Flutterwave data files it copies.
 
@@ -379,13 +380,13 @@ D52 now labels the fee fields illustrative and `docs/limits.md` says they must n
 
 ## 4. Gate output
 
-The gates were run in C18 order after the security group and after the spec-compliance group. The final group is shown here.
+Run in C18 order on 8 November 2026.
 
 ```text
 $ pnpm install --frozen-lockfile
 Lockfile is up to date, resolution step is skipped
 Already up to date
-Done in 321ms using pnpm v10.34.9
+Done in 359ms using pnpm v10.34.9
 ```
 
 ```text
@@ -395,7 +396,7 @@ tsc --noEmit && tsc -p ui/tsconfig.json --noEmit
 
 ```text
 $ pnpm lint
-Checked 344 files in 269ms. No fixes applied.
+Checked 344 files in 275ms. No fixes applied.
 ```
 
 ```text
@@ -403,7 +404,7 @@ $ pnpm build
 ESM dist/cli.js 600.90 KB
 dist/ui/index.html                   0.61 kB
 dist/ui/assets/index-BQTdrcKW.js   317.65 kB
-✓ built in 59ms
+✓ built in 77ms
 ```
 
 ```text
@@ -427,7 +428,7 @@ Lines       : 96.20% ( 5355/5566 )
 ```text
 $ pnpm test:ui
 Running 97 tests using 1 worker
-97 passed (1.1m)
+97 passed (1.2m)
 
 $ pnpm test:ui
 Running 97 tests using 1 worker
@@ -459,6 +460,40 @@ PASS safe app ignores duplicate webhooks
 PASS status and MCP stdout
 PASS stop, session cleanup and temporary folder removal
 PASS smoke test
+
+$ pnpm test:smoke
+PASS build and pack
+PASS fresh temporary folder with a space and a non-English letter
+PASS npm init and install the packed file
+PASS installed tree has no native code or payment libraries
+PASS npx ibeji --help
+Started twins: paystack, flutterwave
+PASS start Ibeji on free ports
+PASS dashboard and its sign-in refusal
+PASS payment through paystack
+PASS payment through flutterwave
+PASS payments through every registered twin
+PASS safe app ignores duplicate webhooks
+PASS status and MCP stdout
+PASS stop, session cleanup and temporary folder removal
+PASS smoke test
+
+$ pnpm test:smoke
+PASS build and pack
+PASS fresh temporary folder with a space and a non-English letter
+PASS npm init and install the packed file
+PASS installed tree has no native code or payment libraries
+PASS npx ibeji --help
+Started twins: paystack, flutterwave
+PASS start Ibeji on free ports
+PASS dashboard and its sign-in refusal
+PASS payment through paystack
+PASS payment through flutterwave
+PASS payments through every registered twin
+PASS safe app ignores duplicate webhooks
+PASS status and MCP stdout
+PASS stop, session cleanup and temporary folder removal
+PASS smoke test
 ```
 
 ```text
@@ -471,79 +506,40 @@ $ pnpm audit
 
 The seven development advisories are accepted by D49. `check:package` fails on any production advisory.
 
-### Focused fail-before and pass-after runs
+## 5. Priority-ordered problem list
 
-```text
-D52 before: expected 105 to be 285
-D52 after:  Test Files 1 passed (1); Tests 22 passed (22)
+### First: key/token leak, real-server harm, or a twin making a false service claim
 
-D55 before: expected 200 to be 400
-D55 after:  Test Files 1 passed (1); Tests 18 passed (18)
+**No P1 problem was found.** The D43-D51 security findings are fixed and covered by regression tests:
 
-D59 before: Test Files 1 failed (1); Tests 2 failed (2)
-D59 after:  Test Files 1 passed (1); Tests 2 passed (2)
+- live keys are removed on arrival and absent from every tested output surface;
+- the dashboard and UI cookie are under `/_ibeji/`;
+- `ibeji doctor` stays local and uses the session policy;
+- session-file permissions are repaired or refused;
+- broadcast, NAT64 and 6to4 addresses are refused;
+- the recorder refuses live keys and Stripe in 0.1.0;
+- screenshots mask credentials.
 
-D61 before: Test Files 1 failed (1); Tests 3 failed (3)
-D61 after:  Test Files 2 passed (2); Tests 9 passed (9)
+The remaining data risks are accepted by D53: customer data is kept as sent, and a user-supplied webhook URL can contain a secret. `docs/safety.md` and `docs/connect-your-app.md` warn about both. No real payment-service key or Ibeji session token was found in the repository.
 
-T4 UI parity: 1 passed
-T2 signature properties: 2 passed (1,000 cases per twin)
-```
+### Second: things that break the spec
 
-T2 and T4 were missing proofs rather than product defects, so their new tests pass on the first run. D52, D55, D59 and D61 failed before their fixes, as shown above.
+1. **P2: C17 T2's "any changed byte fails" is not true for Flutterwave.** `src/twins/flutterwave/webhooks.ts:46-60` verifies the shared `verif-hash` and then only checks that the body is canonical JSON. A changed canonical body with the correct header still verifies, because Flutterwave v3 documents a shared secret, not an HMAC over the body. The property test at `test/unit/webhook-signature-property.test.ts:28-43` proves the real v3 behaviour, including wrong-secret and non-canonical-body rejection, but it cannot prove the literal C17 sentence. This needs a C21 clarification or an explicitly documented exception; inventing a body signature would be wrong.
+2. **P2: the smoke test does not put every server on port 0.** `scripts/smoke.mjs:225` passes only `--port 0`; it starts the twins on their default 4401/4402 ports. C17 says every test that starts a server uses port 0. The step at `:867` is labelled "free ports" but only the control port is free. A developer with Ibeji already running on a default twin port makes the smoke gate fail before it reaches its checks. The three smoke runs passed only because those ports were free.
+3. **P3: C4c is not met by design.** The Stripe twin and its actions are version 0.2.0 under D42. This is not a 0.1.0 defect, but the C4c rows and the Stripe parts of T3 and T15 remain incomplete.
 
-## 5. Status of the review's problems
+### Third: everything else
 
-Every security finding is fixed. Every spec-compliance finding is either fixed by C21 D52 to D62 or explicitly deferred by an approved decision. No open key, token or real-server issue remains.
+1. **P3: the 0.2.0 Stripe comparison page is already in 0.1.0.** `docs/stripe-and-ibeji.md` is present although C19 says it is written in 0.2.0. It is clearly labelled as a planned page and does not claim the twin exists, so this is extra documentation, not a false claim.
+2. **P3: the screenshot script uses default twin ports.** `scripts/screenshots.mjs` starts `ibeji start --port 0` without `--twin-port`, so the documentation image step has the same port-collision risk as the smoke test. It is not a test, so C17's port rule does not apply, but it is fragile.
+3. **P3: `data-credential-value` is a test-only DOM hook.** `ui/src/components/HomePage.tsx:318` adds an attribute used by the screenshot tests. It is not a user-facing feature in SPEC.md and changes no API.
+4. **P3: the story-approval question in Part F is still open.** No `real-story` source is used, so nothing in the product depends on it, but the question remains for Joseph.
+5. **P3: release identity is deliberately deferred.** `package.json` is still 0.0.0 and private, `CHANGELOG.md` is the starter, and `scripts/publish-release.mjs` does not exist. D57 makes these Phase 10 work; they are not 0.1.0 compliance defects.
 
-### Security findings
-
-| # | Original problem | Current status | Evidence |
-|---|---|---|---|
-| 1 | Live keys in request fields leaked in full. | Fixed (D43) | `test/integration/live-key-removal.test.ts:51`; `test/unit/live-key-scanner.test.ts`; `src/twins/stripe/live-keys.ts`. |
-| 2 | Dashboard and UI cookie were not under `/_ibeji/`. | Fixed (D44) | `test/ui/dashboard-cookie.spec.ts`; `test/integration/control-security.test.ts:178`. |
-| 3 | `doctor` made an unpinned GET with the config policy. | Fixed (D45) | `test/integration/doctor-policy-session.test.ts:35`, `:69`; `test/unit/webhooks-dispatcher.test.ts:1118`. |
-| 4 | A permissive session file was used without repair. | Fixed (D46) | `test/unit/control-session-file.test.ts:212`; `test/integration/doctor-policy-session.test.ts:156`, `:192`. |
-| 5 | Directed broadcast, NAT64 and 6to4 addresses were allowed. | Fixed (D47) | `test/unit/webhooks-address.test.ts:124` and the embedded-IPv4 cases. |
-| 6 | The recorder accepted a shared `sk_test_` key under the wrong service. | Fixed (D48) | `test/unit/recorder-keys.test.ts:133`, `:175`, `:219`, `:255`. |
-| 7 | `check:package` did not gate production advisories. | Fixed (D49) | `scripts/check-package.mjs`; `pnpm check:package` prints `PASS: pnpm audit --prod found no advisories.` |
-| 8 | Screenshots showed fake credentials. | Fixed (D50) | `test/unit/screenshot-script.test.ts`; `test/ui/screenshot-masking.spec.ts`; OCR finds five masks and no key. |
-| 9 | The safety page made a promise with no output-surface test. | Fixed (D51) | `test/unit/live-key-safety-docs.test.ts`; `test/integration/live-key-removal.test.ts`. |
-
-### SPEC compliance findings
-
-| # | Original problem | Current status | Evidence |
-|---|---|---|---|
-| 1 | Flutterwave transfer `fee` was invented. | Fixed (D52) | `docs/limits.md` now labels all fee fields illustrative and the failed-transfer message a placeholder. |
-| 2 | Flutterwave failed-payment `app_fee` did not match its fixture. | Fixed (D52) | The twin returns the recorded 285 and failed card; `test/integration/flutterwave.test.ts` D52 test. |
-| 3 | Real customer data and webhook URL secrets can be retained. | Accepted and documented (D53) | `docs/safety.md:37-39`; `docs/connect-your-app.md:7`; `test/unit/compliance-d52-d62.test.ts`. |
-| 4 | Checkout pages used `same-origin` instead of `no-referrer`. | Fixed by approval (D54) | C8 now documents the checkout exception; existing header tests pass. |
-| 5 | Five C12 default fix texts named missing commands or the wrong token source. | Fixed (D61) | `src/core/errors.ts`; `test/unit/compliance-d61.test.ts` checks every named command exists. |
-| 6 | README not-affiliated line named Stripe. | Fixed (D61) | `README.md:38`; `test/unit/compliance-d61.test.ts`. |
-| 7 | `@modelcontextprotocol/client` and `esbuild` had no C21 entry. | Fixed (D56) | C21 D56; C1 row is met. |
-| 8 | C16 release files were missing. | Fixed by deferral (D57) | C21 D57 makes them Phase 10 work; C16 now lists the scripts that exist. |
-| 9 | T4 parity omitted the UI. | Fixed (D58) | `test/ui/failures-scenarios.spec.ts` T4 parity test covers UI, CLI, MCP and control API. |
-| 10 | T2 had no signature property test. | Fixed (D60) | `test/unit/webhook-signature-property.test.ts` runs 1,000 cases per twin. Form encoding moves to Stripe 0.2.0. |
-| 11 | T3 did not cover documentation-only actions. | Fixed by accepted limitation (D60) | `docs/limits.md` lists every action; skipped fixtures are not used. |
-| 12 | T15 did not use the library for hosted payment creation. | Fixed by C17 wording and D60 | `docs/limits.md` official-library table; the test uses plain HTTP only where the library has no method. |
-| 13 | The package is not release-identified. | Deferred (D57) | Version, `private` removal, CHANGELOG and `publish-release.mjs` are Phase 10 work. |
-| 14 | Development scripts repeated the twin list. | Fixed (D59) | Smoke and screenshots read `addresses.twins` from the running session; `test/unit/twin-list-scripts.test.ts`. |
-| 15 | C4c Stripe scope is not built. | Deferred (D42) | Not a 0.1.0 defect; the C4c rows remain not met for 0.2.0. |
-| 16 | `POST /auth/launch`, `connectionGuide`, `port` and the rotate button were unapproved; `launchCode` alias existed. | Fixed (D55) | C8 approves the API details; `test/integration/control-security.test.ts` rejects the alias. |
-| 17 | Extra scripts were outside C16 and dead placeholder code remained. | Fixed (D61) | C16 lists the scripts; `src/core/placeholder.ts` and `ControlClient.placeholder()` are deleted; `test/unit/compliance-d61.test.ts`. |
-| 18 | Coverage branch counts varied by one. | Closed | D21 records that both runs pass the floor; the two group-2 runs both report 90.36%. |
-| 19 | The official-library question was open. | Closed (D62) | `docs/limits.md` official-library table; C17 T15 wording. |
-| 20 | A webhook URL can carry a user secret. | Accepted and documented (D53) | `docs/safety.md:39`; `docs/connect-your-app.md:7`. |
-
-### Residual risks
-
-- **C4c Stripe** is not built in 0.1.0. This is the approved 0.2.0 deferral (D42), not a 0.1.0 regression.
-- **Customer data and webhook URL secrets** are kept as sent and shown by design. D53 tells people to use fake customer data and never put a secret in a webhook URL.
-- **Local same-user malware** can read the session file. D44 records this as the local threat model.
-- **Development advisories** remain accepted under D49; production is clean.
+The two earlier P3 concerns are closed: coverage counts matched in both runs (90.36% branches), and the official-library question is answered by D62 and `docs/limits.md`.
 
 ## Final verdict
 
-For version 0.1.0, the security findings are fixed, the spec-compliance findings are fixed or explicitly deferred by C21 D52 to D62, and the full C18 gate suite passes. The only unmet rows are the C4c Stripe actions, which are approved for version 0.2.0. No live key or session token was found in an output surface. No test was skipped or weakened. The placeholder test and the two `ControlClient.placeholder()` assertions were removed with the dead module and method they covered, as D61 requires; no other test changed.
+For version 0.1.0, the security findings are fixed and the key/token handling is clean. The compliance table is not fully green: C4c is deferred to 0.2.0, C17 T2 is partly met because Flutterwave's documented shared `verif-hash` cannot satisfy the literal "any changed byte fails" sentence, and the smoke test violates the port-0 test rule by starting twins on their default ports. Those two test issues need a C21 clarification or a test change before the 0.1.0 release can be called fully compliant. The rest of the 0.1.0 scope is met.
 
-The first review changed no product code. This update records the fixes in commits `5106016` and `5b72a9c`, plus this review-update commit.
+No product code was changed in this review. No test was skipped, weakened or deleted.
