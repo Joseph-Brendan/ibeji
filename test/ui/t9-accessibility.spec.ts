@@ -203,10 +203,10 @@ test.describe("T9 keyboard", () => {
 
   test("T9 Home copy button works with the keyboard", async ({ dashboard }) => {
     await tabTo(dashboard, "Copy app address for Paystack");
-    await dashboard.keyboard.press("Space");
-    await expect(dashboard.getByRole("button", { name: /app address for Paystack/u })).toHaveText(
-      "Copied",
-    );
+    const copy = dashboard.getByRole("button", { name: /app address for Paystack/u });
+    await expect(copy).toBeFocused();
+    await copy.press("Space");
+    await expect(copy).toHaveText("Copied");
   });
 
   test("T9 Connect your app works with the keyboard", async ({ dashboard }) => {
@@ -215,10 +215,10 @@ test.describe("T9 keyboard", () => {
     await dashboard.keyboard.press("Enter");
     await expect(dashboard.getByRole("heading", { name: "Connect Paystack" })).toBeVisible();
     await tabTo(dashboard, "base URL for Paystack");
-    await dashboard.keyboard.press("Space");
-    await expect(dashboard.getByRole("button", { name: /base URL for Paystack/u })).toHaveText(
-      "Copied",
-    );
+    const copy = dashboard.getByRole("button", { name: /base URL for Paystack/u });
+    await expect(copy).toBeFocused();
+    await copy.press("Space");
+    await expect(copy).toHaveText("Copied");
   });
 
   test("T9 Live activity works with the keyboard", async ({ dashboard }) => {

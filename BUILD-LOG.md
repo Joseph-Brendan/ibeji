@@ -2577,3 +2577,7 @@ The tarball is `ibeji@0.1.0`, 24 files, 339.8 kB. The full list is in the releas
 ### Later
 
 - Log in as `devanddesignhq` and run `pnpm release:publish` when ready to publish 0.1.0.
+
+### CI follow-up
+
+The first 0.1.0 CI run exposed a macOS Node 22 focus flake in the keyboard copy test: it reported `Copy` instead of `Copied`. The test now asserts that the button is focused and presses that focused button directly. It still tests keyboard activation, uses no retry, and passed in two full UI runs.
