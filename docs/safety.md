@@ -38,6 +38,10 @@ Use fake customer data only. Events, records, exports and the dashboard keep the
 
 Never put a secret in a webhook URL. Ibeji shows the URL on the dashboard and includes it in an export, so anyone who sees the dashboard or the export can read that secret.
 
+## Flutterwave webhook check
+
+Flutterwave v3 sends a `verif-hash` header. It is a shared secret, so it proves who sent the webhook, not that its body is unchanged. Flutterwave v3 does not sign the body; a changed body with the correct `verif-hash` can still pass. Validate the fields your app relies on instead of treating the hash as a body signature.
+
 ## Dashboard sign-in
 
 Ibeji does not use accounts or passwords:

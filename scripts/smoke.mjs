@@ -4,13 +4,33 @@ import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const IS_WINDOWS = process.platform === "win32";
 const NPM = IS_WINDOWS ? "npm.cmd" : "npm";
 const NPX = IS_WINDOWS ? "npx.cmd" : "npx";
 const PNPM = IS_WINDOWS ? "pnpm.cmd" : "pnpm";
+// SPEC C3 default twin ports. The twin ids themselves come from ibeji keys --json.
+export const DEFAULT_TWIN_PORTS = new Set([4401, 4402, 4403]);
+
+export function assertNoDefaultTwinPorts(ports, defaults = DEFAULT_TWIN_PORTS) {
+  if (typeof ports !== "object" || ports === null) {
+    throw new Error("the session has no twin ports");
+  }
+  const entries = Object.entries(ports);
+  if (entries.length === 0) {
+    throw new Error("the session has no running twins");
+  }
+  for (const [twinId, port] of entries) {
+    if (typeof port !== "number") {
+      throw new Error(`the session has no bound port for ${twinId}`);
+    }
+    if (defaults.has(port)) {
+      throw new Error(`the ${twinId} twin is bound to its default port ${port}`);
+    }
+  }
+}
 const STEP_NAMES = [
   "build and pack",
   "fresh temporary folder with a space and a non-English letter",
@@ -221,8 +241,36 @@ async function readSession() {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
+async function registeredTwinIds() {
+  const result = await runCommand(NPX, ["--no-install", "ibeji", "keys", "--json"], {
+    cwd: state.smokeDir,
+    env: cliEnv(),
+    timeout: 30_000,
+  });
+  const parsed = JSON.parse(result.stdout);
+  const twinIds = Array.isArray(parsed.twins)
+    ? parsed.twins
+        .map((twin) => (typeof twin === "object" && twin !== null ? twin.id : undefined))
+        .filter((id) => typeof id === "string")
+    : [];
+  if (twinIds.length === 0) {
+    throw new Error("ibeji keys --json returned no registered twins");
+  }
+  return twinIds;
+}
+
 async function startIbeji() {
-  const args = ["--no-install", "ibeji", "start", "--no-open", "--json", "--port", "0"];
+  const twinIds = await registeredTwinIds();
+  const args = [
+    "--no-install",
+    "ibeji",
+    "start",
+    "--no-open",
+    "--json",
+    "--port",
+    "0",
+    ...twinIds.flatMap((twinId) => ["--twin-port", `${twinId}=0`]),
+  ];
   const processInfo = spawnOutput(NPX, args, {
     cwd: state.smokeDir,
     env: cliEnv(),
@@ -870,6 +918,7 @@ async function main() {
       if (twinIds.length === 0) {
         throw new Error("Ibeji started no twins");
       }
+      assertNoDefaultTwinPorts(state.session.ports.twins);
       console.log(`Started twins: ${twinIds.join(", ")}`);
     });
 
@@ -1002,4 +1051,6 @@ async function main() {
   console.log("PASS smoke test");
 }
 
-await main();
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}

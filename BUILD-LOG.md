@@ -2461,3 +2461,58 @@ Run in C18 order after each group:
 - Version 0.1.0 packaging, `CHANGELOG.md` and `scripts/publish-release.mjs` remain Phase 10 work (C21 D57).
 - The Stripe twin and its C4c tests remain version 0.2.0 (C21 D42).
 - Customer data and webhook URL secrets are documented risks under D53.
+
+## Phase 9: apply D63 and D64
+
+Applied the two SPEC v1.7 decisions without editing C21.
+
+### D63: Flutterwave signature test and safety note
+
+- Reworded the Flutterwave property in `test/unit/webhook-signature-property.test.ts` to `T2 D63 ...`: the correct `verif-hash` passes for any JSON webhook body, a different JSON body with the same hash still passes, and any change to the hash value fails. The Paystack body-signature property is unchanged.
+- Added the Flutterwave webhook-check paragraph to `docs/safety.md`: `verif-hash` proves who sent the webhook, not that its body is unchanged, because Flutterwave v3 does not sign the body.
+- Added a small docs test for that paragraph.
+
+### D64: port 0 for every smoke and screenshot twin
+
+- `scripts/smoke.mjs` now runs `ibeji keys --json` before starting, reads the registered twin ids from it, and passes `--twin-port <id>=0` for every id. It reads the bound ports from the start JSON and fails if any twin is bound to 4401, 4402 or 4403, the C3 default ports.
+- `scripts/screenshots.mjs` does the same: reads ids from `ibeji keys --json`, passes `--twin-port <id>=0`, and reads the bound twin addresses from the running session for the Home cards.
+- Added `scripts/smoke.d.mts` so the exported smoke check is type-checked, and updated `test/unit/twin-list-scripts.test.ts` to assert the keys/port-0 flow and to test the default-port guard.
+- The smoke script now only runs `main()` when executed directly, so its exported guard can be imported by tests.
+
+### Proof with default ports already in use
+
+Started a real session with default ports in a temporary home:
+
+```text
+started pid=31181
+{"control":4400,"twins":{"paystack":4401,"flutterwave":4402}}
+```
+
+Then ran the smoke test. It passed on random twin ports while 4400, 4401 and 4402 were held by the other session:
+
+```text
+PASS start Ibeji on free ports
+PASS dashboard and its sign-in refusal
+PASS payments through every registered twin
+PASS safe app ignores duplicate webhooks
+PASS status and MCP stdout
+PASS stop, session cleanup and temporary folder removal
+PASS smoke test
+```
+
+The default session was stopped afterwards; no listener remained on 4400, 4401 or 4402.
+
+### Gates
+
+- `pnpm install --frozen-lockfile`: passed.
+- `pnpm typecheck`: passed.
+- `pnpm lint`: passed with zero warnings.
+- `pnpm build`: passed.
+- `pnpm test`: 791 tests in 84 files passed twice. Coverage: 96.17% statements, 90.36% branches, 97.11% functions, 96.20% lines.
+- `pnpm test:ui`: 97 tests passed twice.
+- `pnpm check:package`: passed, ran `pnpm audit --prod`, matched C16.
+- `pnpm test:smoke`: passed three times, including once with default ports already in use.
+
+### Later
+
+- No follow-up is needed for D63 or D64.

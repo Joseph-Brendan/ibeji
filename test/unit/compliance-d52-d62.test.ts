@@ -24,6 +24,15 @@ describe("D53 customer-data documentation", () => {
   });
 });
 
+describe("D63 Flutterwave webhook documentation", () => {
+  it("D63 says verif-hash proves the sender, not an unchanged body", async () => {
+    const safety = await readFile("docs/safety.md", "utf8");
+    expect(safety).toContain("Flutterwave webhook check");
+    expect(safety).toContain("proves who sent the webhook, not that its body is unchanged");
+    expect(safety).toContain("Flutterwave v3 does not sign the body");
+  });
+});
+
 describe("D62 official library documentation", () => {
   it("D62 names which official libraries can point at a twin", async () => {
     const limits = await readFile("docs/limits.md", "utf8");

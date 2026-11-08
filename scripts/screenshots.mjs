@@ -59,12 +59,70 @@ function waitForExit(child, timeoutMs) {
   });
 }
 
-async function startSession(home) {
-  const child = spawn(process.execPath, [CLI, "start", "--no-open", "--json", "--port", "0"], {
-    cwd: ROOT,
-    env: { ...process.env, HOME: home, USERPROFILE: home, NO_COLOR: "1" },
-    stdio: ["ignore", "pipe", "pipe"],
+function registeredTwinIds(home) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [CLI, "keys", "--json"], {
+      cwd: ROOT,
+      env: { ...process.env, HOME: home, USERPROFILE: home, NO_COLOR: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("ibeji keys --json did not finish within 20 seconds."));
+    }, 20_000);
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        reject(new Error(`ibeji keys --json exited with code ${String(code)}: ${stderr}`));
+        return;
+      }
+      const parsed = JSON.parse(stdout);
+      const twinIds = Array.isArray(parsed.twins)
+        ? parsed.twins
+            .map((twin) => (typeof twin === "object" && twin !== null ? twin.id : undefined))
+            .filter((id) => typeof id === "string")
+        : [];
+      if (twinIds.length === 0) {
+        reject(new Error("ibeji keys --json returned no registered twins."));
+        return;
+      }
+      resolve(twinIds);
+    });
   });
+}
+
+async function startSession(home, twinIds) {
+  const child = spawn(
+    process.execPath,
+    [
+      CLI,
+      "start",
+      "--no-open",
+      "--json",
+      "--port",
+      "0",
+      ...twinIds.flatMap((twinId) => ["--twin-port", `${twinId}=0`]),
+    ],
+    {
+      cwd: ROOT,
+      env: { ...process.env, HOME: home, USERPROFILE: home, NO_COLOR: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
 
   const started = await new Promise((resolve, reject) => {
     const reader = createInterface({ input: child.stdout });
@@ -138,7 +196,8 @@ async function main() {
   let running;
   let browser;
   try {
-    running = await startSession(home);
+    const twinIds = await registeredTwinIds(home);
+    running = await startSession(home, twinIds);
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({
       viewport: { width: 1280, height: 900 },
@@ -146,8 +205,8 @@ async function main() {
     });
     await page.goto(running.started.launchLink);
     await page.getByRole("heading", { name: "Home", level: 1 }).waitFor();
-    const twinIds = Object.keys(running.started.addresses.twins);
-    for (const twinId of twinIds) {
+    const boundTwinIds = Object.keys(running.session.ports.twins);
+    for (const twinId of boundTwinIds) {
       await page.getByTestId(`twin-card-${twinId}`).waitFor();
     }
     await page.locator("[data-credential-value]").first().waitFor();
