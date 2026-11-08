@@ -2536,7 +2536,7 @@ Prepared the 0.1.0 package without publishing.
 - It publishes the tarball from `~/ibeji-release`, so the project folder and its settings are not the working directory, and leaves stdio inherited so npm can ask for an OTP or browser approval.
 - It polls `npm view ibeji@<version>` every 10 seconds for up to 5 minutes, prints `Confirmed: ibeji@<version> is on npm.` and exits 0.
 - It never prints a token or npm auth output.
-- Added `test/unit/publish-release.test.ts` and `test/helpers/fake-npm.mjs`. Tests cover wrong whoami, already-published version, wrong tarball version, a non-yes answer, a fresh answer after pre-typed input, a five-minute timeout, and the success path including publish working directory.
+- Added `test/unit/publish-release.test.ts` and `test/helpers/fake-npm.mjs`. Tests cover wrong whoami, already-published version, wrong tarball version, a non-yes answer, a fresh answer after pre-typed input, a five-minute timeout, and the success path including publish working directory. The working-directory check normalizes Windows short paths with `realpath`.
 
 ### Release check
 

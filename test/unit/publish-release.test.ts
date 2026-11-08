@@ -167,7 +167,7 @@ describe("release script checks", () => {
       expect(harness.stderr()).toContain("within 5 minutes");
       const state = await stateOf(harness.statePath);
       expect(state.published).toBe(true);
-      expect(state.publishCwd).toBe(await realpath(harness.releaseDir));
+      expect(await realpath(String(state.publishCwd))).toBe(await realpath(harness.releaseDir));
     } finally {
       await harness.cleanup();
     }
@@ -188,7 +188,7 @@ describe("release script checks", () => {
       expect(harness.stdout()).toContain("Confirmed: ibeji@");
       const state = await stateOf(harness.statePath);
       expect(state.published).toBe(true);
-      expect(state.publishCwd).toBe(await realpath(harness.releaseDir));
+      expect(await realpath(String(state.publishCwd))).toBe(await realpath(harness.releaseDir));
     } finally {
       await harness.cleanup();
     }
