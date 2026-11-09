@@ -2639,3 +2639,42 @@ Fixed P1, P2, P3, P4, P6, P7 and P8 from the Step 10.2 release check. P5 and P9 
 ### Later
 
 - Step 10.1 must be run again after these changes to rebuild the 0.1.0 release file. The old `~/ibeji-release/ibeji-0.1.0.tgz` predates these fixes.
+
+## Release ibeji@0.1.0 tarball
+
+- Commit: `9080934e5be0871be63a3a7ce12da6c1f5d5b0e9`
+- Tarball: `/Users/josephbrendan/ibeji-release/ibeji-0.1.0.tgz`
+- SHA-256: `f29ed735b65596a04c9492b66f3ad20aad05f2d98f409adb7a83daa05c17f04f`
+
+## Step 10.1 re-run: 0.1.0 release rebuilt after Step 10.2
+
+Date: 9 November 2026.
+
+Re-ran the 0.1.0 release preparation after the Step 10.2 fixes, as the Step 10.2 "Later" note required. The package was already `ibeji@0.1.0` with `private` removed and the 0.1.0 changelog entry from commit `cabb2c5`. `pnpm changeset version` now prints "No unreleased changesets found." and exits 1 because the changeset was already consumed; the version stays 0.1.0.
+
+### Release script and tarball
+
+- `pnpm release:publish` rebuilt and packed `~/ibeji-release/ibeji-0.1.0.tgz` from commit `9080934e5be0871be63a3a7ce12da6c1f5d5b0e9`; SHA-256 `f29ed735b65596a04c9492b66f3ad20aad05f2d98f409adb7a83daa05c17f04f`.
+- A "no" typed before the prompt was discarded; a fresh "no" at the prompt printed `Received: "no"` and stopped. Nothing was published: `npm view ibeji@0.1.0` still returns 404.
+- `test/unit/publish-release.test.ts`, using `test/helpers/fake-npm.mjs`, covers a wrong `npm whoami`, an already-published version, a wrong tarball version, a non-yes answer, input typed before the prompt, the five-minute timeout, and the success path including the publish folder.
+
+### Gates
+
+All C18 gates passed in order:
+
+- `pnpm install --frozen-lockfile`
+- `pnpm typecheck`
+- `pnpm lint` (zero warnings)
+- `pnpm build`
+- `pnpm test`: 807 tests in 88 files passed twice; coverage 96.15% statements, 90.43% branches, 97.11% functions, 96.19% lines
+- `pnpm test:ui`: 98 tests passed twice
+- `pnpm check:package`: publint, C16 file list, and `pnpm audit --prod` (zero advisories)
+- `pnpm test:smoke`: passed three times
+
+### Dry run
+
+`npm publish --dry-run ./ibeji-0.1.0.tgz` from `~/ibeji-release` reported 24 files and 340.3 kB. The tarball contains only `CHANGELOG.md`, `LICENSE`, `README.md`, `THIRD-PARTY-NOTICES`, `dist/`, `package.json` and `scenarios/`. No recorder, tests, `STORIES.md`, `research/`, recorded fixtures, `TWIN-DESIGN.md`, `BUILD-LOG.md`, `UI-PLAN.md`, review files, `.env` files or keys.
+
+### Later
+
+- To publish, run `pnpm release:publish` from a clean tree, review the list, and type `yes`; npm handles the one-time password/browser approval. No tag was pushed.
