@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { mkdir, readFile, rm, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { appendFile, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -94,6 +95,40 @@ export async function checkNpmUser(options) {
     return false;
   }
   return true;
+}
+
+async function checkGitState(options) {
+  const status = await options.git(["status", "--porcelain"]);
+  if (status.code !== 0) {
+    throw new Error(`git status failed with exit code ${status.code}.`);
+  }
+  if (status.stdout.trim() !== "") {
+    return { clean: false, commit: "" };
+  }
+  const head = await options.git(["rev-parse", "HEAD"]);
+  if (head.code !== 0) {
+    throw new Error(`git rev-parse HEAD failed with exit code ${head.code}.`);
+  }
+  const commit = head.stdout.trim();
+  if (!/^[0-9a-f]{40}$/u.test(commit)) {
+    throw new Error("git rev-parse HEAD did not return a full commit id.");
+  }
+  return { clean: true, commit };
+}
+
+async function sha256OfFile(filename) {
+  return createHash("sha256")
+    .update(await readFile(filename))
+    .digest("hex");
+}
+
+function releaseRecord(packageInfo, commit, tarball, checksum) {
+  return `## Release ${packageInfo.name}@${packageInfo.version} tarball
+
+- Commit: \`${commit}\`
+- Tarball: \`${tarball}\`
+- SHA-256: \`${checksum}\`
+`;
 }
 
 async function defaultBuild({ cwd, pnpmCommand, env, shell }) {
@@ -225,11 +260,21 @@ export async function runRelease(options = {}) {
   const npmCommand = options.npmCommand ?? platformCommand("npm");
   const npmArgsPrefix = options.npmArgsPrefix ?? [];
   const pnpmCommand = options.pnpmCommand ?? platformCommand("pnpm");
+  const gitCommand = options.gitCommand ?? "git";
   const shell = options.shell ?? process.platform === "win32";
   const publishStdio = options.publishStdio ?? "inherit";
   const intervalMs = options.waitIntervalMs ?? DEFAULT_INTERVAL_MS;
   const timeoutMs = options.waitTimeoutMs ?? DEFAULT_TIMEOUT_MS;
   const wait = options.sleep ?? delay;
+  const buildLogPath = options.buildLogPath ?? join(cwd, "BUILD-LOG.md");
+  const git =
+    options.git ??
+    ((args) =>
+      run(gitCommand, args, {
+        cwd,
+        env,
+        shell,
+      }));
 
   let packageInfo;
   try {
@@ -269,8 +314,25 @@ export async function runRelease(options = {}) {
 
   const build = options.build ?? (() => defaultBuild({ cwd, pnpmCommand, env, shell }));
   const pack = options.pack ?? (() => defaultPack({ cwd, releaseDir, pnpmCommand, env, shell }));
+  let releaseCommit;
   try {
+    const beforeBuild = await checkGitState({ git });
+    if (!beforeBuild.clean) {
+      stderr.write(
+        "The working tree has uncommitted changes. Commit them before you release so the release file can be traced to a commit.\n",
+      );
+      return 1;
+    }
+    releaseCommit = beforeBuild.commit;
     await build();
+    const beforePack = await checkGitState({ git });
+    if (!beforePack.clean) {
+      stderr.write(
+        "The working tree changed while building. Commit the change before you release so the release file can be traced to a commit.\n",
+      );
+      return 1;
+    }
+    releaseCommit = beforePack.commit;
   } catch (error) {
     stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     return 1;
@@ -298,6 +360,39 @@ export async function runRelease(options = {}) {
     stderr.write(`The packed tarball is missing: ${packed.filename}\n`);
     return 1;
   }
+
+  let checksum;
+  try {
+    checksum = await sha256OfFile(packed.filename);
+  } catch (error) {
+    stderr.write(
+      `The packed tarball checksum could not be read: ${
+        error instanceof Error ? error.message : String(error)
+      }\n`,
+    );
+    return 1;
+  }
+
+  stdout.write(`Release file:
+  package: ${packageInfo.name}@${packageInfo.version}
+  commit: ${releaseCommit}
+  tarball: ${packed.filename}
+  sha256: ${checksum}
+`);
+  try {
+    await appendFile(
+      buildLogPath,
+      `\n${releaseRecord(packageInfo, releaseCommit, packed.filename, checksum)}`,
+    );
+  } catch (error) {
+    stderr.write(
+      `The release record could not be appended to ${buildLogPath}: ${
+        error instanceof Error ? error.message : String(error)
+      }\n`,
+    );
+    return 1;
+  }
+  stdout.write(`Recorded the commit and checksum in ${buildLogPath}.\n`);
 
   stdout.write(questionText(packageInfo.name, packageInfo.version, packed.filename, packed.files));
   const answer =

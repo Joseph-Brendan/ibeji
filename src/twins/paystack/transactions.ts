@@ -556,8 +556,7 @@ function eventSummaryForInitialize(request: TwinRequest): string {
     const currency = readCurrency(body.currency);
     const amount = paystackMoney.parseServiceAmount(amountText, currency);
     const formatted = paystackMoney.formatDisplay(amount, currency);
-    const readable = formatted.endsWith(".00") ? formatted.slice(0, -3) : formatted;
-    return `Your app started a Paystack payment of ${readable} for ${email}`;
+    return `Your app started a Paystack payment of ${formatted} for ${email}`;
   } catch {
     return "Your app tried to start a Paystack payment.";
   }

@@ -332,7 +332,7 @@ describe("Paystack refunds", () => {
         .after(0)
         .find((event) => event.type === "request" && event.details.actionId === "refund.create");
       expect(requestEvent?.summary).toBe(
-        "Your app refunded ₦1,500 through Paystack for transaction refund-summary",
+        "Your app refunded ₦1,500.00 through Paystack for transaction refund-summary",
       );
     });
   });

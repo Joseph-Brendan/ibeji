@@ -9,7 +9,7 @@ describe("C4 Flutterwave money units", () => {
     expect(flutterwaveMoney.parseServiceAmount("7500", "NGN")).toBe(750_000);
     expect(paystackTwin.money.parseServiceAmount("7500", "NGN")).toBe(7_500);
     expect(flutterwaveMoney.formatServiceAmount(750_000, "NGN")).toBe("7500");
-    expect(flutterwaveMoney.formatDisplay(750_000, "NGN")).toBe("NGN 7,500.00");
+    expect(flutterwaveMoney.formatDisplay(750_000, "NGN")).toBe("₦7,500.00");
     expect(flutterwaveMoney.fractionDigits("NGN")).toBe(2);
     expect(flutterwaveMoney.zeroDecimal).toEqual([]);
   });
@@ -21,7 +21,7 @@ describe("C4 Flutterwave money units", () => {
     expect(flutterwaveMoney.formatServiceAmount(1_234, "USD")).toBe("12.34");
     expect(flutterwaveMoney.formatServiceAmount(1_230, "USD")).toBe("12.3");
     expect(flutterwaveMoney.formatServiceAmount(1_200, "USD")).toBe("12");
-    expect(flutterwaveMoney.formatDisplay(1_234, "USD")).toBe("USD 12.34");
+    expect(flutterwaveMoney.formatDisplay(1_234, "USD")).toBe("$12.34");
   });
 
   it("C4 rejects too many decimal places and malformed amounts", () => {

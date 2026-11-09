@@ -1,23 +1,11 @@
 import { IbejiError } from "../../core/errors.js";
+import { formatMoney } from "../../shared/money.js";
 import type { MoneyRules } from "../framework/types.js";
 
 export const PAYSTACK_ZERO_DECIMAL = ["XOF"] as const;
 
-const SYMBOLS: Readonly<Record<string, string>> = {
-  NGN: "₦",
-  USD: "$",
-  GHS: "₵",
-  ZAR: "R",
-  KES: "Ksh.",
-  XOF: "XOF ",
-};
-
 function fractionDigits(currency: string): number {
   return currency === "XOF" ? 0 : 2;
-}
-
-function groupDigits(value: string): string {
-  return value.replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
 }
 
 function parseInteger(text: string): number {
@@ -50,21 +38,14 @@ export const paystackMoney: MoneyRules = {
   fractionDigits,
   parseServiceAmount: (text) => parseInteger(text),
   formatServiceAmount: (amount) => String(amount),
-  formatDisplay: (amount, currency) => {
-    const symbol = SYMBOLS[currency] ?? `${currency} `;
-    if (currency === "XOF") {
-      const whole = BigInt(amount) / 100n;
-      return `${symbol}${groupDigits(whole.toString())}`;
-    }
-
-    const value = BigInt(amount);
-    const negative = value < 0n;
-    const absolute = negative ? -value : value;
-    const whole = absolute / 100n;
-    const fraction = absolute % 100n;
-    const sign = negative ? "-" : "";
-    return `${sign}${symbol}${groupDigits(whole.toString())}.${fraction.toString().padStart(2, "0")}`;
-  },
+  // Paystack requires XOF amounts multiplied by 100 even though XOF is shown
+  // with no decimal places (research/paystack.md section 12).
+  formatDisplay: (amount, currency) =>
+    formatMoney(
+      currency === "XOF" ? BigInt(amount) / 100n : amount,
+      currency,
+      fractionDigits(currency),
+    ),
   assertValid: (amount) => {
     if (!Number.isSafeInteger(amount) || amount <= 0) {
       throw new IbejiError("BAD_REQUEST", {

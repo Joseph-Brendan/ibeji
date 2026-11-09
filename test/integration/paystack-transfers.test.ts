@@ -238,7 +238,7 @@ describe("Paystack transfers", () => {
       const requestEvent = harness.events
         .after(0)
         .find((event) => event.type === "request" && event.details.actionId === "transfer.create");
-      expect(requestEvent?.summary).toBe("Your app sent ₦20,000 to Emeka Obi through Paystack");
+      expect(requestEvent?.summary).toBe("Your app sent ₦20,000.00 to Emeka Obi through Paystack");
     });
   });
 

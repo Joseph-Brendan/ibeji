@@ -2581,3 +2581,61 @@ The tarball is `ibeji@0.1.0`, 24 files, 339.8 kB. The full list is in the releas
 ### CI follow-up
 
 The first 0.1.0 CI run exposed a macOS Node 22 focus flake in the keyboard copy test: it reported `Copy` instead of `Copied`. The test now asserts that the button is focused and presses that focused button directly. It still tests keyboard activation, uses no retry, and passed in two full UI runs.
+
+## Step 10.2 release-check fixes
+
+Fixed P1, P2, P3, P4, P6, P7 and P8 from the Step 10.2 release check. P5 and P9 were deliberately not fixed: SPEC v1.8 C21 D65 now lists `package.json` as published, and the optional forged-webhook README step remains optional.
+
+### P1: fake-data and webhook warnings
+
+- `ui/src/components/ConnectPage.tsx` now shows both D53 warnings near the top of Connect your app, for every twin:
+  - "Use fake customer data only. Ibeji keeps everything your app sends, and shows it in the dashboard and exports."
+  - "Never put a secret in a webhook URL. The URL is shown on screen and saved in exports."
+- Added `D53 Connect shows both safety warnings for every registered twin` to `test/ui/t8-home-connect.spec.ts`. It reads the registered twins from the registry, so a future twin is covered automatically.
+
+### P2: package keywords and check:package
+
+- Removed `"stripe"` from `package.json` keywords.
+- `scripts/check-package.mjs` now reads the registered twin ids from the built CLI (`ibeji keys --json` in a temporary home) and fails when a keyword names a service with a `research/<service>.md` file but no registered twin.
+- Added `scripts/check-package.d.mts` and `test/unit/check-package-keywords.test.ts`.
+
+### P3 and P8: example README and smoke test
+
+- Rewrote `examples/school-fees-app/README.md` for a person who installed Ibeji from npm. The user-facing steps use `npx ibeji start`, `npx ibeji keys`, `npx ibeji status`, the addresses Ibeji prints, `node server.js` with environment variables for both providers, and both webhook setup routes: the dashboard Webhooks page and `npx ibeji webhook-url <twin> <url>`.
+- Repository-only commands (`pnpm build`, `node dist/cli.js`, `pnpm example:*`) are in a separate section at the end.
+- `scripts/smoke.mjs` now copies the example, checks that the user-facing README uses the installed-package commands, reads keys with `ibeji keys <twin> --json`, reads the address with `ibeji status --json`, runs `node server.js` from the copied example folder, and sets the webhook URL with `ibeji webhook-url`.
+
+### P4: release traceability
+
+- `scripts/publish-release.mjs` now refuses a dirty working tree before building and again before packing, records the release commit from `git rev-parse HEAD`, computes the tarball SHA-256, prints both, and appends both to `BUILD-LOG.md`.
+- Added `test/unit/publish-release.test.ts` coverage for a dirty tree and the printed and appended commit/checksum.
+
+### P6: one amount format
+
+- Added `src/shared/money.ts`, the one formatter for every person-facing amount. It uses the currency symbol where Ibeji knows one, then grouped digits with the currency's minor-unit digits, for example `₦12,500.00`.
+- Both twins' `formatDisplay` now delegates to it, with each twin's own fraction digits. Paystack's documented XOF exception converts its API amount before display.
+- `ui/src/money.ts` delegates to the same formatter, so the Data page, checkout pages, event summaries and CLI event output use the same text.
+- Added `test/integration/money-display.test.ts`: the same NGN payment appears as `₦12,500.00` in both twins' summaries and checkout pages.
+
+### P7: plain-language guide terms
+
+- Both connection guides explain "API call" at first use.
+- The Paystack guide explains "HMAC SHA512" at first use. The Flutterwave guide states that v3 uses `verif-hash` instead, explains HMAC SHA512 in one line, and does not claim Flutterwave signs the body.
+- `docs/connect-your-app.md` matches the guide wording.
+- Added `test/unit/connection-guide-jargon.test.ts`.
+
+### Gates
+
+- `pnpm install --frozen-lockfile`: passed.
+- `pnpm typecheck`: passed.
+- `pnpm lint`: passed with zero warnings.
+- `pnpm build`: passed.
+- `pnpm test`: 807 tests in 88 files passed twice.
+- Coverage: 96.15% statements, 90.43% branches, 97.11% functions, 96.19% lines. The 100% core and framework thresholds passed.
+- `pnpm test:ui`: 98 tests passed twice.
+- `pnpm check:package`: passed, ran `pnpm audit --prod`, matched C16, and checked service keywords against the registry.
+- `pnpm test:smoke`: passed three times, including the README command check and `node server.js` from the copied example.
+
+### Later
+
+- Step 10.1 must be run again after these changes to rebuild the 0.1.0 release file. The old `~/ibeji-release/ibeji-0.1.0.tgz` predates these fixes.

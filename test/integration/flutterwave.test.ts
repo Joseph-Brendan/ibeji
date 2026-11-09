@@ -120,7 +120,7 @@ describe("Flutterwave hosted payments and checkout", () => {
       const html = await page.text();
       expect(html).toContain("Ibeji test checkout: Flutterwave twin");
       expect(html).toContain("No real money moves");
-      expect(html).toContain("NGN 7,500.00");
+      expect(html).toContain("₦7,500.00");
       expect(html).toContain("customer.one@example.com");
       expect(html).toContain("checkout-page");
       expect(html).toContain("Pay successfully");
@@ -303,7 +303,7 @@ describe("Flutterwave hosted payments and checkout", () => {
         .after(0)
         .find((event) => event.type === "request" && event.details.actionId === "payment.create");
       expect(requestEvent?.summary).toBe(
-        "Your app started a Flutterwave payment of NGN 7,500.00 for customer.one@example.com",
+        "Your app started a Flutterwave payment of ₦7,500.00 for customer.one@example.com",
       );
     });
   });

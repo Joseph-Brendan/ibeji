@@ -144,19 +144,17 @@ describe("T5 Flutterwave webhook verification", () => {
     const charge = chargeDraft("successful");
     const chargeRaw = adapter.build(charge, {});
     expect(adapter.summarize(charge, chargeRaw)).toBe(
-      "Flutterwave payment successful for NGN 7,500.00",
+      "Flutterwave payment successful for ₦7,500.00",
     );
 
     const refund = refundDraft("processing");
     const refundRaw = adapter.build(refund, {});
-    expect(adapter.summarize(refund, refundRaw)).toBe(
-      "Flutterwave refund processing for NGN 100.00",
-    );
+    expect(adapter.summarize(refund, refundRaw)).toBe("Flutterwave refund processing for ₦100.00");
 
     const transfer = transferDraft("SUCCESSFUL");
     const transferRaw = adapter.build(transfer, {});
     expect(adapter.summarize(transfer, transferRaw)).toBe(
-      "Flutterwave transfer successful for NGN 5,500.00 to Chinedu Okafor",
+      "Flutterwave transfer successful for ₦5,500.00 to Chinedu Okafor",
     );
 
     expect(flutterwaveRetrySchedule).toEqual({
@@ -174,7 +172,7 @@ describe("T5 Flutterwave webhook verification", () => {
       data: { status: "successful", amount: "7500", currency: "NGN" },
     };
     expect(adapter.summarize(stringAmount, adapter.build(stringAmount, {}))).toBe(
-      "Flutterwave payment successful for NGN 7,500.00",
+      "Flutterwave payment successful for ₦7,500.00",
     );
 
     const noName: TwinWebhookDraft = {
@@ -185,7 +183,7 @@ describe("T5 Flutterwave webhook verification", () => {
       data: { status: "SUCCESSFUL", amount: 5_500, currency: "NGN", fullname: "" },
     };
     expect(adapter.summarize(noName, adapter.build(noName, {}))).toBe(
-      "Flutterwave transfer successful for NGN 5,500.00",
+      "Flutterwave transfer successful for ₦5,500.00",
     );
 
     const noData: TwinWebhookDraft = {

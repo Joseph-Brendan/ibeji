@@ -70,6 +70,7 @@ const state = {
   session: undefined,
   startJson: undefined,
   apps: new Set(),
+  readmeEnvs: new Map(),
   cleaned: false,
 };
 const completed = new Set();
@@ -348,12 +349,51 @@ async function startIbeji() {
   return startJson;
 }
 
-function twinEnv(twinId) {
-  const address = state.startJson.addresses.twins[twinId];
-  const credentials = state.startJson.credentials[twinId];
-  if (address === undefined || credentials === undefined) {
-    throw new Error(`the session has no address or credentials for ${twinId}`);
+async function twinEnv(twinId) {
+  const cached = state.readmeEnvs.get(twinId);
+  if (cached !== undefined) {
+    return cached;
   }
+
+  // Follow the example README: read keys with `ibeji keys <twin>` and the
+  // base URL with `ibeji status`, rather than relying on the start output.
+  const keysResult = await runCommand(NPX, ["--no-install", "ibeji", "keys", twinId, "--json"], {
+    cwd: state.smokeDir,
+    env: cliEnv(),
+    timeout: 30_000,
+  });
+  const keys = JSON.parse(keysResult.stdout);
+  const keyTwin = Array.isArray(keys.twins)
+    ? keys.twins.find((twin) => typeof twin === "object" && twin !== null && twin.id === twinId)
+    : undefined;
+  if (keyTwin === undefined || !Array.isArray(keyTwin.credentials)) {
+    throw new Error(`ibeji keys ${twinId} --json returned no credentials`);
+  }
+  const credentials = Object.fromEntries(
+    keyTwin.credentials
+      .filter(
+        (credential) =>
+          typeof credential === "object" &&
+          credential !== null &&
+          typeof credential.role === "string" &&
+          typeof credential.value === "string",
+      )
+      .map((credential) => [credential.role, credential.value]),
+  );
+
+  const statusResult = await runCommand(NPX, ["--no-install", "ibeji", "status", "--json"], {
+    cwd: state.smokeDir,
+    env: cliEnv(),
+    timeout: 30_000,
+  });
+  const status = JSON.parse(statusResult.stdout);
+  const statusTwin = Array.isArray(status.twins)
+    ? status.twins.find((twin) => typeof twin === "object" && twin !== null && twin.id === twinId)
+    : undefined;
+  if (statusTwin === undefined || typeof statusTwin.address !== "string") {
+    throw new Error(`ibeji status --json has no address for ${twinId}`);
+  }
+
   const prefix = `IBEJI_${twinId.toUpperCase()}`;
   const roleSuffix = {
     public: "PUBLIC_KEY",
@@ -364,18 +404,20 @@ function twinEnv(twinId) {
     PAYMENT_PROVIDER: twinId,
     APP_MODE: "safe",
     PORT: "0",
-    [`${prefix}_BASE_URL`]: address.url,
+    [`${prefix}_BASE_URL`]: statusTwin.address,
   };
   for (const [role, value] of Object.entries(credentials)) {
     env[`${prefix}_${roleSuffix[role] ?? role.toUpperCase()}`] = value;
   }
+  state.readmeEnvs.set(twinId, env);
   return env;
 }
 
 async function startApp(twinId) {
-  const processInfo = spawnOutput(process.execPath, [join("school-fees-app", "server.js")], {
-    cwd: state.smokeDir,
-    env: { ...process.env, HOME: state.home, USERPROFILE: state.home, ...twinEnv(twinId) },
+  const appDir = join(state.smokeDir, "school-fees-app");
+  const processInfo = spawnOutput(process.execPath, ["server.js"], {
+    cwd: appDir,
+    env: { ...process.env, HOME: state.home, USERPROFILE: state.home, ...(await twinEnv(twinId)) },
     stdin: "ignore",
     shell: false,
   });
@@ -811,6 +853,35 @@ async function cleanup() {
   }
 }
 
+async function checkReadmeCommands() {
+  const readme = await readFile(join(state.smokeDir, "school-fees-app", "README.md"), "utf8");
+  const contributorHeading = "## For Ibeji contributors (repository only)";
+  const contributorIndex = readme.indexOf(contributorHeading);
+  if (contributorIndex === -1) {
+    throw new Error("the example README has no clearly labelled repository-only section");
+  }
+  const userPart = readme.slice(0, contributorIndex);
+  const required = [
+    "npx ibeji start",
+    "npx ibeji keys",
+    "npx ibeji status",
+    "node server.js",
+    "npx ibeji webhook-url",
+  ];
+  for (const command of required) {
+    if (!userPart.includes(command)) {
+      throw new Error(`the example README does not show the command: ${command}`);
+    }
+  }
+  for (const repositoryCommand of ["pnpm build", "node dist/cli.js", "pnpm example:"]) {
+    if (userPart.includes(repositoryCommand)) {
+      throw new Error(
+        `the example README tells installed users to run a repository-only command: ${repositoryCommand}`,
+      );
+    }
+  }
+}
+
 async function step(name, action) {
   activeStep = name;
   try {
@@ -925,6 +996,8 @@ async function main() {
     await step("dashboard and its sign-in refusal", dashboardStep);
 
     await step("payments through every registered twin", async () => {
+      await checkReadmeCommands();
+      console.log("README commands checked: start, keys, status, node server.js, webhook-url.");
       const twinIds = Object.keys(state.startJson.addresses.twins);
       for (const twinId of twinIds) {
         const app = await startApp(twinId);

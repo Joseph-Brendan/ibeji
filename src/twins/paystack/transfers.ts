@@ -290,11 +290,10 @@ function transferEventSummary(request: TwinRequest, state: TwinStateStore): stri
     return "Your app created a Paystack transfer.";
   }
   const formatted = paystackMoney.formatDisplay(amount, currency);
-  const readable = formatted.endsWith(".00") ? formatted.slice(0, -3) : formatted;
   if (recipient === undefined) {
-    return `Your app sent ${readable} through Paystack`;
+    return `Your app sent ${formatted} through Paystack`;
   }
-  return `Your app sent ${readable} to ${recipient.name} through Paystack`;
+  return `Your app sent ${formatted} to ${recipient.name} through Paystack`;
 }
 
 // Source: documentation, not recorded.

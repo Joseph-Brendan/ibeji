@@ -17,17 +17,15 @@ const RULES: CurrencyRules = {
 
 describe("T8 UI money formatting", () => {
   it("T8: formats zero and the smallest unit", () => {
-    expect(formatMinorUnits(0, "NGN", RULES).text).toBe("NGN 0.00");
-    expect(formatMinorUnits(0, "USD", RULES).text).toBe("USD 0.00");
-    expect(formatMinorUnits(1, "NGN", RULES).text).toBe("NGN 0.01");
-    expect(formatMinorUnits(1, "USD", RULES).text).toBe("USD 0.01");
+    expect(formatMinorUnits(0, "NGN", RULES).text).toBe("₦0.00");
+    expect(formatMinorUnits(0, "USD", RULES).text).toBe("$0.00");
+    expect(formatMinorUnits(1, "NGN", RULES).text).toBe("₦0.01");
+    expect(formatMinorUnits(1, "USD", RULES).text).toBe("$0.01");
   });
 
   it("T8: formats large amounts without floating-point loss", () => {
-    expect(formatMinorUnits(123_456_789_012_345, "NGN", RULES).text).toBe(
-      "NGN 1,234,567,890,123.45",
-    );
-    expect(formatMinorUnits(10n ** 18n, "USD", RULES).text).toBe("USD 10,000,000,000,000,000.00");
+    expect(formatMinorUnits(123_456_789_012_345, "NGN", RULES).text).toBe("₦1,234,567,890,123.45");
+    expect(formatMinorUnits(10n ** 18n, "USD", RULES).text).toBe("$10,000,000,000,000,000.00");
   });
 
   it("T8: formats currencies with no minor unit", () => {
@@ -38,8 +36,8 @@ describe("T8 UI money formatting", () => {
 
   it("T8: uses explicit and default fraction digits", () => {
     expect(formatMinorUnits(1_234, "KWD", RULES).text).toBe("KWD 1.234");
-    expect(formatMinorUnits(1_234, "GHS", RULES).text).toBe("GHS 12.34");
-    expect(formatMinorUnits(-1, "NGN", RULES).text).toBe("-NGN 0.01");
+    expect(formatMinorUnits(1_234, "GHS", RULES).text).toBe("₵12.34");
+    expect(formatMinorUnits(-1, "NGN", RULES).text).toBe("-₦0.01");
   });
 
   it("T8: shows a whole amount when the currency code is not known", () => {

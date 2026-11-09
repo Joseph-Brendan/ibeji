@@ -4,7 +4,7 @@ export const paystackConnectionGuide: ConnectionGuideInfo = {
   summary:
     "Point your app at the local Paystack twin. Use the Ibeji test keys below. No real money moves.",
   baseUrlNote:
-    "Copy the base URL and use it for every Paystack API call. The default port is 4401, but always use the address shown here. Do not use https://api.paystack.co.",
+    "An API call is one request your app sends to a service over the internet. Copy the base URL and use it for every Paystack API call. The default port is 4401, but always use the address shown here. Do not use https://api.paystack.co.",
   keysNote:
     "Copy the public key into browser test code. Copy the secret key into your server's test settings. These keys are fake and only work with Ibeji. Paystack signs webhooks with the secret key; there is no separate webhook secret.",
   steps: [
@@ -34,7 +34,7 @@ export const paystackConnectionGuide: ConnectionGuideInfo = {
     },
   ],
   webhookNote:
-    "Open the Webhooks page and set the Paystack webhook URL to your app's endpoint. Paystack signs each webhook with the x-paystack-signature header. The signature is a keyed hash called HMAC SHA512. It is made from the exact bytes of the request body and the secret key. Verify it before you trust the message.",
+    "Open the Webhooks page and set the Paystack webhook URL to your app's endpoint. Paystack signs each webhook with the x-paystack-signature header. The signature is a keyed hash called HMAC SHA512. HMAC SHA512 is a way of mixing a secret key with the message so your app can check who sent it and that it was not changed. It is made from the exact bytes of the request body and the secret key. Verify it before you trust the message.",
   agentInstruction: `You are connecting this app to the local Ibeji Paystack twin.
 
 Read these values from environment variables:

@@ -1,4 +1,5 @@
 import { IbejiError } from "../../core/errors.js";
+import { formatMoney } from "../../shared/money.js";
 import type { MoneyRules } from "../framework/types.js";
 
 /**
@@ -68,19 +69,8 @@ function formatMinor(amount: number, currency: string): string {
   return `${whole}.${fractionText}`;
 }
 
-function groupDigits(value: string): string {
-  return value.replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
-}
-
 function formatDisplay(amount: number, currency: string): string {
-  const digits = fractionDigits(currency);
-  const text = formatMinor(amount, currency);
-  if (digits === 0) {
-    return `${currency} ${groupDigits(text)}`;
-  }
-
-  const [whole = "0", fraction = ""] = text.split(".");
-  return `${currency} ${groupDigits(whole)}.${fraction.padEnd(digits, "0")}`;
+  return formatMoney(amount, currency, fractionDigits(currency));
 }
 
 /** Flutterwave has no documented v3 zero-decimal currency table. */

@@ -259,9 +259,9 @@ test("T8 Data formats money from the API currency rules and names reset scope", 
     await page.getByRole("link", { name: "Data" }).click();
     await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible();
 
-    await expect(page.getByText("NGN 0.00")).toBeVisible();
-    await expect(page.getByText("USD 0.01")).toBeVisible();
-    await expect(page.getByText("NGN 1,234,567,890,123.45")).toBeVisible();
+    await expect(page.getByText("₦0.00")).toBeVisible();
+    await expect(page.getByText("$0.01")).toBeVisible();
+    await expect(page.getByText("₦1,234,567,890,123.45")).toBeVisible();
     await expect(page.getByText("XOF 500")).toBeVisible();
     await expect(page.getByText("KWD 1.234")).toBeVisible();
 

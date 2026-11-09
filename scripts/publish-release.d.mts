@@ -13,6 +13,14 @@ export type PackedRelease = {
 
 export type ReleaseWriter = { readonly write: (text: string) => unknown };
 
+export type GitResult = {
+  readonly code: number;
+  readonly stdout: string;
+  readonly stderr: string;
+};
+
+export type GitRunner = (args: readonly string[]) => Promise<GitResult>;
+
 export type ReleaseOptions = {
   readonly cwd?: string;
   readonly releaseDir?: string;
@@ -23,10 +31,13 @@ export type ReleaseOptions = {
   readonly npmCommand?: string;
   readonly npmArgsPrefix?: readonly string[];
   readonly pnpmCommand?: string;
+  readonly gitCommand?: string;
+  readonly git?: GitRunner;
   readonly shell?: boolean;
   readonly publishStdio?: "inherit" | "pipe";
   readonly waitIntervalMs?: number;
   readonly waitTimeoutMs?: number;
+  readonly buildLogPath?: string;
   readonly build?: () => Promise<void>;
   readonly pack?: () => Promise<PackedRelease>;
   readonly ask?: () => Promise<string | undefined>;

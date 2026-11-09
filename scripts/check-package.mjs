@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { execFileSync, execSync } from "node:child_process";
-import { readdir, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const IS_WINDOWS = process.platform === "win32";
@@ -30,7 +31,6 @@ const EXPECTED_FILES = [
 const EXPECTED_KEYWORDS = [
   "paystack",
   "flutterwave",
-  "stripe",
   "testing",
   "webhooks",
   "ai-agents",
@@ -49,6 +49,40 @@ const REQUIRED_ROOT_FILES = [
 
 function sameList(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+/**
+ * A keyword that names a service with research but no registered twin would
+ * advertise a capability the release does not have (SPEC.md C21 D42).
+ */
+export function unregisteredServiceKeywords(keywords, registeredTwinIds, serviceNames) {
+  const registered = new Set(registeredTwinIds.map((id) => id.toLowerCase()));
+  const services = new Set(serviceNames.map((name) => name.toLowerCase()));
+  return keywords.filter((keyword) => {
+    const lower = keyword.toLowerCase();
+    return services.has(lower) && !registered.has(lower);
+  });
+}
+
+async function registeredTwinIds(cliPath) {
+  const home = await mkdtemp(join(tmpdir(), "ibeji-check-package-"));
+  try {
+    const output = execFileSync(process.execPath, [cliPath, "keys", "--json"], {
+      cwd: ROOT,
+      env: { ...process.env, HOME: home, USERPROFILE: home },
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+    const parsed = JSON.parse(output);
+    if (!Array.isArray(parsed.twins)) {
+      throw new Error("ibeji keys --json returned no twins list");
+    }
+    return parsed.twins
+      .map((twin) => (typeof twin === "object" && twin !== null ? twin.id : undefined))
+      .filter((id) => typeof id === "string");
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 }
 
 async function exists(path) {
@@ -115,12 +149,35 @@ async function main() {
   }
 
   const cli = join(ROOT, "dist", "cli.js");
-  if (!(await exists(cli))) {
+  const cliExists = await exists(cli);
+  if (!cliExists) {
     problems.push("dist/cli.js is missing; run pnpm build first");
   } else {
     const firstLine = (await readFile(cli, "utf8")).split("\n")[0];
     if (firstLine !== "#!/usr/bin/env node") {
       problems.push("dist/cli.js does not start with the Node shebang");
+    }
+  }
+
+  if (cliExists) {
+    try {
+      const serviceNames = (await readdir(join(ROOT, "research")))
+        .filter((file) => file.endsWith(".md"))
+        .map((file) => file.slice(0, -".md".length));
+      const documentedKeywords = Array.isArray(pkg.keywords) ? pkg.keywords : [];
+      const twinIds = await registeredTwinIds(cli);
+      const unregistered = unregisteredServiceKeywords(documentedKeywords, twinIds, serviceNames);
+      for (const keyword of unregistered) {
+        problems.push(
+          `package.json keyword "${keyword}" names a service with no registered twin. Registered twins: ${twinIds.join(", ")}.`,
+        );
+      }
+    } catch (error) {
+      problems.push(
+        `could not check package keywords against the twin registry: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
   const notices = join(ROOT, "THIRD-PARTY-NOTICES");
@@ -290,4 +347,6 @@ async function main() {
   console.log("PASS: package fields, publint and the packed file list match SPEC.md C16.");
 }
 
-await main();
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}

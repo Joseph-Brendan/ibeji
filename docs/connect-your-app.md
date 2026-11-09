@@ -35,7 +35,7 @@ These keys are fake and only work with Ibeji. Paystack signs webhooks with the s
 
 ### Step 1: Copy the base URL
 
-Copy the base URL and use it for every Paystack API call. The default is `http://127.0.0.1:4401`. Do not use `https://api.paystack.co`.
+An API call is one request your app sends to a service over the internet. Copy the base URL and use it for every Paystack API call. The default is `http://127.0.0.1:4401`. Do not use `https://api.paystack.co`.
 
 ### Step 2: Copy the test keys
 
@@ -59,7 +59,7 @@ Send the secret key in `Authorization: Bearer <secret key>`.
 
 ### Step 5: Set the webhook URL
 
-Open the **Webhooks** page and set the Paystack webhook URL to your app's endpoint. Paystack signs each webhook with the `x-paystack-signature` header. The signature is a keyed hash called HMAC SHA512. It is made from the exact bytes of the request body and the secret key. Verify it before you trust the message.
+Open the **Webhooks** page and set the Paystack webhook URL to your app's endpoint. Paystack signs each webhook with the `x-paystack-signature` header. The signature is a keyed hash called HMAC SHA512. HMAC SHA512 is a way of mixing a secret key with the message so your app can check who sent it and that it was not changed. It is made from the exact bytes of the request body and the secret key. Verify it before you trust the message.
 
 ### Step 6: Check my connection
 
@@ -112,7 +112,7 @@ These values are fake and only work with Ibeji. The encryption key is not issued
 
 ### Step 1: Copy the base URL
 
-Copy the base URL and use it for every Flutterwave v3 API call. The default is `http://127.0.0.1:4402`. Do not use `https://api.flutterwave.com/v3`.
+An API call is one request your app sends to a service over the internet. Copy the base URL and use it for every Flutterwave v3 API call. The default is `http://127.0.0.1:4402`. Do not use `https://api.flutterwave.com/v3`.
 
 ### Step 2: Copy the test keys
 
@@ -152,7 +152,7 @@ The library starts telemetry code. Telemetry means automatic usage messages. Tha
 
 ### Step 6: Set the webhook URL
 
-Open the **Webhooks** page and set the Flutterwave webhook URL to your app's endpoint. Flutterwave sends a `verif-hash` header. Compare it with the webhook hash before you trust the message. The v3 refund webhook has no documented event name. Treat the refund payload as its own message.
+Open the **Webhooks** page and set the Flutterwave webhook URL to your app's endpoint. Flutterwave sends a `verif-hash` header. Compare it with the webhook hash before you trust the message. Flutterwave v3 does not sign the body with HMAC SHA512; it uses this shared secret instead. HMAC SHA512 is a way of mixing a secret key with the message so your app can check who sent it and that it was not changed. The v3 refund webhook has no documented event name. Treat the refund payload as its own message.
 
 ### Step 7: Check my connection
 

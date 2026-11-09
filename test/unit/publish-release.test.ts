@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,11 +14,13 @@ import {
 } from "../../scripts/publish-release.mjs";
 
 const FAKE_NPM = join(process.cwd(), "test", "helpers", "fake-npm.mjs");
+const RELEASE_COMMIT = "0123456789abcdef0123456789abcdef01234567";
 
 type Harness = {
   readonly options: ReleaseOptions;
   readonly statePath: string;
   readonly releaseDir: string;
+  readonly buildLogPath: string;
   readonly stdout: () => string;
   readonly stderr: () => string;
   readonly cleanup: () => Promise<void>;
@@ -27,6 +30,7 @@ async function makeHarness(overrides: Partial<ReleaseOptions> = {}): Promise<Har
   const directory = await mkdtemp(join(tmpdir(), "ibeji-release-test-"));
   const statePath = join(directory, "npm-state.json");
   const releaseDir = join(directory, "release");
+  const buildLogPath = join(directory, "BUILD-LOG.md");
   await mkdir(releaseDir, { recursive: true });
   const packageInfo = JSON.parse(await readFile("package.json", "utf8")) as {
     readonly name: string;
@@ -66,6 +70,16 @@ async function makeHarness(overrides: Partial<ReleaseOptions> = {}): Promise<Har
     npmCommand: process.execPath,
     npmArgsPrefix: [FAKE_NPM],
     publishStdio: "pipe",
+    buildLogPath,
+    git: async (args) => {
+      if (args[0] === "status" && args[1] === "--porcelain") {
+        return { code: 0, stdout: "", stderr: "" };
+      }
+      if (args[0] === "rev-parse" && args[1] === "HEAD") {
+        return { code: 0, stdout: `${RELEASE_COMMIT}\n`, stderr: "" };
+      }
+      return { code: 1, stdout: "", stderr: `unexpected git command: ${args.join(" ")}` };
+    },
     build: async () => {},
     pack: async () => packed,
     ask: async () => "yes",
@@ -78,6 +92,7 @@ async function makeHarness(overrides: Partial<ReleaseOptions> = {}): Promise<Har
     options,
     statePath,
     releaseDir,
+    buildLogPath,
     stdout: () => stdout,
     stderr: () => stderr,
     cleanup: () => rm(directory, { recursive: true, force: true }),
@@ -126,6 +141,57 @@ describe("release script checks", () => {
       expect(await runRelease(harness.options)).toBe(1);
       expect(harness.stderr()).toContain("is already on npm");
       expect(harness.stdout()).not.toContain("About to publish");
+    } finally {
+      await harness.cleanup();
+    }
+  });
+
+  it("C21 D67 stops on a dirty working tree before building or packing", async () => {
+    let built = false;
+    let packed = false;
+    const harness = await makeHarness({
+      git: async (args) => {
+        if (args[0] === "status") {
+          return { code: 0, stdout: " M package.json\n", stderr: "" };
+        }
+        return { code: 0, stdout: `${RELEASE_COMMIT}\n`, stderr: "" };
+      },
+      build: async () => {
+        built = true;
+      },
+      pack: async () => {
+        packed = true;
+        throw new Error("pack must not run on a dirty tree");
+      },
+    });
+    try {
+      expect(await runRelease(harness.options)).toBe(1);
+      expect(harness.stderr()).toContain("uncommitted changes");
+      expect(built).toBe(false);
+      expect(packed).toBe(false);
+    } finally {
+      await harness.cleanup();
+    }
+  });
+
+  it("C21 D67 records the release commit and tarball checksum in output and BUILD-LOG", async () => {
+    const harness = await makeHarness({
+      env: {
+        ...process.env,
+        FAKE_NPM_VIEW_MODE: "absent-then-present",
+        FAKE_NPM_VERSION: (
+          JSON.parse(await readFile("package.json", "utf8")) as { readonly version: string }
+        ).version,
+      },
+    });
+    try {
+      expect(await runRelease(harness.options)).toBe(0);
+      const checksum = createHash("sha256").update("fake tarball").digest("hex");
+      expect(harness.stdout()).toContain(`commit: ${RELEASE_COMMIT}`);
+      expect(harness.stdout()).toContain(`sha256: ${checksum}`);
+      const log = await readFile(harness.buildLogPath, "utf8");
+      expect(log).toContain(`Commit: \`${RELEASE_COMMIT}\``);
+      expect(log).toContain(`SHA-256: \`${checksum}\``);
     } finally {
       await harness.cleanup();
     }

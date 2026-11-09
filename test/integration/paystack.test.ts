@@ -144,7 +144,7 @@ describe("Paystack event summaries and transaction behavior", () => {
             event.type === "request" && event.details.actionId === "transaction.initialize",
         );
       expect(requestEvent?.summary).toBe(
-        "Your app started a Paystack payment of ₦5,000 for ada@example.com",
+        "Your app started a Paystack payment of ₦5,000.00 for ada@example.com",
       );
     });
   });

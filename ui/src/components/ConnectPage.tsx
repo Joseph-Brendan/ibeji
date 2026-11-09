@@ -321,6 +321,18 @@ export function ConnectPage(props: ConnectPageProps): ReactNode {
         Point your app at one twin. Copy the base URL and test keys below.
       </p>
 
+      <section
+        className="safety-block connect-warnings"
+        data-testid="connect-warnings"
+        aria-label="Safety warnings"
+      >
+        <p>
+          Use fake customer data only. Ibeji keeps everything your app sends, and shows it in the
+          dashboard and exports.
+        </p>
+        <p>Never put a secret in a webhook URL. The URL is shown on screen and saved in exports.</p>
+      </section>
+
       {selectedTwin === undefined ? (
         <div className="twin-picker">
           <p className="empty-title">Choose a twin to connect.</p>

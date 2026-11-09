@@ -1,4 +1,5 @@
 import type { CurrencyRules } from "../../src/shared/control.js";
+import { formatMoney } from "../../src/shared/money.js";
 
 export type MoneyDisplay = {
   readonly text: string;
@@ -38,41 +39,17 @@ function currencyDigits(
   };
 }
 
-function groupDigits(value: string): string {
-  return value.replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
-}
-
-function toBigInt(amount: number | bigint): bigint | undefined {
-  if (typeof amount === "bigint") {
-    return amount;
-  }
-  return Number.isSafeInteger(amount) ? BigInt(amount) : undefined;
-}
-
 export function formatMinorUnits(
   amount: number | bigint,
   currency: string,
   rules: CurrencyRules,
 ): MoneyDisplay {
-  const code = currency.trim().toUpperCase();
-  const label = code === "" ? "Unknown currency" : code;
   const { digits, known } = currencyDigits(currency, rules);
-  const value = toBigInt(amount);
-  if (value === undefined) {
-    return { text: `${label} ${String(amount)}`, digits, known: false };
-  }
-
-  const negative = value < 0n;
-  const absolute = negative ? -value : value;
-  const unit = 10n ** BigInt(digits);
-  const whole = absolute / unit;
-  const fraction = absolute % unit;
-  const fractionText = digits === 0 ? "" : `.${fraction.toString().padStart(digits, "0")}`;
-  const sign = negative ? "-" : "";
+  const amountKnown = typeof amount === "bigint" || Number.isSafeInteger(amount);
   return {
-    text: `${sign}${label} ${groupDigits(whole.toString())}${fractionText}`,
+    text: formatMoney(amount, currency, digits),
     digits,
-    known,
+    known: known && amountKnown,
   };
 }
 

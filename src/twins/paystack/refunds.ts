@@ -323,8 +323,7 @@ function refundEventSummary(request: { readonly rawBody: Uint8Array }): string {
       ? body.currency.trim().toUpperCase()
       : "NGN";
   const formatted = paystackMoney.formatDisplay(amountValue, currency);
-  const readable = formatted.endsWith(".00") ? formatted.slice(0, -3) : formatted;
-  return `Your app refunded ${readable} through Paystack for transaction ${identifier}`;
+  return `Your app refunded ${formatted} through Paystack for transaction ${identifier}`;
 }
 
 function createRefund(context: ActionContext) {

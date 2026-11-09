@@ -7,81 +7,141 @@ A very small Node app for a school's fees desk. It uses Ibeji's Paystack and Flu
 
 No real money moves. The app uses only Node's built-in modules, so there is no web framework to install.
 
+This guide is written for a person who installed Ibeji from npm. Every Ibeji command below runs the installed copy through `npx`. Run the commands in a terminal from the folder that contains this `README.md`.
+
 **Version 0.1.0 note:** this app supports Paystack and Flutterwave. The Stripe twin is version 0.2.0 and is not part of this release. The app stops with a plain message if `PAYMENT_PROVIDER=stripe`.
 
 ## 1. Start Ibeji
 
-From the repository root:
+Open a terminal in this example folder and run:
 
 ```bash
-pnpm install
-pnpm build
-node dist/cli.js start
+npx ibeji start
 ```
 
-The dashboard opens in your browser. If you installed Ibeji globally, `ibeji start` does the same thing.
+Ibeji prints a block for Paystack and a block for Flutterwave. Each block shows:
 
-Leave this terminal running.
+- **Base URL**: the address your app must use
+- **Public key**
+- **Secret key**
+- **Webhook URL** (empty until you set one)
+
+It also prints a seed and a dashboard link, and opens the dashboard in your browser.
+
+Leave this terminal running. Open a second terminal for the next steps.
+
+Never use fixed ports such as 4401 or 4402. Ibeji may choose different ports on your computer. Always copy the base URL that Ibeji prints.
 
 ## 2. Copy the test details
 
-Open the **Connect your app** page in the dashboard, or run `node dist/cli.js keys paystack` or `node dist/cli.js keys flutterwave`. Copy the address and test keys into your terminal.
+In the second terminal, in this example folder, run:
+
+```bash
+npx ibeji keys
+```
+
+This prints the fake test keys for both twins. To print one twin only, run `npx ibeji keys paystack` or `npx ibeji keys flutterwave`.
+
+To print the addresses again, run:
+
+```bash
+npx ibeji status
+```
+
+The **Base URL** for each twin is also in the `npx ibeji start` output and on the dashboard's **Connect your app** page.
 
 ### Paystack
 
+Copy the values from the Ibeji output into these commands:
+
 ```bash
-export IBEJI_PAYSTACK_BASE_URL="http://127.0.0.1:4401"
-export IBEJI_PAYSTACK_PUBLIC_KEY="pk_test_..."
-export IBEJI_PAYSTACK_SECRET_KEY="sk_test_..."
+export IBEJI_PAYSTACK_BASE_URL="<Paystack Base URL printed by ibeji start or ibeji status>"
+export IBEJI_PAYSTACK_PUBLIC_KEY="<Paystack Public key printed by ibeji keys>"
+export IBEJI_PAYSTACK_SECRET_KEY="<Paystack Secret key printed by ibeji keys>"
 ```
 
 ### Flutterwave
 
 ```bash
-export IBEJI_FLUTTERWAVE_BASE_URL="http://127.0.0.1:4402"
-export IBEJI_FLUTTERWAVE_PUBLIC_KEY="FLWPUBK_TEST-..."
-export IBEJI_FLUTTERWAVE_SECRET_KEY="FLWSECK_TEST-..."
-export IBEJI_FLUTTERWAVE_WEBHOOK_HASH="ibeji_..."
+export IBEJI_FLUTTERWAVE_BASE_URL="<Flutterwave Base URL printed by ibeji start or ibeji status>"
+export IBEJI_FLUTTERWAVE_PUBLIC_KEY="<Flutterwave Public key printed by ibeji keys>"
+export IBEJI_FLUTTERWAVE_SECRET_KEY="<Flutterwave Secret key printed by ibeji keys>"
+export IBEJI_FLUTTERWAVE_WEBHOOK_HASH="<Flutterwave Webhook secret hash printed by ibeji keys>"
 ```
 
-These are Ibeji's fake local test values. Never put a live key in this app.
+These are Ibeji's fake local test values. Never put a real service key in this app.
+
+On Windows PowerShell, set the same values with `$env:NAME = "value"`, for example:
+
+```powershell
+$env:IBEJI_PAYSTACK_BASE_URL = "<Paystack Base URL>"
+$env:IBEJI_PAYSTACK_PUBLIC_KEY = "<Paystack Public key>"
+$env:IBEJI_PAYSTACK_SECRET_KEY = "<Paystack Secret key>"
+```
 
 ## 3. Start the app
 
-Choose one command:
+Use one of these commands. The app prints `School fees app listening on http://127.0.0.1:3000` and the webhook URL it expects.
+
+Paystack, naive mode:
 
 ```bash
-pnpm example:paystack:naive
-pnpm example:paystack:safe
-pnpm example:flutterwave:naive
-pnpm example:flutterwave:safe
+PAYMENT_PROVIDER=paystack APP_MODE=naive node server.js
 ```
 
-The app prints:
+Paystack, safe mode:
 
-```text
-School fees app listening on http://127.0.0.1:3000
+```bash
+PAYMENT_PROVIDER=paystack APP_MODE=safe node server.js
 ```
 
-Open that address. To use another port, set `PORT` before the command, for example `PORT=3100 pnpm example:paystack:naive`.
+Flutterwave, naive mode:
+
+```bash
+PAYMENT_PROVIDER=flutterwave APP_MODE=naive node server.js
+```
+
+Flutterwave, safe mode:
+
+```bash
+PAYMENT_PROVIDER=flutterwave APP_MODE=safe node server.js
+```
+
+Open the printed address in your browser. To use another port, set `PORT` before the command, for example `PORT=3100 PAYMENT_PROVIDER=paystack APP_MODE=naive node server.js`.
+
+On Windows PowerShell, set the variables first:
+
+```powershell
+$env:PAYMENT_PROVIDER = "paystack"
+$env:APP_MODE = "naive"
+node server.js
+```
 
 ## 4. Set the webhook URL in Ibeji
 
-In the dashboard, open **Webhooks** or **Connect your app**:
+The app prints the webhook URL for the provider you started, for example `http://127.0.0.1:3000/webhooks/paystack`. Use the port the app printed.
 
-- Paystack: set the webhook URL to `http://127.0.0.1:3000/webhooks/paystack`
-- Flutterwave: set the webhook URL to `http://127.0.0.1:3000/webhooks/flutterwave`
+Choose either way to save it in Ibeji.
 
-If you changed `PORT`, use that port in the URL.
+**Dashboard:** open the **Webhooks** page, or the **Connect your app** page, and paste the URL into the matching twin's webhook field.
+
+**CLI:** run one of these in a terminal:
+
+```bash
+npx ibeji webhook-url paystack http://127.0.0.1:3000/webhooks/paystack
+npx ibeji webhook-url flutterwave http://127.0.0.1:3000/webhooks/flutterwave
+```
+
+Use the port your app printed if it is not 3000.
 
 The app verifies each webhook the way the service does:
 
-- Paystack: `x-paystack-signature`, an HMAC SHA512 of the raw body using the secret key.
-- Flutterwave: `verif-hash`, compared with the webhook hash.
+- **Paystack:** `x-paystack-signature`, an HMAC SHA512 of the raw body using the secret key.
+- **Flutterwave:** `verif-hash`, compared with the webhook hash.
 
 ## 5. See Musa's first bug: paid too early
 
-1. Open `http://127.0.0.1:3000`.
+1. Open `http://127.0.0.1:3000` (or the address the app printed).
 2. Click **Pay fees** next to Amina Bello.
 3. Click **Start payment**.
 4. Choose **Pay successfully** on the Ibeji checkout page.
@@ -118,13 +178,13 @@ Switch the failure off before the next step.
 Stop the app with `Ctrl+C`, then start the safe command for the same provider:
 
 ```bash
-pnpm example:paystack:safe
+PAYMENT_PROVIDER=paystack APP_MODE=safe node server.js
 ```
 
 or:
 
 ```bash
-pnpm example:flutterwave:safe
+PAYMENT_PROVIDER=flutterwave APP_MODE=safe node server.js
 ```
 
 The webhook URL stays saved in Ibeji. Pay another student:
@@ -146,23 +206,16 @@ The webhook URL stays saved in Ibeji. Pay another student:
 
 | Provider | Mode | Command |
 |---|---|---|
-| Paystack | Naive | `pnpm example:paystack:naive` |
-| Paystack | Safe | `pnpm example:paystack:safe` |
-| Flutterwave | Naive | `pnpm example:flutterwave:naive` |
-| Flutterwave | Safe | `pnpm example:flutterwave:safe` |
+| Paystack | Naive | `PAYMENT_PROVIDER=paystack APP_MODE=naive node server.js` |
+| Paystack | Safe | `PAYMENT_PROVIDER=paystack APP_MODE=safe node server.js` |
+| Flutterwave | Naive | `PAYMENT_PROVIDER=flutterwave APP_MODE=naive node server.js` |
+| Flutterwave | Safe | `PAYMENT_PROVIDER=flutterwave APP_MODE=safe node server.js` |
 
-You can also run the app directly on macOS or Linux:
+Webhook URL commands:
 
 ```bash
-PAYMENT_PROVIDER=paystack APP_MODE=naive node examples/school-fees-app/server.js
-```
-
-On Windows PowerShell, set the variables first:
-
-```powershell
-$env:PAYMENT_PROVIDER = "paystack"
-$env:APP_MODE = "naive"
-node examples/school-fees-app/server.js
+npx ibeji webhook-url paystack http://127.0.0.1:3000/webhooks/paystack
+npx ibeji webhook-url flutterwave http://127.0.0.1:3000/webhooks/flutterwave
 ```
 
 ## How the two providers are called
@@ -174,6 +227,30 @@ node examples/school-fees-app/server.js
 
 - `server.js`: the pages, payment start, return page, webhook checks and student records.
 - `providers.js`: the Paystack and Flutterwave request and verification rules.
-- `run.js`: the small wrapper used by the four one-command scripts.
+- `run.js`: the small wrapper used by the four repository-only shortcut scripts.
 
 All student records are in memory. Restarting the app clears them.
+
+## For Ibeji contributors (repository only)
+
+You do not need this section if you installed Ibeji from npm.
+
+Inside the Ibeji repository, the same app can be started with the repository scripts after building:
+
+```bash
+pnpm install
+pnpm build
+pnpm example:paystack:naive
+pnpm example:paystack:safe
+pnpm example:flutterwave:naive
+pnpm example:flutterwave:safe
+```
+
+The repository's development commands are:
+
+```bash
+node dist/cli.js start
+node dist/cli.js keys
+```
+
+These commands use the source tree's `dist/` folder and are not part of the installed package.

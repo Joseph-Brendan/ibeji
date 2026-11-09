@@ -425,7 +425,7 @@ describe("Flutterwave transfers", () => {
         .after(0)
         .find((event) => event.type === "request" && event.details.actionId === "transfer.create");
       expect(requestEvent?.summary).toBe(
-        `Your app sent NGN 5,500.00 to ${accountNameFor("0000000001", "044")} through Flutterwave`,
+        `Your app sent ₦5,500.00 to ${accountNameFor("0000000001", "044")} through Flutterwave`,
       );
     });
   });
@@ -440,7 +440,7 @@ describe("Flutterwave transfers", () => {
       const unnamedEvent = harness.events
         .after(0)
         .find((event) => event.type === "request" && event.details.actionId === "transfer.create");
-      expect(unnamedEvent?.summary).toBe("Your app sent NGN 100.00 through Flutterwave");
+      expect(unnamedEvent?.summary).toBe("Your app sent ₦100.00 through Flutterwave");
 
       const invalid = await createTransfer(harness, {
         account_bank: "044",

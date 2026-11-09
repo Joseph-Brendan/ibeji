@@ -198,6 +198,24 @@ test.describe("T8 Connect your app", () => {
     await expectNoSeriousAxe(dashboard, "Connect guide");
   });
 
+  test("D53 Connect shows both safety warnings for every registered twin", async ({
+    dashboard,
+  }) => {
+    const fakeDataWarning =
+      "Use fake customer data only. Ibeji keeps everything your app sends, and shows it in the dashboard and exports.";
+    const webhookWarning =
+      "Never put a secret in a webhook URL. The URL is shown on screen and saved in exports.";
+    for (const twin of twins) {
+      await gotoPage(dashboard, "Connect your app");
+      await dashboard.getByRole("link", { name: /All twins/u }).click();
+      await dashboard.getByTestId(`guide-card-${twin.id}`).click();
+      const warnings = dashboard.getByTestId("connect-warnings");
+      await expect(warnings.getByText(fakeDataWarning)).toBeVisible();
+      await expect(warnings.getByText(webhookWarning)).toBeVisible();
+    }
+    await expectNoSeriousAxe(dashboard, "Connect safety warnings");
+  });
+
   test("T8 Connect copies the base URL, credentials and agent instruction", async ({
     dashboard,
     ibejiSession,

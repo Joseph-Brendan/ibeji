@@ -4,7 +4,7 @@ export const flutterwaveConnectionGuide: ConnectionGuideInfo = {
   summary:
     "Point your app at the local Flutterwave twin. Use the Ibeji test keys below. No real money moves.",
   baseUrlNote:
-    "Copy the base URL and use it for every Flutterwave v3 API call. The default port is 4402, but always use the address shown here. Do not use https://api.flutterwave.com/v3.",
+    "An API call is one request your app sends to a service over the internet. Copy the base URL and use it for every Flutterwave v3 API call. The default port is 4402, but always use the address shown here. Do not use https://api.flutterwave.com/v3.",
   keysNote:
     "Copy the public key into browser test code. Copy the secret key into your server's test settings. Copy the webhook hash into your webhook check. These values are fake and only work with Ibeji.",
   steps: [
@@ -45,7 +45,7 @@ const flw = new Flutterwave(
     },
   ],
   webhookNote:
-    "Open the Webhooks page and set the Flutterwave webhook URL to your app's endpoint. Flutterwave sends a verif-hash header. Compare it with the webhook hash before you trust the message. The v3 refund webhook has no documented event name. Treat the refund payload as its own message.",
+    "Open the Webhooks page and set the Flutterwave webhook URL to your app's endpoint. Flutterwave sends a verif-hash header. Compare it with the webhook hash before you trust the message. Flutterwave v3 does not sign the body with HMAC SHA512; it uses this shared secret instead. HMAC SHA512 is a way of mixing a secret key with the message so your app can check who sent it and that it was not changed. The v3 refund webhook has no documented event name. Treat the refund payload as its own message.",
   agentInstruction: `You are connecting this app to the local Ibeji Flutterwave twin.
 
 Read these values from environment variables:
