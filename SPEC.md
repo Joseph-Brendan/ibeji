@@ -1,10 +1,10 @@
-# Ibeji: Build Specification v1.7
+# Ibeji: Build Specification v1.8
 
 Owner: Joseph Brendan, Dev and Design HQ
 Build tool: Antigravity, on a personal Mac
 Status: ready to build
 Date: 27 October 2026
-Change from v1.6: T2 wording fixed for services that mark webhooks with a shared secret instead of signing the body, and the smoke test must start every twin on port 0 (C21 D63, D64). Change from v1.5: decisions from the Phase 9 spec compliance review (C21, D52 to D62): fee values are labelled illustrative, checkout pages keep `Referrer-Policy: same-origin`, three implemented API details are approved, and the T2, T4, T15 and twin-list rules are made precise. Change from v1.4: fixes from the Phase 9 security review (C21, D43 to D51): live keys are removed from every request field on arrival and from every output, the dashboard moves under /_ibeji/ so its cookie is not sent to other apps, `ibeji doctor` only contacts addresses on this computer, and the webhook address rules close two gaps. Change from v1.3: version 0.1.0 ships the Paystack and Flutterwave twins; the Stripe twin follows in version 0.2.0 (C21 D42). Stripe's scope (C4c) and design stay in this file for 0.2.0. Change from v1.2: decisions from the Phase 2 research and twin design are applied (C21, D31 to D41): the Flutterwave and Stripe API versions, the per-twin failure table, Stripe version-header handling, how money is stored, and idempotency. Change from v1.1: decisions from the Step 1.1 kickoff review are applied throughout and listed in C21 (D1 to D30). The biggest changes: how the dashboard signs in (C8), exact failure settings and the order failures apply in (C5), the webhook address rules (C7, C13), the control API route table (C8), and the split of the "no native code" rule into a runtime rule and a development rule (C1).
+Change from v1.7: release-check decisions D65 to D67: `package.json` is listed as published, money has one display format, and the release file must be traced to its commit. Change from v1.6: T2 wording fixed for services that mark webhooks with a shared secret instead of signing the body, and the smoke test must start every twin on port 0 (C21 D63, D64). Change from v1.5: decisions from the Phase 9 spec compliance review (C21, D52 to D62): fee values are labelled illustrative, checkout pages keep `Referrer-Policy: same-origin`, three implemented API details are approved, and the T2, T4, T15 and twin-list rules are made precise. Change from v1.4: fixes from the Phase 9 security review (C21, D43 to D51): live keys are removed from every request field on arrival and from every output, the dashboard moves under /_ibeji/ so its cookie is not sent to other apps, `ibeji doctor` only contacts addresses on this computer, and the webhook address rules close two gaps. Change from v1.3: version 0.1.0 ships the Paystack and Flutterwave twins; the Stripe twin follows in version 0.2.0 (C21 D42). Stripe's scope (C4c) and design stay in this file for 0.2.0. Change from v1.2: decisions from the Phase 2 research and twin design are applied (C21, D31 to D41): the Flutterwave and Stripe API versions, the per-twin failure table, Stripe version-header handling, how money is stored, and idempotency. Change from v1.1: decisions from the Step 1.1 kickoff review are applied throughout and listed in C21 (D1 to D30). The biggest changes: how the dashboard signs in (C8), exact failure settings and the order failures apply in (C5), the webhook address rules (C7, C13), the control API route table (C8), and the split of the "no native code" rule into a runtime rule and a development rule (C1).
 
 This file is the single source of truth for the project. The coding agent reads it before every task. If the code and this file disagree, the agent stops and asks.
 
@@ -676,7 +676,7 @@ ibeji/
 
 Not committed: `node_modules`, `dist`, `coverage`, test reports.
 
-**Published files:** `dist/` (the CLI, server code, built UI with fonts, twin data files), `scenarios/`, `README.md`, `LICENSE`, `THIRD-PARTY-NOTICES`, `CHANGELOG.md`. Nothing else. A test of the packed file checks this list (C18 `check:package`).
+**Published files:** `package.json` (npm always includes it), `dist/` (the CLI, server code, built UI with fonts, twin data files), `scenarios/`, `README.md`, `LICENSE`, `THIRD-PARTY-NOTICES`, `CHANGELOG.md`. Nothing else. A test of the packed file checks this list (C18 `check:package`).
 
 ### C17. Testing
 
@@ -846,6 +846,15 @@ Coverage counts differing by one branch between runs (third-list item 3) need no
 |---|---|---|---|
 | D63 | T2's signature property depends on the service's method. Body-signing services: any changed byte fails. Shared-secret services such as Flutterwave v3: any changed secret value fails; body changes are not detected, because the real service does not detect them either. `docs/safety.md` tells Flutterwave users that `verif-hash` proves who sent a webhook, not that its body is unchanged. | My D60 wording assumed every service signs the body. Flutterwave v3 does not, and making the twin stricter than Flutterwave would be a false service claim. | C17 |
 | D64 | The smoke test and the screenshot script start every twin on port 0. They read the registered twin ids from `ibeji keys --json`, which works before any session exists, and pass `--twin-port <id>=0` for each. | The smoke test used the default twin ports 4401 and 4402, so it would fail on a computer already running Ibeji, and it broke the C17 port-0 rule. | C17, C3 |
+
+**9 November 2026: decisions from the Step 10.2 release check.**
+
+| Id | Decision | Reason | Sections |
+|---|---|---|---|
+| D65 | `package.json` is listed in C16's published files. | npm always publishes it, so the list and the release file disagreed. | C16 |
+| D66 | Every amount Ibeji shows to a person (event summaries, Data page, checkout pages, CLI output) uses one format: the currency symbol where one exists, then the amount with all its minor-unit digits, for example `₦12,500.00`. Each twin's money rules supply the digits; one shared formatter writes the text. | The Paystack twin showed `₦12,500` while the Flutterwave twin showed `NGN 12,500.00` for the same payment, which makes a non-technical user wonder if the amounts differ. | C10, C4 |
+| D67 | The release script packs the release file only from a clean working tree, after the release commit, and records the commit id and the file's SHA-256 checksum in its output and in BUILD-LOG.md. The Step 10.2 check confirms them. | The tested file could not be traced to the commit it was packed from. | C18, Phase 10 |
+
 ---
 
 ## Part E. Rules for the coding agent
